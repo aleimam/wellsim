@@ -124,6 +124,8 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
   .tab { flex: 1; padding: 10px 0; border-radius: 6px; text-align: center; }
   main { padding: 8px; }
   .panel { gap: 10px; }
+  /* reserve mode's half-page split is a desktop layout — full width on phones */
+  .panel.mode-reserve { grid-template-columns: 1fr; }
 
   /* one-column input array, finger-sized boxes; 16px font prevents the
      iOS focus auto-zoom */

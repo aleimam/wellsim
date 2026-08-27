@@ -366,7 +366,6 @@ document.addEventListener('input', (e) => {
 
 /* ---- copyable side tables ---- */
 function renderTables(containerId, tables) {
-  mobileShowResults(); // any run that produced result tables lands the phone on them
   const el = document.getElementById(containerId);
   el.innerHTML = tables
     .map(
@@ -731,9 +730,16 @@ function setMobileView(v) {
   if (v === 'results') resizeVisibleCharts();
 }
 
-// Inputs is the start view on phones; a completed run jumps to Results
+// Inputs is the start view on phones; a completed run jumps to Results —
+// but only a run the USER started (the page's initial auto-solve must not
+// steal the start view). Any tap on an action button opens a jump window.
+let lastRunClickMs = 0;
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.closest && e.target.closest('.action')) lastRunClickMs = Date.now();
+}, true);
+
 function mobileShowResults() {
-  if (isPhone()) setMobileView('results');
+  if (isPhone() && Date.now() - lastRunClickMs < 30000) setMobileView('results');
 }
 
 // live headline result in the header (the PWF bar pattern)
@@ -1048,6 +1054,7 @@ async function oilForecastRun() {
     yaxis: { title: 'Rate stb/d · GOR scf/stb', rangemode: 'tozero' },
     yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
   }, { displaylogo: false, responsive: true });
+  mobileShowResults();
   renderTables('oil-table-fc', [
     {
       title: 'Tarner forecast', headers: ['date', 'q stb/d', 'Pres', 'Pwf', 'GOR', 'Np MMstb', 'Gp Bscf', 'So', 'Sg'],
@@ -1127,6 +1134,7 @@ async function oilReserveRun() {
         ? `<span class="method">STOIP — minimum connected (${methodName})</span><span class="val">${fmt(r.rlt.stoiipMMstb, 1)} MMstb</span>`
         : `<span class="method">STOIP (${methodName})</span><span class="val warn">no depletion signal</span>`;
     if (r.rlt.stoiipMMstb != null) setHeadline(`${fmt(r.rlt.stoiipMMstb, 1)} MMstb`, 'STOIP min connected');
+    mobileShowResults();
     // Pwf decline + slope line
     const tMax = Math.max(...r.rows.map((p) => p.dtDays));
     const pwf0 = r.rows[0].pwfPsi;
@@ -1155,6 +1163,7 @@ async function oilReserveRun() {
       ? `<span class="method">STOIIP — minimum connected (${methodName})</span><span class="val">${fmt(fit.nAvgMMstb, 1)} MMstb</span>`
       : `<span class="method">STOIIP (${methodName})</span><span class="val warn">no depletion signal</span>`;
   if (fit.nAvgMMstb != null) setHeadline(`${fmt(fit.nAvgMMstb, 1)} MMstb`, 'STOIIP min connected');
+  mobileShowResults();
 
   const mb = r.rows.filter((p) => p.npMMstb > 0);
   const eoMax = Math.max(0, ...mb.map((p) => p.eo));
@@ -1441,6 +1450,7 @@ async function espSensRun() {
     xaxis: { title: 'Oil rate, stb/d', rangemode: 'tozero' },
     yaxis: { title: 'Pwf, psi', rangemode: 'tozero' },
   }, { displaylogo: false, responsive: true });
+  mobileShowResults();
   renderTables('oil-table-espsens', [{
     title: 'ESP data at the solved node',
     headers: ['case', 'J', 'q stb/d', 'Pwf', 'Pint', 'Pdis', 'ΔP', 'head ft', 'Qg@pump', 'grad', 'free gas %', 'WHT °F', 'thrust'],
@@ -1703,6 +1713,7 @@ async function gasReserveRun() {
       ? `<span class="method">GIP — minimum connected (${methodName})</span><span class="val">${fmt(r.fit.giipBscf, 1)} Bscf</span>`
       : `<span class="method">GIP (${methodName})</span><span class="val warn">no depletion signal</span>`;
   if (r.fit.giipBscf != null) setHeadline(`${fmt(r.fit.giipBscf, 1)} Bscf`, 'GIP min connected');
+  mobileShowResults();
   if (r.fit.giipBscf != null) {
     setComputed('gas-giipBscf', r.fit.giipBscf, 2);
     setComputed('gas-pziPsi', r.fit.pziPsi, 1);
@@ -1817,6 +1828,7 @@ async function gasForecastRun() {
     yaxis: { title: 'Rate MMscf/d · Gp Bscf', rangemode: 'tozero' },
     yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
   }, { displaylogo: false, responsive: true });
+  mobileShowResults();
   renderTables('gas-table-fc', [
     {
       title: 'Forecast', headers: ['date', 'q MMscf/d', 'Pres', 'p/Z', 'Pwf', 'Gp Bscf', 'plateau'],
