@@ -43,7 +43,37 @@ function saveUsers(users) {
 
 const hashPw = (pw, salt) => crypto.scryptSync(String(pw), salt, 64).toString('hex');
 
-export function register({ company, username, password }) {
+// brute-force throttle: after 5 failed logins for a username within 15
+// minutes, further attempts are rejected until the window cools down
+const failedLogins = new Map(); // username -> { count, firstAt }
+const THROTTLE_MAX = 5;
+const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+
+function throttled(u) {
+  const f = failedLogins.get(u);
+  if (!f) return false;
+  if (Date.now() - f.firstAt > THROTTLE_WINDOW_MS) {
+    failedLogins.delete(u);
+    return false;
+  }
+  return f.count >= THROTTLE_MAX;
+}
+
+function noteFailure(u) {
+  const f = failedLogins.get(u);
+  if (!f || Date.now() - f.firstAt > THROTTLE_WINDOW_MS) {
+    failedLogins.set(u, { count: 1, firstAt: Date.now() });
+  } else {
+    f.count += 1;
+  }
+}
+
+export function register({ company, username, password, invite }) {
+  // optional registration gate: set WELLSIM_INVITE on the server to require
+  // an invite word for new accounts (open registration otherwise)
+  const required = process.env.WELLSIM_INVITE;
+  if (required && String(invite ?? '') !== required)
+    return { error: 'registration needs the invite word — ask the site owner' };
   const c = slug(company);
   const u = slug(username);
   if (!c) return { error: 'company name required' };
@@ -67,11 +97,20 @@ export function register({ company, username, password }) {
 
 export function login({ username, password }) {
   const u = slug(username);
+  if (throttled(u))
+    return { error: 'too many failed attempts — wait 15 minutes and try again' };
   const rec = loadUsers().find((x) => x.username === u);
   const bad = { error: 'wrong username or password' };
-  if (!rec) return bad;
+  if (!rec) {
+    noteFailure(u);
+    return bad;
+  }
   const h = hashPw(password ?? '', rec.salt);
-  if (!crypto.timingSafeEqual(Buffer.from(h), Buffer.from(rec.hash))) return bad;
+  if (!crypto.timingSafeEqual(Buffer.from(h), Buffer.from(rec.hash))) {
+    noteFailure(u);
+    return bad;
+  }
+  failedLogins.delete(u);
   const token = crypto.randomUUID();
   sessions.set(token, { company: rec.company, username: rec.username });
   return { token, company: rec.company, username: rec.username };

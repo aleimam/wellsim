@@ -43,6 +43,27 @@ test('save / list / load / delete a case; auth required', () => {
   assert.equal(caseList({ token }).cases.length, 0);
 });
 
+test('login throttle: 5 failures lock the username for the window', () => {
+  register({ company: 'Gamma Co', username: 'carol', password: 'goodpw1' });
+  for (let i = 0; i < 5; i++) {
+    assert.ok(/wrong username or password/.test(login({ username: 'carol', password: 'bad' }).error));
+  }
+  // 6th attempt (even with the RIGHT password) is throttled
+  assert.ok(/too many failed attempts/.test(login({ username: 'carol', password: 'goodpw1' }).error));
+  // other usernames are unaffected
+  assert.ok(login({ username: 'ali', password: 'secret7' }).token);
+});
+
+test('invite word gates registration when WELLSIM_INVITE is set', () => {
+  process.env.WELLSIM_INVITE = 'drillbit';
+  try {
+    assert.ok(/invite word/.test(register({ company: 'X', username: 'noinv', password: 'pass1' }).error));
+    assert.ok(register({ company: 'X', username: 'withinv', password: 'pass1', invite: 'drillbit' }).token);
+  } finally {
+    delete process.env.WELLSIM_INVITE;
+  }
+});
+
 test('cases are isolated per company; logout kills the token', () => {
   const a = login({ username: 'ali', password: 'secret7' });
   caseSave({ token: a.token, name: 'acme-secret', case: CASE });

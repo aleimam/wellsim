@@ -13,6 +13,30 @@ import { accountHandlers } from './accounts.js';
 // the per-company server case database
 const handlers = { ...apiHandlers, ...accountHandlers };
 
+// rolling backup of the case database (data/ -> data-backups/<date>/, kept
+// 14 days): guards against accidental deletion/corruption. Copy the backups
+// folder offsite for real disaster protection.
+import { cpSync, mkdirSync, readdirSync, rmSync, existsSync } from 'node:fs';
+function backupData() {
+  try {
+    const dataDir = process.env.WELLSIM_DATA_DIR ?? path.resolve(process.cwd(), 'data');
+    if (!existsSync(dataDir)) return;
+    const bakRoot = path.join(path.dirname(dataDir), 'data-backups');
+    const stamp = new Date().toISOString().slice(0, 10);
+    const dest = path.join(bakRoot, stamp);
+    if (existsSync(dest)) return; // one backup per day
+    mkdirSync(dest, { recursive: true });
+    cpSync(dataDir, dest, { recursive: true });
+    const keep = readdirSync(bakRoot).sort().slice(0, -14);
+    for (const old of keep) rmSync(path.join(bakRoot, old), { recursive: true, force: true });
+    console.log(`data backup: ${dest}`);
+  } catch (e) {
+    console.error('data backup failed:', e.message);
+  }
+}
+backupData();
+setInterval(backupData, 6 * 60 * 60 * 1000).unref(); // re-check every 6 h
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.resolve(__dirname, '../ui');
 const MIME = {

@@ -17,6 +17,7 @@
       <button id="tab-gas" class="tab">Gas Well</button>
       <a id="save-case" href="#" class="hdr-link">Save as</a>
       <a id="open-case" href="#" class="hdr-link">Open</a>
+      <a id="print-report" href="#" class="hdr-link">Print report</a>
       <a id="acct-link" href="#" class="hdr-link">Sign in</a>
       <a id="help-link" href="/help.html" target="_blank" class="hdr-link">Help</a>
       <input type="file" id="open-case-file" accept=".json,application/json" style="display:none" />
@@ -140,6 +141,7 @@
               <div class="senshead">prod_data — inputs green (GOR/WC blank = base), outputs dt / pr / z filled by the solver</div>
               <div class="tbl-actions">
                 <button id="oil-prod-paste" class="copybtn" type="button">Paste from clipboard</button>
+                <button id="oil-prod-csv" class="copybtn" type="button">Import CSV</button>
                 <button id="oil-prod-add" class="copybtn" type="button">+10 rows</button>
                 <button id="oil-prod-clear" class="copybtn" type="button">Clear</button>
                 <span class="note" style="margin:0">or click a cell and Ctrl+V (Date, FTHP, q, GOR, WC, Pwf)</span>
@@ -298,6 +300,7 @@
               <div class="senshead">prod_data — inputs green (CGR/WGR blank = base), outputs dt / pr / z filled by the solver</div>
               <div class="tbl-actions">
                 <button id="gas-prod-paste" class="copybtn" type="button">Paste from clipboard</button>
+                <button id="gas-prod-csv" class="copybtn" type="button">Import CSV</button>
                 <button id="gas-prod-add" class="copybtn" type="button">+10 rows</button>
                 <button id="gas-prod-clear" class="copybtn" type="button">Clear</button>
                 <span class="note" style="margin:0">or click a cell and Ctrl+V (Date, FTHP, q, CGR, WGR, Pwf)</span>

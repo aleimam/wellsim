@@ -101,6 +101,21 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
 
 #error-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #8e2f2f; color: #fff; padding: 10px 20px; font-size: 14px; z-index: 20; }
 
+/* ---------- print report: results only, clean page ---------- */
+@media print {
+  header nav, .inputs, #error-bar, #acct-panel, .copybtn { display: none !important; }
+  header { background: #fff; color: #16324f; padding: 0 0 8px; border-bottom: 2px solid #16324f; }
+  header .sub { color: #5c7387; display: inline; }
+  body { background: #fff; }
+  .panel, .panel.mode-reserve { display: block; }
+  .results .chart, .datatable { border: 1px solid #ccc; break-inside: avoid; page-break-inside: avoid; }
+  .chartrow { display: block; }
+  .chartrow .chart { margin-bottom: 8px; }
+  .datatable { width: 100%; max-height: none; overflow: visible; }
+  .summary .card { border: 1px solid #ccc; }
+  .giipbanner .val { color: #1f7a44 !important; }
+}
+
 /* ---------- mobile (phones) ---------- */
 @media (max-width: 640px) {
   header { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }

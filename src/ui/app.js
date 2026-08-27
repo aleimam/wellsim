@@ -2150,6 +2150,30 @@ document.getElementById('acct-signout').onclick = guard(async () => {
 document.getElementById('acct-save').onclick = guard(acctSaveCase);
 document.getElementById('acct-refresh').onclick = guard(acctRefresh);
 acctUi();
+
+// CSV import for the production tables (same column order as paste:
+// Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf; header line auto-skipped)
+function csvImport(parse, fill) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.csv,.txt,text/csv';
+  inp.onchange = () => {
+    const f = inp.files?.[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => fill(parse(String(rd.result)), 0);
+    rd.readAsText(f);
+  };
+  inp.click();
+}
+document.getElementById('gas-prod-csv').onclick = () => csvImport(parseProdClipboard, fillProdRows);
+document.getElementById('oil-prod-csv').onclick = () => csvImport(parseOilProdClipboard, fillOilProdRows);
+
+// printable report: hide the input column and chrome, keep summary + charts
+document.getElementById('print-report').onclick = (e) => {
+  e.preventDefault();
+  window.print();
+};
 document.getElementById('water-btn-solve').onclick = guard(waterSolve);
 document.getElementById('water-btn-calibrate').onclick = guard(waterCalibrate);
 document.getElementById('water-btn-sens').onclick = guard(waterSens);
