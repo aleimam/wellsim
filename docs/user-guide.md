@@ -26,6 +26,12 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   ISO (`2014-11-17`), or a plain day number / Excel serial. Impossible dates
   (day > 31, month > 12) are rejected with the row number — nothing silently rolls over.
   Time-of-day is honoured (sporadic test timestamps work). `dt` is days from the first row.
+- **Header bar** (final layout): the **Oil Well | Water Well | Gas Well** tabs,
+  then **Save as · Open · Print report · Sign in · Help**. Help opens the full
+  in-app manual (`/help.html` — user guide + every equation and deviation).
+- **Print report** (header): prints the results only — charts, tables, summary
+  cards and banners on a clean white page (inputs, navigation and buttons hide).
+  Use the browser dialog's "Save as PDF" for a shareable report.
 - **Save as / Open** (header buttons): the whole case — every input,
   selection and production table across all three tabs — saves to a JSON
   file and restores in one click; program-filled grey cells stay
@@ -58,14 +64,16 @@ there is no gas) with the Darcy J on water properties (μ = 0.5 cp, Bw = 1);
 future-pressure IPR sensitivities keep J constant (water μ·B do not change
 with pressure). No gas/oil-PVT inputs appear (no GOR, API, Rsi, Pb, WC, oil
 viscosity — the liquid viscosity collapses to the sheets' hardcoded 0.5 cp
-water value). Defaults: FTHP 200 psi · 2000 bbl/d · Pri 4800 psi.
+water value). Defaults: FTHP 200 psi (producer) · 2000 bbl/d · Pri 4800 psi.
 A water well is head-dominated: it flows naturally only when Pr beats
 THP + the static water column (≈ 0.446 psi/ft at SG 1.05); otherwise the
 solver reports no-intersection — that is the physics, not an error.
 
 **Well type selector: Producer | Injector.** The injector reverses the march —
-water flows DOWN, so **BHIP = injection THP + head − friction** — and
-temperatures relax top-down from the injection-water temperature (new input,
+water flows DOWN, so **BHIP = injection THP + head − friction**. Selecting
+Injector swaps the THP default from 200 to **2000 psi** (and back to 200 on
+Producer; a value you typed yourself is kept). Temperatures
+relax top-down from the injection-water temperature (new input,
 default 90 °F) toward geothermal, making the **bottomhole injection
 temperature (BHT)** the calculated output. The injectivity IPR is
 **q = J·(Pwf − Pr)** with the same water Darcy J; the operating point is the
@@ -103,7 +111,7 @@ Chen above.
 | IPR — Darcy | Pri 3550 psi · Pr blank = Pri · K 50 mD · H 42.653 ft · Re 1640.5 ft · Rw 0.5104 ft · Skin 0 |
 | Match factors | Head 1 · Friction 1 |
 | Gas lift | Injection depth 2490.92 mTVD · Injection rate 0 · sweep to 2 MMscf/d in 10 steps |
-| ESP | Pump depth 2985 mTVD · Pump ΔP 1325.16 psi (manual) · Tubing gas blank = formation gas |
+| ESP | Pump depth 2985 mTVD · Pump ΔP 1325.16 psi (manual) · Tubing gas blank = formation gas · selecting ESP swaps the GOR default 5000 → **300 scf/stb** (back on natural/gas lift; a typed value is kept) |
 
 **Well-head temperature is always calculated** (Ramey chain) — the heat-transfer
 inputs are required; there is no input THT.
@@ -156,6 +164,16 @@ inputs are required; there is no input THT.
    matched K carries it into the Darcy record). Validation: from the demo
    well's measured gauges the solver recovers the workbook's PI input
    (2.698 vs 2.7).
+   **Two ESP views** (radio under the ESP inputs): *Model match* shows the
+   final charts — IPR vs the coupled ESP-VLP nodal plot, wellhead PQ & WHT,
+   the PumpCurve with the results block beside it, and the Traverse on its
+   own row with the measured Pint/Pdis markers. The Traverse also draws in
+   **Manual ΔP** mode, where your input ΔP appears as the highlighted
+   pressure step at pump depth merged into the march. *Sensitivity* runs
+   future-Pres cases (Darcy future-J chain), each fully solved: the chart
+   overlays every case's IPR with its solved node starred, and the table
+   lists the ESP data at each node (rate, Pwf, Pint, Pdis, ΔP, head,
+   Qg@pump, gradient, free gas %, WHT, thrust window).
 
 ### Multi-layer IPR (optional, oil & gas well models)
 

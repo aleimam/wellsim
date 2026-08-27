@@ -177,7 +177,8 @@ pre.eq code { background: none; padding: 0; }
   <h1>WellSim Manual</h1>
   <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a zero-dependency web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
   <div class="statusrow">
-    <span class="chip"><b>165</b> regression tests passing</span>
+    <span class="chip"><b>167</b> regression tests passing</span>
+    <span class="chip"><b>43/43</b> sheet-parity sensitivities</span>
     <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
     <span class="chip">port 3355 &middot; zero npm dependencies</span>
   </div>
@@ -200,9 +201,10 @@ pre.eq code { background: none; padding: 0; }
 <p>Project-wide principles: <b>Darcy IPR is the default and dominant J</b> for both fluids (the test J calibrates a matched permeability at your judged skin); two pressure records (Pri immutable anchor, Pr working); <b>explicit physics only</b> &mdash; Brill &amp; Beggs Z everywhere, no goal-seek; well-head temperature always <em>calculated</em> (Ramey); gas impurities are inputs wherever gas properties appear.</p>
 
 <h2 id="run">Run &amp; test</h2>
-<pre class="eq">node src/server/server.js        # serves http://localhost:3355
-node --test                      # 133 tests</pre>
-<p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>.</p>
+<pre class="eq">node src/server/server.js               # serves http://localhost:3355
+node --test                             # 167 tests
+node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
+<p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is distributed separately as <code>WellSim-1.0.zip</code>.</p>
 
 <h2 id="conventions">UI conventions</h2>
 <div class="cells">
@@ -215,7 +217,9 @@ node --test                      # 133 tests</pre>
   <li><b>Side tables</b> beside each chart hold the plotted numbers with a Copy button (tab-separated, pastes into Excel).</li>
   <li><b>Production tables</b> accept clipboard paste (button or Ctrl+V in a cell); column order <code>Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf</code>; header lines auto-skip; up to 200 rows.</li>
   <li><b>Dates</b>: <code>17-Nov-14</code>, <code>17-Nov-2014 13:00:00</code>, <code>05/03/2014 06:30</code>, ISO, or a day serial. Impossible dates are rejected with the row number &mdash; nothing silently rolls over. dt = days from the first row; time-of-day honoured.</li>
-  <li><b>Save as / Open</b> (header): the whole case &mdash; every input, selection and production table across all three tabs &mdash; saves to a JSON file and restores in one click; program-filled grey cells stay program-filled.</li>
+  <li><b>Header bar</b> (final layout): the Oil Well | Water Well | Gas Well tabs, then <b>Save as</b> &middot; <b>Open</b> &middot; <b>Print report</b> &middot; <b>Sign in</b> &middot; <b>Help</b>.</li>
+  <li><b>Save as / Open</b>: the whole case &mdash; every input, selection and production table across all three tabs &mdash; saves to a JSON file and restores in one click; program-filled grey cells stay program-filled.</li>
+  <li><b>Print report</b>: prints the results only &mdash; charts, tables, summary cards and banners on a clean white page (inputs, navigation and buttons hide); use the browser dialog&rsquo;s &ldquo;Save as PDF&rdquo; for a shareable report.</li>
   <li><b>Company case database</b> (Sign in, header): register a company account (username + password, scrypt-hashed on the server) to save cases server-side under <code>data/cases/&lt;company&gt;/</code> &mdash; every user of a company shares its case list (save / load / delete). <b>The free version stays</b>: every calculation works without an account; only the server case store needs one. Sessions are in-memory (a server restart signs everyone out); put TLS in front for internet deployment.</li>
   <li><b>Mobile</b>: below 640&nbsp;px the layout stacks and the action button stays pinned.</li>
 </ul>
@@ -223,8 +227,8 @@ node --test                      # 133 tests</pre>
 <hr class="sect">
 <h2 id="oil-well"><span class="sect">Oil</span> &mdash; Well model</h2>
 <p class="lede">Lift types: Natural flow &middot; Gas lift &middot; ESP (one active).</p>
-<div class="note"><b>Water Well tab</b> &mdash; a dedicated tab beside Oil Well and Gas Well: the oil-tab structure without the Reserve/Forecast modules (lift types, get-Pwf calibration and sensitivities included), running the same modified-Griffith march at its limiting case: API fixed at 10&deg; (SG = 1.000 exactly), w.c. 100&nbsp;%, GOR = Rsi = 0, Pb = 0. Rates are <b>gross water</b> (bbl/d); the IPR is built in as the pure linear Darcy form (no Vogel curvature) with the Darcy J on water properties (&mu; = 0.5 cp, Bw = 1); future-pressure IPR sensitivities keep J constant. Defaults: FTHP 200 psi &middot; 2000 bbl/d &middot; Pri 4800 psi. Head-dominated: it flows naturally only when Pr beats THP + the static water column (&asymp;&nbsp;0.446 psi/ft at SG 1.05) &mdash; otherwise &ldquo;no-intersection&rdquo; is the physics, not an error.</div>
-<div class="note"><b>Injector</b> &mdash; the Water Well tab has a Producer | Injector selector. The injector reverses the march (water flows DOWN: BHIP = injection THP + head &minus; friction) and relaxes temperatures top-down from the injection-water temperature (input, default 90&deg;F) toward geothermal &mdash; the bottomhole injection temperature (BHT) is the calculated output. Injectivity IPR: q = J&middot;(Pwf &minus; Pr) with the same water Darcy J; operating point = available BHIP (falls with rate) crossing Pr + q/J (rises). Charts: injectivity nodal + injection-THP-required vs rate with BHT on the second axis. Calibration from an injection test (BHIP input-or-marched &rarr; J injectivity &rarr; matched K). Lift and sensitivities hide for the injector; when THP + head cannot reach Pr the THP deficit is reported. Laminar Fanning 16/Re below the transition, Chen above.</div>
+<div class="note"><b>Water Well tab</b> &mdash; a dedicated tab beside Oil Well and Gas Well: the oil-tab structure without the Reserve/Forecast modules (lift types, get-Pwf calibration and sensitivities included), running the same modified-Griffith march at its limiting case: API fixed at 10&deg; (SG = 1.000 exactly), w.c. 100&nbsp;%, GOR = Rsi = 0, Pb = 0. Rates are <b>gross water</b> (bbl/d); the IPR is built in as the pure linear Darcy form (no Vogel curvature) with the Darcy J on water properties (&mu; = 0.5 cp, Bw = 1); future-pressure IPR sensitivities keep J constant. Defaults: FTHP 200 psi (producer) &middot; 2000 bbl/d &middot; Pri 4800 psi. Head-dominated: it flows naturally only when Pr beats THP + the static water column (&asymp;&nbsp;0.446 psi/ft at SG 1.05) &mdash; otherwise &ldquo;no-intersection&rdquo; is the physics, not an error.</div>
+<div class="note"><b>Injector</b> &mdash; the Water Well tab has a Producer | Injector selector. The injector reverses the march (water flows DOWN: BHIP = injection THP + head &minus; friction) &mdash; selecting it swaps the THP default from 200 to <b>2000 psi</b> (and back on Producer) &mdash; and relaxes temperatures top-down from the injection-water temperature (input, default 90&deg;F) toward geothermal &mdash; the bottomhole injection temperature (BHT) is the calculated output. Injectivity IPR: q = J&middot;(Pwf &minus; Pr) with the same water Darcy J; operating point = available BHIP (falls with rate) crossing Pr + q/J (rises). Charts: injectivity nodal + injection-THP-required vs rate with BHT on the second axis. Calibration from an injection test (BHIP input-or-marched &rarr; J injectivity &rarr; matched K). Lift and sensitivities hide for the injector; when THP + head cannot reach Pr the THP deficit is reported. Laminar Fanning 16/Re below the transition, Chen above.</div>
 
 <h4>Defaults</h4>
 <div class="tblwrap"><table>
@@ -236,7 +240,7 @@ node --test                      # 133 tests</pre>
 <tr><td>IPR (Darcy)</td><td class="num">Pri 3550 &middot; K 50 mD &middot; H 42.653 ft &middot; Re 1640.5 &middot; Rw 0.5104 &middot; skin 0</td></tr>
 <tr><td>Test</td><td class="num">2100 stb/d @ 700 psi &middot; Pwf blank = get&nbsp;Pwf</td></tr>
 <tr><td>Gas lift</td><td class="num">injection 2490.92 mTVD &middot; sweep to 2 MMscf/d in 10 steps</td></tr>
-<tr><td>ESP</td><td class="num">pump 2985 mTVD &middot; &Delta;P 1325.16 psi (manual) &middot; tubing gas blank = formation</td></tr>
+<tr><td>ESP</td><td class="num">pump 2985 mTVD &middot; &Delta;P 1325.16 psi (manual) &middot; tubing gas blank = formation &middot; selecting ESP swaps the GOR default 5000&rarr;300 scf/stb (back on natural/gas lift)</td></tr>
 </table></div>
 
 <h4>Workflow</h4>

@@ -30,27 +30,53 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-165 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+167 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
-round trips, reserve and forecast synthetic-tank recoveries.
+round trips, ESP stack, reserve and forecast synthetic-tank recoveries.
+
+```bash
+node scripts/validation-sweep.mjs
+```
+
+43 end-to-end sensitivity cases (5 per module) checked against the origin
+workbooks — 43/43 pass.
 
 ## Layout
 
 ```
 src/core/pvt/         constants, oil (Standing-metric family), gas (B&B Z, CKB+Dempsey mu), water
 src/core/vlp/         wellpath, common (Chen friction, Ramey T), ashry factor,
-                      oil-march (modified Griffith), gas-march (modified Gray)
+                      oil-march (modified Griffith), gas-march (modified Gray),
+                      water-injector, esp (pump stack), esp-catalog (68-pump database)
 src/core/ipr/         oil-ipr (composite Vogel + Darcy J), gas-ipr (Darcy Pr^2 + C&n),
                       multilayer, inflow, skin-guidance
 src/core/nodal/       nodal (operating point), calibrate (get_Pwf), sensitivity, gaslift
 src/core/reserve/     gas-reserve (Pres solver, p/Z, SITHP march, reservoir limit, forecast)
                       oil-reserve (Pres solver, Havlena-Odeh MB, static MB, reservoir limit)
+                      tarner (oil forecast)
 src/core/solvers/     brent
-src/server/           server.js (built-in http), api.js (form -> core mapping)
-src/ui/               index.html, style.css, app.js
+src/server/           server.js (built-in http), api.js (form -> core mapping),
+                      accounts.js (company case database: register/login, case CRUD)
+src/ui/               index.html, style.css, app.js, help.html (in-app manual)
 tests/                node:test suites
-docs/                 user-guide.md, equations.md
+scripts/              validation-sweep.mjs (43-case module-vs-workbook sweep)
+docs/                 user-guide.md, equations.md, deploy.md
 ```
+
+## The website
+
+The header bar carries the three well tabs (**Oil | Water | Gas**) plus
+**Save as · Open · Print report · Sign in · Help**:
+
+- **Save as / Open** — the whole case (every input, selection and production
+  table across all tabs) to/from a JSON file.
+- **Print report** — results-only clean page (charts, tables, summaries);
+  "Save as PDF" in the browser dialog makes the shareable report.
+- **Sign in** — the company case database: register a company account to save
+  cases server-side, shared by the company's users. **The free version stays**:
+  every calculation works without an account.
+- **Help** — the full in-app manual at `/help.html` (user guide + every
+  equation, constant and workbook deviation).
 
 ## Documentation
 
@@ -59,6 +85,12 @@ docs/                 user-guide.md, equations.md
 - [docs/equations.md](docs/equations.md) — every correlation and equation as
   implemented, with the exact tuned constants, plus the documented deviations from
   the source workbooks.
+- [docs/deploy.md](docs/deploy.md) — internet deployment (Render + custom domain
+  DNS, or a VPS with nginx/certbot); `render.yaml` and `Dockerfile` are in the
+  repo root.
+
+A standalone portable build (`WellSim.exe` — no install, cases saved beside the
+exe) is maintained as a separate fork and distributed as `WellSim-1.0.zip`.
 
 ## Principles (project-wide)
 
