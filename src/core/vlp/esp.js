@@ -92,15 +92,24 @@ export function espIntakeState(cfg, { pIntakePsi, tIntakeF, sepEffPct }) {
   const gasEffBbl = sep > 0 ? totalGasBbl * (1 - sep / 100) : totalGasBbl;
   const vtNoSep = vw + vo + totalGasBbl;
   const vt = vw + vo + gasEffBbl;
-  // masses (S17/S18/S19): gas mass reduced with the separated volume
-  const massW = flow.qw * (cfg.waterSg ?? 1.05) * LIQ_LB_PER_FT3 * 5.615;
-  const massO = qo * (141.5 / (131.5 + cfg.api)) * LIQ_LB_PER_FT3 * 5.615;
-  const gasScfTotal = qo * cfg.gorScfStb;
-  const massGEff = AIR_LB_PER_SCF * cfg.gasSg * (sep > 0 ? gasScfTotal * (1 - sep / 100) : gasScfTotal);
-  const gradPsiFt = (((massW + massO + massGEff) / vt / 5.615) / 62.42) * 0.433; // BL col
   const freeGasPct = (freeGasBbl / vtNoSep) * 100; // BE65 / X24
   const freeGasSepBbl = freeGasBbl * (1 - sep / 100); // AZ69
   const freeGasPctSep = (freeGasSepBbl / vt) * 100; // BE69
+  // the sheet's BE74: the tubing GLR is cut by the free-gas-fraction
+  // reduction the separator achieves (percentage POINTS, BE65 - BE69)
+  const sepCutPct = freeGasPct - freeGasPctSep;
+  // masses (BHP S17/S18/S19). SHEET QUIRK kept: the no-separator row's gas
+  // mass BI65 = S18 = 0.0765*gg*P10 — the SEPARATED tubing gas — while the
+  // separator row's BI69 uses the post-separation total vapor as scf.
+  const massW = flow.qw * (cfg.waterSg ?? 1.05) * LIQ_LB_PER_FT3 * 5.615;
+  const massO = qo * (141.5 / (131.5 + cfg.api)) * LIQ_LB_PER_FT3 * 5.615;
+  const gasScfTotal = qo * cfg.gorScfStb;
+  const tubingGasScf = gasScfTotal * (1 - sepCutPct / 100); // P10
+  const massGNoSep = AIR_LB_PER_SCF * cfg.gasSg * tubingGasScf; // BI65 = S18
+  const massGSep = AIR_LB_PER_SCF * cfg.gasSg * gasScfTotal * (1 - sep / 100); // BI69
+  const gradOf = (mass, v) => ((mass / v / 5.615) / 62.42) * 0.433; // BL col
+  const gradNoSepPsiFt = gradOf(massW + massO + massGNoSep, vtNoSep); // BL65 / BJ38
+  const gradSepPsiFt = gradOf(massW + massO + massGSep, vt); // BL69
   return {
     rs, bo, z, bgBblScf,
     vwBbl: vw, voBbl: vo, freeGasBbl, totalGasBbl,
@@ -108,11 +117,11 @@ export function espIntakeState(cfg, { pIntakePsi, tIntakeF, sepEffPct }) {
     qGrossPumpNoSepBpd: vtNoSep,
     freeGasPct,
     freeGasPctSep,
-    // the sheet's BE74: the tubing GLR is cut by the free-gas-fraction
-    // reduction the separator achieves (percentage POINTS, BE65 - BE69)
-    sepCutPct: freeGasPct - freeGasPctSep,
+    sepCutPct,
     sepRequired: freeGasPct > 10, // BF65 rule (>10% -> separator required)
-    gradPsiFt,
+    gradNoSepPsiFt,
+    gradSepPsiFt,
+    gradPsiFt: sep > 0 ? gradSepPsiFt : gradNoSepPsiFt, // BJ39 switch
   };
 }
 
@@ -132,20 +141,27 @@ const espCfg = (cfg, dpPsi, tubingGasScfD) => ({
  * dP -> march -> intake P,T -> Qgross@pump & gradient -> head(curve) ->
  * dP', to convergence. Returns { dpPsi, march, state, headFt }.
  */
-export function espSolveDp(cfg, pump, { stages, freqHz, wearFactor = 0, sepEffPct = 95 }) {
+export function espSolveDp(cfg, pump, { stages, freqHz, wearFactor = 0, sepEffPct = 95, pwfIprPsi = null }) {
   const curve = pumpCurveAt(pump, { stages, freqHz, wearFactor });
   let dp = curve[THRUST.bep].headFt * 0.35; // sane start: BEP head x typical gradient
   let tubingGas = cfg.qOilStbD * cfg.gorScfStb; // first pass: no separation
   let out = null;
   for (let k = 0; k < 60; k++) {
-    const m = oilMarch(espCfg(cfg, dp, tubingGas));
+    const c = espCfg(cfg, dp, tubingGas);
+    const m = oilMarch(c);
     const pumpIdx = m.stations.findIndex((s) => s.pPsi === m.intakePsi);
-    const tPump = m.stations[pumpIdx >= 0 ? pumpIdx : m.stations.length - 3].tF;
-    const state = espIntakeState(cfg, { pIntakePsi: Math.max(m.intakePsi, 60), tIntakeF: tPump, sepEffPct });
+    const tPump = m.stations[pumpIdx >= 0 ? pumpIdx : m.stations.length - 3].tF; // N65 = N49
+    // sheet rows 63-69 evaluate the intake state at the IPR-side back-march
+    // intake M65 = max(D65, 100) (equal to the top-down intake once the
+    // traverses match); without an IPR anchor, the top-down intake is used
+    let pip = null;
+    if (pwfIprPsi != null) pip = espBackMarch(c, pwfIprPsi).pipPsi;
+    const stateP = Math.max(pip ?? m.intakePsi, 100); // M65 floor
+    const state = espIntakeState(cfg, { pIntakePsi: stateP, tIntakeF: tPump, sepEffPct });
     const headFt = headAtRateFt(curve, state.qGrossPumpBpd);
     const dpNew = headFt * state.gradPsiFt;
     const tubingGasNew = cfg.qOilStbD * cfg.gorScfStb * (1 - state.sepCutPct / 100); // P10/BE74
-    out = { dpPsi: dpNew, tubingGasScfD: tubingGasNew, march: m, state, headFt };
+    out = { dpPsi: dpNew, tubingGasScfD: tubingGasNew, march: m, state, headFt, pipIprPsi: pip };
     if (Math.abs(dpNew - dp) < 1e-6 && Math.abs(tubingGasNew - tubingGas) < 1e-3) {
       return { ...out, converged: true };
     }
@@ -164,11 +180,12 @@ export function espOperatingPoint(cfg, ipr, pump, opts) {
   const oilFrac = oilFraction(cfg);
   const R = (q) => {
     const c = { ...cfg, qOilStbD: q };
-    const sol = espSolveDp(c, pump, opts);
     const pwfIpr = pwfAtQGross(q / oilFrac, ipr);
     if (!(pwfIpr > 0)) return { r: NaN };
-    const back = espBackMarch(espCfg(c, sol.dpPsi, sol.tubingGasScfD), pwfIpr);
-    return { r: sol.march.intakePsi - back.pipPsi, sol, pwfIpr, pipIpr: back.pipPsi };
+    // the IPR anchor rides inside the dP fixed point (sheet rows 63-69
+    // evaluate the intake state at the back-march intake M65)
+    const sol = espSolveDp(c, pump, { ...opts, pwfIprPsi: pwfIpr });
+    return { r: sol.march.intakePsi - sol.pipIprPsi, sol, pwfIpr, pipIpr: sol.pipIprPsi };
   };
   const qMax = Math.min(qMaxGross(ipr) * oilFrac * 0.98, 12000);
   const qMin = Math.max(qMax * 0.02, 50);
@@ -227,11 +244,11 @@ export function matchStages(cfg, ipr, pump, { freqHz, sepEffPct = 95, testQOilSt
   const oilFrac = oilFraction(cfg);
   const pwfIpr = pwfAtQGross(testQOilStbD / oilFrac, ipr);
   if (!(pwfIpr > 0)) throw new Error('matchStages: test rate exceeds the IPR AOF');
-  const solveAt = (stages) => espSolveDp(c, pump, { stages, freqHz, wearFactor: 0, sepEffPct });
+  const solveAt = (stages) =>
+    espSolveDp(c, pump, { stages, freqHz, wearFactor: 0, sepEffPct, pwfIprPsi: pwfIpr });
   const R = (stages) => {
     const sol = solveAt(stages);
-    const back = espBackMarch(espCfg(c, sol.dpPsi, sol.tubingGasScfD), pwfIpr);
-    return sol.march.intakePsi - back.pipPsi;
+    return sol.march.intakePsi - sol.pipIprPsi;
   };
   // too few stages -> small dP -> high traverse intake -> R > 0; the FIRST
   // downward crossing is the physical stage count (far off-curve states can

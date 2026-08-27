@@ -78,12 +78,13 @@ test('intake state pinned to the BHP 63-69 block', () => {
   close(s.qGrossPumpBpd, 3332.4373630216, 0.03); // BD69
   close(s.freeGasPct, 12.3552316154176, 0.05); // BE65
   close(s.sepCutPct, 11.3675469229856, 0.06); // BE74
-  close(s.gradPsiFt, 0.307891727757973, 0.03); // BJ39
+  close(s.gradPsiFt, 0.307891727757973, 0.03); // BJ39 (sep branch active)
   assert.equal(s.sepRequired, true); // BF65 (>10 %)
-  // no separator: gassier, lighter column
-  const s0 = espIntakeState(CFG, { pIntakePsi: 1397.59061968516, tIntakeF: 230, sepEffPct: 0 });
-  assert.ok(s0.gradPsiFt < s.gradPsiFt);
-  close(s0.gradPsiFt, 0.204440252648098, 0.03); // BJ38
+  // BOTH gradient branches from one call, sheet quirk preserved: the no-sep
+  // row's gas MASS is the separated tubing gas (BI65 = S18 = 0.0765*gg*P10)
+  close(s.gradSepPsiFt, 0.307891727757973, 0.03); // BL69
+  close(s.gradNoSepPsiFt, 0.204440252648098, 0.01); // BL65 — tight: exact mass basis
+  assert.ok(s.gradNoSepPsiFt < s.gradSepPsiFt); // gassier column is lighter
 });
 
 test('coupled dP solve converges near the workbook operating state', () => {
