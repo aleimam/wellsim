@@ -731,9 +731,10 @@ function setMobileView(v) {
   if (v === 'results') resizeVisibleCharts();
 }
 
-// the Inputs view stays the default on phones — results are one tap away on
-// the bottom bar (no auto-jump after a run, per user preference)
-function mobileShowResults() {}
+// Inputs is the start view on phones; a completed run jumps to Results
+function mobileShowResults() {
+  if (isPhone()) setMobileView('results');
+}
 
 // live headline result in the header (the PWF bar pattern)
 function setHeadline(value, caption) {
