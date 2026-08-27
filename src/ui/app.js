@@ -698,6 +698,7 @@ function setSkin(s) {
   try { localStorage.setItem('wellsim-skin', s); } catch (e) {}
   document.getElementById('skin').href = s === 'modern' ? '/style.css' : '/classic.css';
   document.getElementById('skin-link').textContent = s === 'modern' ? 'Classic view' : 'Mobile view';
+  if (s === 'modern') setMobileView('inputs'); // Inputs is the default tab of the mobile view
   setTimeout(resizeVisibleCharts, 350); // re-fit charts once the new sheet applies
 }
 
@@ -730,10 +731,9 @@ function setMobileView(v) {
   if (v === 'results') resizeVisibleCharts();
 }
 
-// after a successful run on a phone, jump straight to the results view
-function mobileShowResults() {
-  if (isPhone()) setMobileView('results');
-}
+// the Inputs view stays the default on phones — results are one tap away on
+// the bottom bar (no auto-jump after a run, per user preference)
+function mobileShowResults() {}
 
 // live headline result in the header (the PWF bar pattern)
 function setHeadline(value, caption) {
@@ -755,9 +755,14 @@ function summary(id, cards) {
   mobileShowResults();
 }
 
+// On phones the chart size is FIXED, computed once from the viewport (screen
+// width minus page padding and borders): charts fit the view exactly and never
+// re-fit as panels toggle. Desktop keeps fluid autosizing.
 const LAYOUT = () => ({
   margin: window.innerWidth < 640 ? { l: 46, r: 10, t: 34, b: 40 } : { l: 60, r: 20, t: 40, b: 45 },
-  height: window.innerWidth < 640 ? 280 : 380,
+  ...(window.innerWidth < 640
+    ? { autosize: false, width: window.innerWidth - 18, height: 260 }
+    : { height: 380 }),
   font: { family: '"IBM Plex Sans", "Segoe UI", sans-serif', size: window.innerWidth < 640 ? 11 : 12, color: '#0B1418' },
   legend: { orientation: 'h', y: -0.22 },
   plot_bgcolor: '#FBFCFC',
