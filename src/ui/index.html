@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WellSim — Nodal Analysis</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <header>
+    <h1>WellSim</h1>
+    <span class="sub">Nodal analysis &middot; well performance &middot; sensitivities</span>
+    <nav>
+      <button id="tab-oil" class="tab active">Oil Well</button>
+      <button id="tab-water" class="tab">Water Well</button>
+      <button id="tab-gas" class="tab">Gas Well</button>
+      <a id="save-case" href="#" class="hdr-link">Save as</a>
+      <a id="open-case" href="#" class="hdr-link">Open</a>
+      <a id="acct-link" href="#" class="hdr-link">Sign in</a>
+      <a id="help-link" href="/help.html" target="_blank" class="hdr-link">Help</a>
+      <input type="file" id="open-case-file" accept=".json,application/json" style="display:none" />
+    </nav>
+    <div id="acct-panel" style="display:none">
+      <div id="acct-out">
+        <div class="acct-title">Company case database</div>
+        <input id="acct-company" placeholder="company name" />
+        <input id="acct-user" placeholder="username" />
+        <input id="acct-pass" type="password" placeholder="password" />
+        <div class="acct-btns">
+          <button id="acct-login" class="copybtn">Sign in</button>
+          <button id="acct-register" class="copybtn">Register</button>
+        </div>
+        <div class="acct-note">Free use needs no account — accounts only add saved cases on the server, shared per company.</div>
+      </div>
+      <div id="acct-in" style="display:none">
+        <div class="acct-title" id="acct-who"></div>
+        <input id="acct-case-name" placeholder="case name" />
+        <div class="acct-btns">
+          <button id="acct-save" class="copybtn">Save case to server</button>
+          <button id="acct-refresh" class="copybtn">Refresh</button>
+          <button id="acct-signout" class="copybtn">Sign out</button>
+        </div>
+        <div id="acct-cases"></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="panel-oil" class="panel">
+      <div class="inputs">
+        <fieldset>
+          <legend>Oil module (one active)</legend>
+          <label class="radio"><input type="radio" name="oil-module" value="well" checked /> Well model</label>
+          <label class="radio"><input type="radio" name="oil-module" value="reserve" /> Reserve estimate</label>
+          <label class="radio"><input type="radio" name="oil-module" value="forecast" /> Forecast</label>
+        </fieldset>
+        <div id="oil-mod-well">
+        <fieldset>
+          <legend>Lift type (one active)</legend>
+          <label class="radio"><input type="radio" name="oil-lift" value="natural" checked /> Natural flow</label>
+          <label class="radio"><input type="radio" name="oil-lift" value="gaslift" /> Gas lift</label>
+          <label class="radio"><input type="radio" name="oil-lift" value="esp" /> ESP</label>
+        </fieldset>
+        <div id="oil-form"></div>
+        <fieldset>
+          <legend>Layers (one active)</legend>
+          <label class="radio"><input type="radio" name="oil-mlmode" value="single" checked /> Single layer (default)</label>
+          <label class="radio"><input type="radio" name="oil-mlmode" value="multi" /> Multi-layer (optional)</label>
+          <div id="oil-ml" style="display:none">
+            <div class="senshead">Per-layer Darcy — Re/Rw &amp; Pb shared from the well inputs; WC/GOR blank = base</div>
+            <table class="sens" id="oil-ml-table"></table>
+            <div class="note">Layers collapse to one final J at the theoretical average pressure (training deck 4); a layer with Pr below the operating Pwf is flagged as crossflow.</div>
+          </div>
+        </fieldset>
+        <div id="oil-lift-gl" style="display:none">
+          <fieldset>
+            <legend>Gas lift</legend>
+            <div id="oil-gl-fields"></div>
+            <div class="senshead">Performance curve sweep</div>
+            <div id="oil-gl-inputs"></div>
+            <button id="oil-btn-gl" class="action secondary">Run gas-lift performance curve</button>
+            <div id="oil-gl-result" class="note"></div>
+          </fieldset>
+        </div>
+        <div id="oil-lift-esp" style="display:none">
+          <fieldset>
+            <legend>ESP</legend>
+            <div class="frow" style="grid-template-columns: minmax(0,1fr) 170px;">
+              <label>Pump (database in background)</label>
+              <select id="oil-espPumpSel"></select>
+            </div>
+            <div id="oil-esp-fields"></div>
+            <div id="oil-esp-custom" style="display:none">
+              <div class="senshead">Custom pump — per-stage curve at the reference frequency (add new pump)</div>
+              <div id="oil-esp-custom-fields"></div>
+              <table class="sens" id="oil-espcurve-table"></table>
+            </div>
+            <div id="oil-esp-manual" style="display:none"><div id="oil-esp-manual-fields"></div></div>
+            <div id="oil-esp-matchrow" style="display:none">
+              <button id="oil-btn-espstages" class="action secondary">Match stages (new pump, wear 0)</button>
+              <button id="oil-btn-espwear" class="action secondary">Match wear + PI (measured Pint/Pdis)</button>
+              <div class="senshead">ESP view (one active)</div>
+              <label class="radio"><input type="radio" name="oil-esptab" value="match" checked /> Model match</label>
+              <label class="radio"><input type="radio" name="oil-esptab" value="sens" /> Sensitivity</label>
+              <div id="oil-espsens-inputs" style="display:none">
+                <div class="senshead">Future reservoir pressures, psi (future J via Darcy; each case fully solved)</div>
+                <div id="oil-esppres-list" class="presrow"></div>
+                <button id="oil-btn-espsens" class="action secondary">Run Pres sensitivity (ESP)</button>
+              </div>
+            </div>
+            <div id="oil-esp-result" class="note"></div>
+          </fieldset>
+        </div>
+        <fieldset>
+          <legend>Production test (optional)</legend>
+          <div id="oil-test"></div>
+          <button id="oil-btn-calibrate" class="action secondary">Calibrate from test (get Pwf &rarr; J Jones &rarr; matched K)</button>
+          <div id="oil-cal-result" class="note"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Sensitivities</legend>
+          <div class="senshead">VLP parameter sets (blank = base value)</div>
+          <table class="sens" id="oil-sens-table"></table>
+          <div class="senshead">Future reservoir pressures, psi</div>
+          <div id="oil-pres-list" class="presrow"></div>
+          <button id="oil-btn-sens" class="action secondary">Run sensitivities</button>
+        </fieldset>
+        <button id="oil-btn-solve" class="action">Solve well</button>
+        </div>
+        <div id="oil-mod-reserve" style="display:none">
+          <fieldset>
+            <legend>Reserve estimate — material balance (workbook: oil reserve estimate)</legend>
+            <div class="note">Well data, marches and the matched IPR are taken from the Well model module.</div>
+            <label class="radio"><input type="radio" name="oil-pressource" value="prod" checked /> 1. Prod data &amp; macro (Pres solver)</label>
+            <label class="radio"><input type="radio" name="oil-pressource" value="static" /> 2. Static Pres history (memory gauge)</label>
+            <label class="radio"><input type="radio" name="oil-pressource" value="rlt" /> 3. Reservoir limit (constant rate)</label>
+            <div id="oil-rsv-guidance" class="guidance"></div>
+            <div id="oil-rsv-prod">
+              <div class="senshead">prod_data — inputs green (GOR/WC blank = base), outputs dt / pr / z filled by the solver</div>
+              <div class="tbl-actions">
+                <button id="oil-prod-paste" class="copybtn" type="button">Paste from clipboard</button>
+                <button id="oil-prod-add" class="copybtn" type="button">+10 rows</button>
+                <button id="oil-prod-clear" class="copybtn" type="button">Clear</button>
+                <span class="note" style="margin:0">or click a cell and Ctrl+V (Date, FTHP, q, GOR, WC, Pwf)</span>
+              </div>
+              <table class="sens" id="oil-prod-table"></table>
+            </div>
+            <div id="oil-rsv-static" style="display:none">
+              <div class="senshead">Measured static reservoir pressures (memory-gauge surveys) — no IPR/VLP involved. Np/Gp are integrated from the prod-data table (selection 1).</div>
+              <table class="sens" id="oil-static-table"></table>
+            </div>
+            <div id="oil-rsv-rlt" style="display:none">
+              <div class="senshead">Reservoir limit (workbook sheet): m = &minus;slope(Pwf, t) over all rows, Ct = Cg&middot;Sg + Co&middot;So + Cw&middot;Sw + Cf, STOIP = q&#772;/(Ct&middot;m)</div>
+              <div id="oil-rlt-fields"></div>
+            </div>
+            <button id="oil-btn-reserve" class="action">Run selected method &rarr; STOIIP</button>
+            <div id="oil-reserve-result" class="note"></div>
+            <div id="oil-stoiip-banner" class="giipbanner"></div>
+          </fieldset>
+        </div>
+        <div id="oil-mod-forecast" style="display:none">
+          <fieldset>
+            <legend>Forecast — Tarner (saturation-tracking MB + nodal)</legend>
+            <div class="note">Well data, marches and the matched IPR are taken from the Well model module; N and the start state chain off the Reserve module (grey = calculated).</div>
+            <div class="senshead">Forecast Pwf source (one active)</div>
+            <label class="radio"><input type="radio" name="oil-pwfmode" value="vlp" checked /> Nodal at forecast FTHP (VLP-coupled)</label>
+            <label class="radio"><input type="radio" name="oil-pwfmode" value="fixed" /> Fixed minimum Pwf (workbook)</label>
+            <div id="oil-fc-fields"></div>
+            <button id="oil-btn-forecast" class="action">Run forecast</button>
+            <div id="oil-fc-result" class="note"></div>
+          </fieldset>
+        </div>
+      </div>
+      <div class="results">
+        <div id="oil-summary" class="summary"></div>
+        <div class="chartrow" id="oil-cr-nodal"><div id="oil-chart-nodal" class="chart"></div><div id="oil-table-nodal" class="datatable"></div></div>
+        <div class="chartrow" id="oil-cr-gl"><div id="oil-chart-gl" class="chart"></div><div id="oil-table-gl" class="datatable"></div></div>
+        <div id="oil-chart-sens" class="chart"></div>
+        <div class="chartrow" id="oil-cr-whp"><div id="oil-chart-whp" class="chart"></div><div id="oil-table-whp" class="datatable"></div></div>
+        <div class="chartrow" id="oil-cr-rsv1" style="display:none"><div id="oil-chart-rsv1" class="chart"></div><div id="oil-table-rsv1" class="datatable"></div></div>
+        <div class="chartrow" id="oil-cr-rsv2" style="display:none"><div id="oil-chart-rsv2" class="chart"></div><div id="oil-table-rsv2" class="datatable"></div></div>
+        <div class="chartrow stack" id="oil-cr-fc" style="display:none"><div id="oil-chart-fc" class="chart"></div><div id="oil-table-fc" class="datatable"></div></div>
+        <div class="chartrow" id="oil-cr-esptrav" style="display:none"><div id="oil-chart-esptrav" class="chart"></div><div id="oil-table-esptrav" class="datatable"></div></div>
+        <div class="chartrow stack" id="oil-cr-espsens" style="display:none"><div id="oil-chart-espsens" class="chart"></div><div id="oil-table-espsens" class="datatable"></div></div>
+      </div>
+    </section>
+
+    <section id="panel-water" class="panel" style="display:none">
+      <div class="inputs">
+        <fieldset>
+          <legend>Well type (one active)</legend>
+          <label class="radio"><input type="radio" name="water-welltype" value="producer" checked /> Producer</label>
+          <label class="radio"><input type="radio" name="water-welltype" value="injector" /> Injector</label>
+        </fieldset>
+        <fieldset id="water-lift-fieldset">
+          <legend>Lift type (one active)</legend>
+          <label class="radio"><input type="radio" name="water-lift" value="natural" checked /> Natural flow</label>
+          <label class="radio"><input type="radio" name="water-lift" value="gaslift" /> Gas lift</label>
+          <label class="radio"><input type="radio" name="water-lift" value="esp" /> ESP</label>
+        </fieldset>
+        <div class="note" style="margin:0 0 10px">Water well &mdash; the oil marches at their limiting case: API 10 (SG = 1.000), w.c. 100%, no gas. Rates are gross water; the IPR is the pure linear Darcy line (Pb = 0).</div>
+        <div id="water-form"></div>
+        <div id="water-lift-gl" style="display:none">
+          <fieldset>
+            <legend>Gas lift</legend>
+            <div id="water-gl-fields"></div>
+            <div class="senshead">Performance curve sweep</div>
+            <div id="water-gl-inputs"></div>
+            <button id="water-btn-gl" class="action secondary">Run gas-lift performance curve</button>
+            <div id="water-gl-result" class="note"></div>
+          </fieldset>
+        </div>
+        <div id="water-lift-esp" style="display:none">
+          <fieldset>
+            <legend>ESP</legend>
+            <div id="water-esp-fields"></div>
+            <div class="note">Pump &Delta;P and tubing gas are direct inputs for now — the pump-catalog,
+            intake/separator and matching solver arrive with the ESP stack.</div>
+          </fieldset>
+        </div>
+        <fieldset>
+          <legend>Production test (optional)</legend>
+          <div id="water-test"></div>
+          <button id="water-btn-calibrate" class="action secondary">Calibrate from test (get Pwf &rarr; J Jones &rarr; matched K)</button>
+          <div id="water-cal-result" class="note"></div>
+        </fieldset>
+        <fieldset id="water-sens-fieldset">
+          <legend>Sensitivities</legend>
+          <div class="senshead">VLP parameter sets (blank = base value)</div>
+          <table class="sens" id="water-sens-table"></table>
+          <div class="senshead">Future reservoir pressures, psi (J constant &mdash; water &mu;&middot;B do not change)</div>
+          <div id="water-pres-list" class="presrow"></div>
+          <button id="water-btn-sens" class="action secondary">Run sensitivities</button>
+        </fieldset>
+        <button id="water-btn-solve" class="action">Solve well</button>
+      </div>
+      <div class="results">
+        <div id="water-summary" class="summary"></div>
+        <div class="chartrow" id="water-cr-nodal"><div id="water-chart-nodal" class="chart"></div><div id="water-table-nodal" class="datatable"></div></div>
+        <div class="chartrow" id="water-cr-gl"><div id="water-chart-gl" class="chart"></div><div id="water-table-gl" class="datatable"></div></div>
+        <div id="water-chart-sens" class="chart"></div>
+        <div class="chartrow" id="water-cr-whp"><div id="water-chart-whp" class="chart"></div><div id="water-table-whp" class="datatable"></div></div>
+      </div>
+    </section>
+
+    <section id="panel-gas" class="panel" style="display:none">
+      <div class="inputs">
+        <fieldset>
+          <legend>Gas module (one active)</legend>
+          <label class="radio"><input type="radio" name="gas-module" value="well" checked /> Well model</label>
+          <label class="radio"><input type="radio" name="gas-module" value="reserve" /> Reserve estimate</label>
+          <label class="radio"><input type="radio" name="gas-module" value="forecast" /> Forecast</label>
+        </fieldset>
+        <div id="gas-mod-well">
+          <div id="gas-form"></div>
+          <fieldset>
+            <legend>IPR — Darcy Pr&sup2; is the main J</legend>
+            <label class="radio"><input type="radio" name="gas-iprmode" value="j" checked /> Darcy Pr&sup2; (default)</label>
+            <label class="radio"><input type="radio" name="gas-iprmode" value="cn" /> C &amp; n (calculated)</label>
+            <div id="gas-ipr-darcy">
+              <div id="gas-darcy-fields"></div>
+              <div class="senshead">Layers (one active)</div>
+              <label class="radio"><input type="radio" name="gas-mlmode" value="single" checked /> Single layer (default)</label>
+              <label class="radio"><input type="radio" name="gas-mlmode" value="multi" /> Multi-layer (optional)</label>
+              <div id="gas-ml" style="display:none">
+                <div class="senshead">Per-layer Darcy — Re/Rw shared; CGR/WGR blank = base. J-form collapse is exact.</div>
+                <table class="sens" id="gas-ml-table"></table>
+              </div>
+            </div>
+            <div id="gas-ipr-cn" style="display:none"><div id="gas-cn-fields"></div></div>
+          </fieldset>
+          <fieldset>
+            <legend>Multi-rate test (Pwf blank &rarr; get Pwf from THP)</legend>
+            <table class="sens" id="gas-test-table"></table>
+            <button id="gas-btn-calibrate" class="action secondary">Calibrate from test</button>
+            <div id="gas-cal-result" class="note"></div>
+          </fieldset>
+          <fieldset>
+            <legend>Sensitivities</legend>
+            <div class="senshead">VLP parameter sets (blank = base value)</div>
+            <table class="sens" id="gas-sens-table"></table>
+            <div class="senshead">Future reservoir pressures, psi</div>
+            <div id="gas-pres-list" class="presrow"></div>
+            <button id="gas-btn-sens" class="action secondary">Run sensitivities</button>
+          </fieldset>
+          <button id="gas-btn-solve" class="action">Solve well</button>
+        </div>
+        <div id="gas-mod-reserve" style="display:none">
+          <fieldset>
+            <legend>Reserve estimate — p/Z (workbook: gas reserve estimate)</legend>
+            <div class="note">Well data, marches and the matched IPR are taken from the Well model module.</div>
+            <label class="radio"><input type="radio" name="gas-pressource" value="prod" checked /> 1. Prod data &amp; macro (Pres solver)</label>
+            <label class="radio"><input type="radio" name="gas-pressource" value="sithp" /> 2. Pres from SITHP</label>
+            <label class="radio"><input type="radio" name="gas-pressource" value="rlt" /> 3. Reservoir limit (constant rate)</label>
+            <div id="gas-rsv-guidance" class="guidance"></div>
+            <div id="gas-rsv-prod">
+              <div class="senshead">prod_data — inputs green (CGR/WGR blank = base), outputs dt / pr / z filled by the solver</div>
+              <div class="tbl-actions">
+                <button id="gas-prod-paste" class="copybtn" type="button">Paste from clipboard</button>
+                <button id="gas-prod-add" class="copybtn" type="button">+10 rows</button>
+                <button id="gas-prod-clear" class="copybtn" type="button">Clear</button>
+                <span class="note" style="margin:0">or click a cell and Ctrl+V (Date, FTHP, q, CGR, WGR, Pwf)</span>
+              </div>
+              <table class="sens" id="gas-prod-table"></table>
+            </div>
+            <div id="gas-rsv-sithp" style="display:none">
+              <div class="senshead">Static surveys — q = 0 rows, Pres by the static gas march (well-model data + geothermal temp). Gp is taken from the cumulative of the prod data table (selection 1).</div>
+              <table class="sens" id="gas-sithp-table"></table>
+            </div>
+            <div id="gas-rsv-rlt" style="display:none">
+              <div class="senshead">Reservoir limit (workbook sheet): m = −slope(Pwf, t) over all rows, Ct = Cg·Sg + Co·So + Cw·Sw + Cf, GIIP = q̄/(Ct·m)</div>
+              <div id="gas-rlt-fields"></div>
+            </div>
+            <button id="gas-btn-reserve" class="action">Run selected method &rarr; GIIP</button>
+            <div id="gas-reserve-result" class="note"></div>
+            <div id="gas-giip-banner" class="giipbanner"></div>
+          </fieldset>
+        </div>
+        <div id="gas-mod-forecast" style="display:none">
+          <fieldset>
+            <legend>Forecast — p/Z tank + nodal</legend>
+            <div class="note">Well data, marches and the matched IPR are taken from the Well model module.</div>
+            <div id="gas-fc-fields"></div>
+            <button id="gas-btn-forecast" class="action">Run forecast</button>
+            <div id="gas-fc-result" class="note"></div>
+          </fieldset>
+        </div>
+      </div>
+      <div class="results">
+        <div id="gas-summary" class="summary"></div>
+        <div class="chartrow" id="gas-cr-nodal"><div id="gas-chart-nodal" class="chart"></div><div id="gas-table-nodal" class="datatable"></div></div>
+        <div id="gas-chart-sens" class="chart"></div>
+        <div class="chartrow" id="gas-cr-whp"><div id="gas-chart-whp" class="chart"></div><div id="gas-table-whp" class="datatable"></div></div>
+        <div class="chartrow" id="gas-cr-pz" style="display:none"><div id="gas-chart-pz" class="chart"></div><div id="gas-table-pz" class="datatable"></div></div>
+        <div class="chartrow stack" id="gas-cr-fc" style="display:none"><div id="gas-chart-fc" class="chart"></div><div id="gas-table-fc" class="datatable"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="error-bar" style="display:none"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

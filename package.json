@@ -1,0 +1,11 @@
+{
+  "name": "wellsim",
+  "version": "0.1.0",
+  "description": "Oil & gas well nodal analysis, reserve estimation and production forecast — JS port of the M. El-Ashry Excel toolset",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server/server.js"
+  }
+}

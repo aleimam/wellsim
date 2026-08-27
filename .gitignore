@@ -1,0 +1,14 @@
+# server case database — user credentials and client company cases: NEVER commit
+data/
+
+# proprietary source material (M. El-Ashry Excel toolset + training slides)
+oil excel/
+gas excel/
+training slids/
+*.pptx
+*.xls
+*.xlsm
+
+node_modules/
+*.log
+.DS_Store

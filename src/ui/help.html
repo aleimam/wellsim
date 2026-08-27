@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WellSim Manual</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Fira+Code:wght@400;500&display=swap">
+<style>
+:root {
+  --paper: #FAFBF9;
+  --ink: #1B2A38;
+  --muted: #5C7387;
+  --navy: #16324F;
+  --green: #1F7A44;
+  --blue: #1668B0;
+  --amber: #C77F14;
+  --line: #D7DEE5;
+  --card: #FFFFFF;
+  --code-bg: #F0F4F2;
+  --cell-in: #EAF6EA;   --cell-in-bd: #B9C7D2;
+  --cell-calc: #EEF1F4; --cell-calc-tx: #7D8B98;
+  --cell-out: #F5ECEF;  --cell-out-bd: #D9C6CD; --cell-out-tx: #5A4A52;
+  --thead: #EDF2F6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #10181F;
+    --ink: #DCE6EE;
+    --muted: #8FA5B8;
+    --navy: #9FBFDD;
+    --green: #4CBF7B;
+    --blue: #62A8E0;
+    --amber: #E0A045;
+    --line: #2A3947;
+    --card: #17222C;
+    --code-bg: #1C2933;
+    --cell-in: #1D3324;   --cell-in-bd: #3A5544;
+    --cell-calc: #222E38; --cell-calc-tx: #8FA5B8;
+    --cell-out: #33222A;  --cell-out-bd: #55404A; --cell-out-tx: #C7A9B4;
+    --thead: #1C2833;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #10181F;
+  --ink: #DCE6EE;
+  --muted: #8FA5B8;
+  --navy: #9FBFDD;
+  --green: #4CBF7B;
+  --blue: #62A8E0;
+  --amber: #E0A045;
+  --line: #2A3947;
+  --card: #17222C;
+  --code-bg: #1C2933;
+  --cell-in: #1D3324;   --cell-in-bd: #3A5544;
+  --cell-calc: #222E38; --cell-calc-tx: #8FA5B8;
+  --cell-out: #33222A;  --cell-out-bd: #55404A; --cell-out-tx: #C7A9B4;
+  --thead: #1C2833;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.6 "Source Sans 3", system-ui, sans-serif;
+}
+.wrap { display: flex; max-width: 1180px; margin: 0 auto; gap: 40px; padding: 0 24px; }
+nav.toc {
+  width: 220px; flex: none; position: sticky; top: 0; align-self: flex-start;
+  max-height: 100vh; overflow-y: auto; padding: 28px 0 40px;
+  font-size: 13px;
+}
+nav.toc .tochead { font: 700 11px/1 "Source Sans 3", sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin: 18px 0 6px; }
+nav.toc a { display: block; color: var(--ink); text-decoration: none; padding: 3px 0 3px 10px; border-left: 2px solid var(--line); }
+nav.toc a:hover, nav.toc a:focus-visible { border-left-color: var(--green); color: var(--green); outline: none; }
+main { flex: 1; min-width: 0; max-width: 780px; padding-bottom: 90px; }
+@media (max-width: 860px) { nav.toc { display: none; } .wrap { gap: 0; } }
+
+header.hero { border-bottom: 3px solid var(--navy); padding: 44px 0 26px; margin-bottom: 8px; }
+header.hero h1 { font: 700 42px/1.05 "Bitter", Georgia, serif; margin: 0 0 8px; color: var(--navy); letter-spacing: -0.5px; }
+header.hero p.tag { margin: 0 0 16px; font-size: 17px; color: var(--muted); max-width: 60ch; }
+.statusrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 500 12px/1 "Fira Code", ui-monospace, monospace; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
+.chip b { color: var(--green); font-weight: 500; }
+
+h2 { font: 700 26px/1.2 "Bitter", Georgia, serif; color: var(--navy); margin: 52px 0 4px; text-wrap: balance; }
+h2 .sect { color: var(--green); }
+h3 { font: 600 19px/1.25 "Bitter", Georgia, serif; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font: 700 14px/1.3 "Source Sans 3", sans-serif; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); margin: 24px 0 6px; }
+p, ul, ol { max-width: 70ch; }
+p { margin: 10px 0; }
+li { margin: 4px 0; }
+a { color: var(--blue); }
+.lede { font-size: 17px; color: var(--muted); margin-top: 2px; }
+hr.sect { border: 0; border-top: 1px solid var(--line); margin: 44px 0 0; }
+
+.tblwrap { overflow-x: auto; margin: 14px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { background: var(--thead); text-align: left; font-weight: 600; padding: 7px 10px; border: 1px solid var(--line); white-space: nowrap; }
+td { padding: 6px 10px; border: 1px solid var(--line); vertical-align: top; }
+td.num, .mono { font-family: "Fira Code", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 13px; }
+td.ok { color: var(--green); font-weight: 600; }
+td.plan { color: var(--amber); }
+
+pre.eq {
+  background: var(--code-bg); border: 1px solid var(--line); border-left: 3px solid var(--green);
+  border-radius: 4px; padding: 12px 16px; overflow-x: auto;
+  font: 400 13.5px/1.65 "Fira Code", ui-monospace, monospace; margin: 12px 0;
+}
+code { font: 400 0.9em "Fira Code", ui-monospace, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+pre.eq code { background: none; padding: 0; }
+
+.note {
+  border-left: 3px solid var(--amber); background: var(--card); border-radius: 0 4px 4px 0;
+  padding: 10px 16px; margin: 14px 0; font-size: 14.5px; max-width: 70ch;
+}
+.note b:first-child { color: var(--amber); }
+
+.cells { display: flex; flex-wrap: wrap; gap: 14px; margin: 14px 0; }
+.cellcard { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.cell {
+  display: inline-block; min-width: 74px; text-align: right; padding: 4px 8px;
+  font: 400 13px "Fira Code", ui-monospace, monospace; border-radius: 3px;
+}
+.cell.in   { background: var(--cell-in); border: 1px solid var(--cell-in-bd); }
+.cell.calc { background: var(--cell-calc); border: 1px dashed var(--cell-in-bd); color: var(--cell-calc-tx); font-style: italic; }
+.cell.out  { background: var(--cell-out); border: 1px solid var(--cell-out-bd); color: var(--cell-out-tx); }
+
+.selgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 14px 0; }
+.selcard { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+.selcard .n { font: 700 12px/1 "Fira Code", ui-monospace, monospace; color: var(--green); }
+.selcard h5 { font: 600 15.5px/1.3 "Bitter", Georgia, serif; margin: 6px 0 6px; }
+.selcard p { font-size: 13.5px; margin: 0; color: var(--muted); }
+
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.appbar { background: #16324F; color: #fff; padding: 10px 24px; display: flex; align-items: baseline; gap: 14px; }
+.appbar .brand { font: 700 18px/1 "Bitter", Georgia, serif; letter-spacing: 0.5px; }
+.appbar .sub { color: #9FB8CC; font-size: 12px; flex: 1; }
+.appbar a.back { color: #CFE0EE; font-size: 13px; text-decoration: none; border: 1px solid #2C5A86; padding: 5px 14px; border-radius: 5px; }
+.appbar a.back:hover { background: #23486B; }
+</style>
+</head>
+<body>
+<div class="appbar">
+  <span class="brand">WellSim</span>
+  <span class="sub">Manual &middot; user guide &amp; equations reference</span>
+  <a class="back" href="/">&larr; Open the app</a>
+</div>
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <div class="tochead">Overview</div>
+  <a href="#status">What&rsquo;s built</a>
+  <a href="#run">Run &amp; test</a>
+  <a href="#conventions">UI conventions</a>
+  <div class="tochead">User guide</div>
+  <a href="#oil-well">Oil &mdash; well model</a>
+  <a href="#oil-reserve">Oil &mdash; reserve</a>
+  <a href="#gas-well">Gas &mdash; well model</a>
+  <a href="#gas-reserve">Gas &mdash; reserve</a>
+  <a href="#oil-forecast">Oil &mdash; forecast</a>
+  <a href="#gas-forecast">Gas &mdash; forecast</a>
+  <div class="tochead">Reference</div>
+  <a href="#eq-const">Constants</a>
+  <a href="#eq-oilpvt">Oil PVT</a>
+  <a href="#eq-gaspvt">Gas PVT</a>
+  <a href="#eq-wellbore">Trajectory &amp; marches</a>
+  <a href="#eq-ipr">IPR</a>
+  <a href="#eq-nodal">Nodal analysis</a>
+  <a href="#eq-reserves">Reserves</a>
+  <a href="#eq-forecast">Forecast</a>
+  <a href="#deviations">Workbook deviations</a>
+  <a href="#trouble">Troubleshooting</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>WellSim Manual</h1>
+  <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a zero-dependency web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
+  <div class="statusrow">
+    <span class="chip"><b>165</b> regression tests passing</span>
+    <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
+    <span class="chip">port 3355 &middot; zero npm dependencies</span>
+  </div>
+</header>
+
+<h2 id="status">What&rsquo;s built</h2>
+<div class="tblwrap"><table>
+<tr><th>Module</th><th>Oil</th><th>Gas</th></tr>
+<tr><td><b>1 &mdash; Well model</b> (nodal analysis)</td>
+    <td class="ok">Natural &check; &middot; Gas lift &check; &middot; <b>ESP full stack</b> &check; (68-pump database, matching, design proof) &middot; Water Well tab &check; (producer + injector)</td>
+    <td class="ok">Natural &check;</td></tr>
+<tr><td><b>2 &mdash; Reserve estimate</b></td>
+    <td class="ok">&check; Havlena&ndash;Odeh MB &middot; static-gauge MB &middot; reservoir limit</td>
+    <td class="ok">&check; p/Z prod data &middot; p/Z from SITHP &middot; reservoir limit</td></tr>
+<tr><td><b>3 &mdash; Forecast</b></td>
+    <td class="ok">&check; Tarner (saturation-tracking MB + nodal)</td>
+    <td class="ok">&check; p/Z tank + nodal, history overlay</td></tr>
+</table></div>
+
+<p>Project-wide principles: <b>Darcy IPR is the default and dominant J</b> for both fluids (the test J calibrates a matched permeability at your judged skin); two pressure records (Pri immutable anchor, Pr working); <b>explicit physics only</b> &mdash; Brill &amp; Beggs Z everywhere, no goal-seek; well-head temperature always <em>calculated</em> (Ramey); gas impurities are inputs wherever gas properties appear.</p>
+
+<h2 id="run">Run &amp; test</h2>
+<pre class="eq">node src/server/server.js        # serves http://localhost:3355
+node --test                      # 133 tests</pre>
+<p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>.</p>
+
+<h2 id="conventions">UI conventions</h2>
+<div class="cells">
+  <div class="cellcard"><span class="cell in">1625</span> <span><b>Input</b> &mdash; you type it</span></div>
+  <div class="cellcard"><span class="cell calc">2059.9</span> <span><b>Input-or-calculated</b> &mdash; blank = program fills it (grey); typing reclaims it</span></div>
+  <div class="cellcard"><span class="cell out">3511.3</span> <span><b>Output</b> &mdash; read-only (the workbook&rsquo;s pink cells)</span></div>
+</div>
+<ul>
+  <li><b>Selection modules</b>: where the workbook had parallel sheets, one radio selection is active and the rest hide (lift type, IPR basis, module, reserve pressure-source).</li>
+  <li><b>Side tables</b> beside each chart hold the plotted numbers with a Copy button (tab-separated, pastes into Excel).</li>
+  <li><b>Production tables</b> accept clipboard paste (button or Ctrl+V in a cell); column order <code>Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf</code>; header lines auto-skip; up to 200 rows.</li>
+  <li><b>Dates</b>: <code>17-Nov-14</code>, <code>17-Nov-2014 13:00:00</code>, <code>05/03/2014 06:30</code>, ISO, or a day serial. Impossible dates are rejected with the row number &mdash; nothing silently rolls over. dt = days from the first row; time-of-day honoured.</li>
+  <li><b>Save as / Open</b> (header): the whole case &mdash; every input, selection and production table across all three tabs &mdash; saves to a JSON file and restores in one click; program-filled grey cells stay program-filled.</li>
+  <li><b>Company case database</b> (Sign in, header): register a company account (username + password, scrypt-hashed on the server) to save cases server-side under <code>data/cases/&lt;company&gt;/</code> &mdash; every user of a company shares its case list (save / load / delete). <b>The free version stays</b>: every calculation works without an account; only the server case store needs one. Sessions are in-memory (a server restart signs everyone out); put TLS in front for internet deployment.</li>
+  <li><b>Mobile</b>: below 640&nbsp;px the layout stacks and the action button stays pinned.</li>
+</ul>
+
+<hr class="sect">
+<h2 id="oil-well"><span class="sect">Oil</span> &mdash; Well model</h2>
+<p class="lede">Lift types: Natural flow &middot; Gas lift &middot; ESP (one active).</p>
+<div class="note"><b>Water Well tab</b> &mdash; a dedicated tab beside Oil Well and Gas Well: the oil-tab structure without the Reserve/Forecast modules (lift types, get-Pwf calibration and sensitivities included), running the same modified-Griffith march at its limiting case: API fixed at 10&deg; (SG = 1.000 exactly), w.c. 100&nbsp;%, GOR = Rsi = 0, Pb = 0. Rates are <b>gross water</b> (bbl/d); the IPR is built in as the pure linear Darcy form (no Vogel curvature) with the Darcy J on water properties (&mu; = 0.5 cp, Bw = 1); future-pressure IPR sensitivities keep J constant. Defaults: FTHP 200 psi &middot; 2000 bbl/d &middot; Pri 4800 psi. Head-dominated: it flows naturally only when Pr beats THP + the static water column (&asymp;&nbsp;0.446 psi/ft at SG 1.05) &mdash; otherwise &ldquo;no-intersection&rdquo; is the physics, not an error.</div>
+<div class="note"><b>Injector</b> &mdash; the Water Well tab has a Producer | Injector selector. The injector reverses the march (water flows DOWN: BHIP = injection THP + head &minus; friction) and relaxes temperatures top-down from the injection-water temperature (input, default 90&deg;F) toward geothermal &mdash; the bottomhole injection temperature (BHT) is the calculated output. Injectivity IPR: q = J&middot;(Pwf &minus; Pr) with the same water Darcy J; operating point = available BHIP (falls with rate) crossing Pr + q/J (rises). Charts: injectivity nodal + injection-THP-required vs rate with BHT on the second axis. Calibration from an injection test (BHIP input-or-marched &rarr; J injectivity &rarr; matched K). Lift and sensitivities hide for the injector; when THP + head cannot reach Pr the THP deficit is reported. Laminar Fanning 16/Re below the transition, Chen above.</div>
+
+<h4>Defaults</h4>
+<div class="tblwrap"><table>
+<tr><th>Group</th><th>Fields (default)</th></tr>
+<tr><td>Well &amp; flow</td><td class="num">FTHP 700 psi &middot; rate 2100 stb/d &middot; WC 50% &middot; GOR 5000 scf/stb &middot; ID 2.992 in &middot; roughness 0.00006</td></tr>
+<tr><td>Trajectory</td><td class="num">top perf 2810 mAH &middot; kick-off 1910 m &middot; deviation 7&deg;</td></tr>
+<tr><td>Fluids &amp; PVT</td><td class="num">46 API &middot; &gamma;g 0.842 &middot; Rsi 700 scf/stb &middot; Tres 201&deg;F &middot; &mu; tubing 6 cp &middot; water SG 1.05 &middot; Pb blank = calc</td></tr>
+<tr><td>Heat transfer</td><td class="num">soil 90&deg;F &middot; U 3 BTU/hr&middot;ft&sup2;&middot;&deg;F &middot; OD 3.5 in &middot; Cp 0.51</td></tr>
+<tr><td>IPR (Darcy)</td><td class="num">Pri 3550 &middot; K 50 mD &middot; H 42.653 ft &middot; Re 1640.5 &middot; Rw 0.5104 &middot; skin 0</td></tr>
+<tr><td>Test</td><td class="num">2100 stb/d @ 700 psi &middot; Pwf blank = get&nbsp;Pwf</td></tr>
+<tr><td>Gas lift</td><td class="num">injection 2490.92 mTVD &middot; sweep to 2 MMscf/d in 10 steps</td></tr>
+<tr><td>ESP</td><td class="num">pump 2985 mTVD &middot; &Delta;P 1325.16 psi (manual) &middot; tubing gas blank = formation</td></tr>
+</table></div>
+
+<h4>Workflow</h4>
+<ol>
+  <li><b>Solve well</b> &mdash; IPR + VLP, operating point (rate, Pwf, calculated WHT), AOF, well-head PQ curve with WHT on the second axis.</li>
+  <li><b>Calibrate from test</b> &mdash; get&nbsp;Pwf marches the test Pwf from FTHP if blank; the Jones/test J is computed Pri-anchored; <b>you judge skin</b> (guidance table by drilling/completion method) and the program back-solves the matched K so J(Darcy)&nbsp;=&nbsp;J(test).</li>
+  <li><b>Sensitivities</b> &mdash; VLP parameter sets (blank = base) and future pressures (0.75/0.5/0.25&nbsp;&times;&nbsp;Pr) with the future-J chain.</li>
+  <li><b>Gas-lift performance</b> &mdash; injection sweep, optimum, incremental dQ/dInj.</li>
+  <li><b>ESP</b> &mdash; the full pump stack: 68-pump database in the background (WD/WG/WE/FLEX/ESP-B) with add-new-pump (custom per-stage curve) and Manual &Delta;P fallback; affinity scaling 30&ndash;60&nbsp;Hz with the down-thrust/BEP/up-thrust envelope; intake free-gas block with the default-ON gas separator (95%, &ldquo;Separator required&rdquo; above 10% free gas, tubing GLR cut by the BE74 fraction); the coupled solve closes &Delta;P&rarr;march&rarr;intake&rarr;head&rarr;&Delta;P and matches the bottom-up traverse (Pwf from the IPR at CONSTANT Pres) to the top-down one at the intake &mdash; PI is the IPR match factor. <b>Match stages</b> (first run, new pump, wear 0) solves the installed stage count with a DESIGN PROOF: all stage-dependent march pressures must stay above the design floor (input, default 300 psi) — the minimum binds at the pump intake, and a match that would starve it is capped at the stage count where intake = floor; <b>Match wear + PI</b> from measured Pint/Pdis (validation: recovers the workbook&rsquo;s PI 2.7 as 2.698). Two ESP views: <b>Model match</b> with the FINAL charts (IPR vs the coupled ESP-VLP nodal plot, wellhead PQ &amp; WHT, PumpCurve with the results block beside, and the Traverse on its own row with measured markers &mdash; also shown in Manual-&Delta;P mode, where the input &Delta;P appears as the highlighted step at pump depth) and <b>Sensitivity</b> &mdash; future-Pres cases (Darcy future J), each FULLY solved: the chart shows every case&rsquo;s IPR with its solved node starred, and the table lists the ESP data at each node (rate, Pwf, Pint, Pdis, &Delta;P, head, Qg@pump, gradient, free gas %, WHT, thrust).</li>
+</ol>
+
+<div class="note"><b>Multi-layer IPR (optional, oil &amp; gas)</b> &mdash; a Layers selector (Single default | Multi-layer): per-layer K/H/skin/Pr (Re/Rw &amp; Pb shared) + per-layer fluids (blank = base), each layer&rsquo;s Darcy J with its own &mu;&middot;B (oil) / &mu;&middot;z (gas) at the layer&rsquo;s Pr. Layers collapse to one final J (training deck 4): oil via the theoretical average pressure + solution-point match; gas exactly (J_t = &Sigma;J&#7522;, PrAvg = &radic;(&Sigma;J&#7522;Pr&#7522;&sup2;/&Sigma;J&#7522;)). Blended ratios drive the marches; a Layers-@-operating-Pwf table shows each layer&rsquo;s contribution with crossflow flagged. Darcy basis only (C&amp;n has no exact collapse). <b>Fit to test:</b> with Multi-layer active, Calibrate also fits the commingled system &mdash; every layer K is scaled by one closed-form factor &lambda; = J(test)/J(total) so the total J lands exactly on the Jones/test J (layer K ratios preserved; solved K&rsquo;s written back into the table). Sensitivities stay single-layer.</div>
+<h2 id="oil-reserve"><span class="sect">Oil</span> &mdash; Reserve estimate</h2>
+<div class="selgrid">
+  <div class="selcard"><span class="n">1</span><h5>Prod data &amp; macro</h5>
+    <p>Per-row Pwf (input-or-march) &rarr; Pr by composite-Vogel inversion iterated with J_2 &rarr; Havlena&ndash;Odeh MB. Headline N = AVERAGE(F/Eo); slope of F&nbsp;vs&nbsp;Eo as cross-check; F&ndash;Eo crossplot + N&nbsp;vs&nbsp;Np charts.</p></div>
+  <div class="selcard"><span class="n">2</span><h5>Static Pres history</h5>
+    <p>Measured memory-gauge pressures typed directly (Date | Pres) &mdash; no IPR/VLP anywhere. Np/Gp from the prod-data cumulative. The strongest data when surveys exist.</p></div>
+  <div class="selcard"><span class="n">3</span><h5>Reservoir limit</h5>
+    <p>m = &minus;slope(Pwf, t), Ct = Cg&middot;Sg+Co&middot;So+Cw&middot;Sw+Cf, STOIP = q&#772;/(Ct&middot;m). Defaults Sg 0.1 / So 0.8 / Sw 0.15. Early lower bound.</p></div>
+</div>
+<div class="note"><b>Keep the window early and short.</b> This is an early-production method &mdash; on an undersaturated pressure path Eo is compressibility-only, and years-apart rows legitimately blow N up. Demo data (days apart) gives 14.7 / 91.9 / 1.5 MMstb across the three selections &mdash; the spread is the tool exposing input uncertainty; judge each method by its own inputs.</div>
+
+<hr class="sect">
+<h2 id="gas-well"><span class="sect">Gas</span> &mdash; Well model</h2>
+<h4>Defaults</h4>
+<div class="tblwrap"><table>
+<tr><th>Group</th><th>Fields (default)</th></tr>
+<tr><td>Well &amp; flow</td><td class="num">FTHP 1625 psi &middot; 14.137 MMscf/d &middot; CGR 57.436 &middot; WGR 3.846 stb/MMscf &middot; ID 2.992 in &middot; base roughness 0.0021 in</td></tr>
+<tr><td>Trajectory</td><td class="num">top perf 3013 mAH &middot; kick-off 690 m &middot; deviation 23.65&deg;</td></tr>
+<tr><td>Fluids &amp; PVT</td><td class="num">cond. 48.7 API &middot; &gamma;g 0.763 &middot; N&#8322; 1.2% &middot; CO&#8322; 3% &middot; H&#8322;S 2 ppm &middot; Tres 232&deg;F &middot; &mu;cond 2 cp &middot; &sigma; 30 dyn/cm</td></tr>
+<tr><td>Reservoir</td><td class="num">Pri 3800 psi &middot; Pr blank = Pri</td></tr>
+<tr><td>IPR (Darcy)</td><td class="num">K 5 mD &middot; H 80 ft &middot; Re 1640.5 &middot; Rw 0.5104 &middot; skin 0</td></tr>
+<tr><td>Multi-rate test</td><td class="num">2440/5.192 &middot; 2000/10.002 &middot; 1625/14.137 (psi / MMscf/d), Pwf blank = get Pwf</td></tr>
+</table></div>
+<p>IPR basis (one active): <b>Darcy Pr&sup2;</b> (default, dominant) or <b>C&nbsp;&amp;&nbsp;n</b> (grey = fitted from the test). Calibration fits C&amp;n, computes the test J, and matches Darcy K at your judged skin. Impurities feed the sour pseudo-critical route everywhere.</p>
+
+<h2 id="gas-reserve"><span class="sect">Gas</span> &mdash; Reserve estimate</h2>
+<div class="selgrid">
+  <div class="selcard"><span class="n">1</span><h5>Prod data &amp; macro</h5>
+    <p>Per-row Pwf (input-or-march) &rarr; Pr = &radic;(1000q/J + Pwf&sup2;) &rarr; explicit Z &rarr; Gp trapezoid &rarr; p/Z vs Gp line &rarr; minimum connected GIIP.</p></div>
+  <div class="selcard"><span class="n">2</span><h5>Pres from SITHP</h5>
+    <p>Static shut-in surveys; Pres by the static gas march (gas-head-only stations, geothermal T, per-station Z &mdash; 1.2% vs the workbook case). Gp from prod cumulative; no IPR/VLP.</p></div>
+  <div class="selcard"><span class="n">3</span><h5>Reservoir limit</h5>
+    <p>GIIP = q&#772;/(Ct&middot;m)/1000. Defaults Sg 0.85 / So 0 / Sw 0.15; Cg grey = from two Bg points; slim table + Pwf-decline chart.</p></div>
+</div>
+
+<h2 id="oil-forecast"><span class="sect">Oil</span> &mdash; Forecast (Tarner)</h2>
+<p>Saturation-tracking material-balance forecast (the workbook Tarner sheet). N and the start state (date, Np, Pres) are grey input-or-calculated, chained off the Reserve module. Per step the two sheet residuals are solved deterministically: pressure closes the gas balance (Gp by GOR trapezoid = Gp from MB), saturation closes So = (1&minus;Swi)(N&minus;Np)Bo/(N&middot;Boi(1&minus;ct&Delta;p)); rel-perm from the sheet&rsquo;s Kro(So)/Krg(Sg) polynomials; GOR = Rs + (Krg/Kro)(&mu;oBo/&mu;gBg); rate qo = J1&middot;(Kro/&mu;o)/Bo&middot;(P&minus;Pwf) with J1 = 0.00708Kh/(ln(Re/Rw)&minus;0.75+S). Forecast Pwf source (one active): <b>nodal at forecast FTHP</b> (VLP-coupled &mdash; the author&rsquo;s commented-out intent, default) or <b>fixed minimum Pwf</b> (the sheet&rsquo;s active behavior). Defaults: step 30 d &middot; FTHP 150 psi &middot; forecast W.C 0 &middot; min Pwf 500 &middot; Swi 0.15 &middot; Cw 2.63e-6 &middot; Cf 3.25e-6 &middot; abandonment 50 stb/d. Deviations: PVT stepped at the NEAREST SOLVED Pres &mdash; each step evaluates Rs/Bo/Bg/&mu; once at the previous step&rsquo;s converged pressure and holds them through the solve (user directive; the saved sheet froze them at initial values); Brent/alternation to convergence instead of 5 GoalSeek loops; the rate stays coupled to the trial pressure within each step, exactly like the sheet&rsquo;s K/M columns under GoalSeek. Chart: history + forecast (rate, GOR, Pres) on a calendar axis, table below.</p>
+
+<h2 id="gas-forecast"><span class="sect">Gas</span> &mdash; Forecast</h2>
+<p>p/Z tank coupled to the nodal model, <b>chained off the end of history</b>: start date / start Gp / start Pres are grey input-or-calculated (last prod date, cumulative, minimum solved Pres). Defaults: step 30 d &middot; FTHP 300 psi &middot; plateau 12 MMscf/d &middot; abandonment 1 MMscf/d &middot; max 60 steps &middot; GIIP &amp; p&#7522;/Z&#7522; grey = from the reserve fit.</p>
+<p>Each step: Pr from the p/Z line (first step anchors on start Pres) &rarr; Darcy IPR at Pr &rarr; nodal operating point at forecast FTHP &rarr; q = min(op, plateau) &rarr; Gp advances. Terminates on abandonment / depletion / dead well / max steps, reporting EUR and recovery %. The chart overlays history + forecast on a calendar-date axis; the results table sits below it.</p>
+
+<hr class="sect">
+<h2 id="eq-const">Constants &amp; conversions</h2>
+<div class="tblwrap"><table>
+<tr><th>Constant</th><th>Value</th></tr>
+<tr><td>scf &rarr; m&sup3;</td><td class="num">0.02831684639</td></tr>
+<tr><td>bbl &rarr; m&sup3;</td><td class="num">0.158987304</td></tr>
+<tr><td>Water density</td><td class="num">998.9926968 kg/m&sup3; &equiv; 62.36509524 lb/ft&sup3;</td></tr>
+<tr><td>psi &rarr; Pa</td><td class="num">1 / 0.000145037738</td></tr>
+<tr><td>&pi; (trajectory cosine)</td><td class="num">22/7 &nbsp;(Excel legacy, preserved)</td></tr>
+<tr><td>&pi; (areas)</td><td class="num">3.14</td></tr>
+<tr><td>Pb calibration constant</td><td class="num">2.1045604254721</td></tr>
+</table></div>
+
+<h2 id="eq-oilpvt">Oil PVT (Standing-metric family)</h2>
+<p>With T<sub>C</sub> = (T&minus;32)&middot;5/9, &rho;&#8338; = 141.5/(131.5+API)&middot;998.9926968 kg/m&sup3;, rs in m&sup3;/m&sup3;.</p>
+<pre class="eq">Pb [psi]  = 125·[ (582·rsi/γg)^0.83 · 10^(0.00164·Tc − 1768/ρo) − 1.4 ] / 14.5 · 2.1045604254721
+Rs(P&lt;Pb)  : rs = (γg/582) · [ (8e-6·P_Pa + 1.4) · 10^(1768/ρo − 0.00164·Tc) ]^(1/0.83);  Rs = Rsi above Pb
+Bo_sat    = 0.9759 + 12e-5 · (177·rs·√(γg/ρo) + 2.25·Tc + 40)^1.2
+Bo(P&gt;Pb)  = e^(3e-6·(Pb−P)) · Bo_sat(Rsi)
+μ_od (Glaso)      = 3.141e10 · T_F^(−3.444) · (log10 API)^a ,  a = 10.313·log10(T_F) − 36.447
+Beggs–Robinson    : A = 10.715·(Rs+100)^−0.515 ,  B = 5.44·(Rs+150)^−0.338 ,  μo = A·μod^B
+Vasquez–Beggs P&gt;Pb: μ = μob·(P/Pb)^m ,  m = 2.6·P^1.187·10^(−3.9e-5·P − 5)</pre>
+
+<h2 id="eq-gaspvt">Gas PVT</h2>
+<pre class="eq">Sweet pcrits (oil family): Tpc = 169 + 314·γg     Ppc = 708.75 − 57.7·γg
+Sour route (gas wells)   : γhc = (γg − 0.9672·yN2 − 1.5195·yCO2 − 1.1762·yH2S)/(1 − Σy)
+  Tc_hc = 187 + 330·γhc − 71.5·γhc²      Pc_hc = 706 + 51.7·γhc − 11.1·γhc²
+  Kay mixing (+227.3/547.6/672.4 T; +493/1071/1306 P) + Wichert–Aziz ε correction</pre>
+<pre class="eq">Brill &amp; Beggs Z (explicit — the ONLY Z model):
+A = 1.39·(Tpr−0.92)^0.5 − 0.36·Tpr − 0.101
+B = (0.62−0.23·Tpr)·Ppr + (0.066/(Tpr−0.86) − 0.037)·Ppr² + 0.32/10^(9(Tpr−1))·Ppr⁶
+C = 0.132 − 0.32·log10(Tpr)         D = 10^(0.3106 − 0.49·Tpr + 0.1824·Tpr²)
+Z = A + (1−A)/e^B + C·Ppr^D</pre>
+<pre class="eq">μg = μ_base(γg,T)/Tpr · exp( Dempsey poly16(Ppr,Tpr) )   (a0 = −2.462 … a11 = 0.00441, sheet column V)
+ρg = 28.97·γg·P / (Z·10.73·(T+460))  [lb/ft³]
+b (march)       = 0.0283·Z·(T+460)/(P+14.5)
+Bg (res. limit) = 0.00504·5.61·(T+460)·Z/P          [cf/scf]
+Bg (oil MB)     = 0.0283·Z·(T+460)/(P+14.5)/5.615    [bbl/scf]</pre>
+<p>Quirk preserved: the oil family anchors T<sub>pr</sub> at station 1; the gas march uses local T<sub>pr</sub>.</p>
+
+<h2 id="eq-wellbore">Trajectory, temperatures &amp; marches</h2>
+<pre class="eq">TVD = kickoff + (AH − kickoff)·cos(θ·(22/7)/180)
+Ramey WHT (always calculated):
+  K10 = (OD_ft·3.14·U)/((w/24)·Cp)      K11 = e^(−K10·L₁)   (L₁ = FIRST station spacing — sheet quirk)
+  T_shelf(x) = T_soil + (T_res−T_soil)·TVD(x)/TVD_tot
+  bottom-up: T(i) = T_shelf(i) + (T(i+1) − T_shelf(i))·K11</pre>
+<pre class="eq">Chen friction (Fanning):
+  1/√f = −4·log10[ ε/3.7065 − (5.0452/Re)·log10( ε^1.1098/2.8257 + (7.149/Re)^0.8981 ) ]
+dP_fric/dx = (1/144)·f·w²/(7.413e10·d_ft⁵·ρ_mix)·matchFriction
+Head acts on ΔTVD, friction on ΔAH — explicit Euler, 25–30 stations, no iteration.</pre>
+<p><b>Oil march (modified Griffith)</b> &mdash; one march for natural / gas lift / ESP:</p>
+<pre class="eq">E_L = 1 − 0.38·(1 + v_m/0.8 − √disc)                      (Griffith, author's 0.38)
+Ashry head factor (applied to the hydrostatic term):
+  f_WC  = 7.27117418e-6·WC² − 1.19359442e-3·WC + 1.00062546
+  GOR≤400   : f_GOR = −6.59987105e-7·GOR² + 3.56896045e-4·GOR + 1.02495053
+  400–5000  : f_GOR =  1.97914840e-8·GOR² − 1.61983769e-4·GOR + 1.09560265   (capped at 5000)
+  F_head = (f_GOR·f_WC)^0.82</pre>
+<p>Segments: natural 29 stations; gas lift 15+14 around the injection point; ESP 26 + pump node + 2 (&Delta;P at the pump, separated tubing gas above, back-march for intake with properties at max(P,&nbsp;100)).</p>
+<p><b>Gas march (modified Gray)</b> &mdash; Gray holdup with condensate + water loading, effective-roughness friction (base 0.0021&nbsp;in), local T<sub>pr</sub>. Bit-parity pins: BHP!D51 = 3598.66511095252 @ 1e-8; three real get&nbsp;Pwf points (3414.02 / 2913.97 / 2647.82 psi).</p>
+
+<h2 id="eq-ipr">IPR</h2>
+<pre class="eq">Oil — composite Vogel (q_gross; q_oil = q_gross·(1−WC/100)):
+  Pr&gt;Pb, Pwf≥Pb : q = J·(Pr − Pwf)
+  Pr&gt;Pb, Pwf&lt;Pb : q = J·(Pr − Pb) + (J·Pb/1.8)·(1 − 0.2·Pwf/Pb − 0.8·(Pwf/Pb)²)
+  Pr≤Pb         : q = (J·Pr/1.8)·(1 − 0.2·Pwf/Pr − 0.8·(Pwf/Pr)²)
+Darcy J (dominant): J = 0.00708·K·h / [ μo·Bo·(ln(Re/Rw) − 0.75 + S) ]
+Calibrate: user judges skin → closed-form matched K so J_Darcy = J_test (Pri-anchored)
+Future J (J_2x): μo·Bo re-evaluated at the future Pr, with Beggs–Robinson A/B at the
+  CURRENT-Pr Rs (sheet quirk). Pins: J_21–23 = 5.27146844059 / 5.8313895807703 / 6.78094220552862</pre>
+<pre class="eq">Gas:
+  Darcy Pr² : q [MMscf/d] = J·(Pr² − Pwf²)/1000        J_test = 1000·q/(Pri² − Pwf²)
+  From K    : J = 703e-6·K·h / [ μg·Z·(T+460)·(ln(0.472·Re/Rw) + S) ]
+  C &amp; n     : q = C·(Pr² − Pwf²)^n                     (log-log least squares)
+  Pr from test: Pr = √(1000·q/J + Pwf²)   |   Pr = √((q/C)^(1/n) + Pwf²)</pre>
+<p>Multi-layer (optional): per-layer rates at common Pwf with crossflow warnings; equivalent record gas-exact (J_t = &Sigma;J&#7522;, Pr&#8320; = &radic;(&Sigma;J&#7522;Pr&#7522;&sup2;/&Sigma;J&#7522;)); oil Pr-average solves &Sigma;Q&#7522; = 0.</p>
+
+<h2 id="eq-nodal">Nodal analysis</h2>
+<pre class="eq">Operating point: Brent root of R(q) = VLP(q) − IPR(q), highest-rate crossing (stable branch)
+Well-head curve: WHP(q) = Pwf_IPR(q) − Pwf_VLP(q) + FTHP, with calculated WHT per rate
+get_Pwf: any blank test/production Pwf is marched from its FTHP at its own rate and ratios</pre>
+
+<h2 id="eq-reserves">Reserves</h2>
+<pre class="eq">GAS — p/Z (selections 1 &amp; 2):
+  Pr per row (closed form) → Z → Gp trapezoid → least-squares p/Z vs Gp
+  GIIP [Bscf] = −(p/Z)ᵢ / slope                      (minimum connected)
+  SITHP statics: gas-head-only station march, geothermal T, per-station Z
+GAS &amp; OIL — reservoir limit (selection 3):
+  m = −slope(Pwf vs t) over ALL rows
+  Cg = (Bg₁ − Bg₂)/Bg₁/(P₂ − P₁)   (first &amp; last rows; input-or-calculated)
+  Ct = Cg·Sg + Co·So + Cw·Sw + Cf
+  GIIP [Bscf] = q̄/(Ct·m)/1000      STOIP [MMstb] = q̄/(Ct·m)/1e6</pre>
+<pre class="eq">OIL — Havlena–Odeh (selections 1 &amp; 2, solution-gas drive → minimum STOIIP):
+  Pr per row: composite-Vogel inversion fixed-point iterated with J_2 (macro loops 5×)
+  Np, Gp trapezoids (produced gas: Rsi above Pb, row GOR below);  Rp = Gp/Np
+  F  = Np·( Bo + (Rp − Rs)·Bg )        Eo = Bo + (Rsi − Rs)·Bg − Boi
+  Headline  N = AVERAGE(F/Eo)  over rows with Np &gt; 0        (sheet AD1)
+  Cross-check N = SLOPE(F vs Eo) incl. the exact (0,0) anchor (sheet V1)
+  Selection 2 evaluates the same MB at MEASURED gauge pressures — no IPR/VLP.</pre>
+
+<h2 id="eq-forecast">Forecast (gas)</h2>
+<pre class="eq">start: date = last prod date, Gp = cumulative, Pres = MIN solved Pres  (all overridable)
+per Δt: (p/Z)_target = (p/Z)ᵢ·(1 − Gp/GIIP)
+        Pr = start Pres (first step) | Brent-invert P/Z(P) = target
+        Darcy IPR at Pr → nodal op at forecast FTHP → q = min(q_op, plateau)
+        Gp += q·Δt/1000
+stops: abandonment | depleted | died | max-steps   →  EUR, recovery %</pre>
+
+<h2 id="deviations">Documented deviations from the workbooks</h2>
+<ol>
+  <li><b>Z factor</b>: the sheets GoalSeek Hall&ndash;Yarborough (left unconverged in places); WellSim is explicit Brill&nbsp;&amp;&nbsp;Beggs. Station parity pinned at 1e-9 with sheet Z injected; march drift bands: natural &lt;2%, gas-lift &lt;5.5%, ESP &lt;3&ndash;5%; gas march bit-exact.</li>
+  <li><b>Solvers</b>: Brent replaces GoalSeek and the forecast&rsquo;s quadratic-LSQ intersection &mdash; same intent, exact crossing.</li>
+  <li><b>Forecast plateau Pwf</b>: reported at the produced (constrained) rate; the sheet&rsquo;s unconstrained-intersection quirk is not replicated.</li>
+  <li><b>Pressure update</b>: exact p/Z inversion instead of the one-step-lag Z estimate.</li>
+  <li><b>Oil reservoir-limit Cg anchors</b>: first &amp; last rows (sheet pinned rows 5 &amp; 14) &mdash; near-immaterial for oil Ct.</li>
+  <li><b>WHT</b>: always calculated (Ramey); the input-THT path was removed by design decision.</li>
+  <li><b>Rounding artifacts preserved</b> where parity needs them: &pi; = 22/7 trajectory cosine; the <code>rouhgsc</code> artifact available as a test override.</li>
+</ol>
+
+<h2 id="trouble">Troubleshooting</h2>
+<div class="tblwrap"><table>
+<tr><th>Symptom</th><th>Cause &amp; fix</th></tr>
+<tr><td>&ldquo;unparseable date row N&rdquo;</td><td>Fix that row; nothing was computed. Use d-MMM-yy, dd/mm/yyyy hh:mm:ss, ISO, or a day number.</td></tr>
+<tr><td>&ldquo;no depletion signal&rdquo;</td><td>The fitted p/Z (or MB Eo) is not declining &mdash; more data spread needed, or the volume genuinely is not closing.</td></tr>
+<tr><td>Huge oil MB N</td><td>Undersaturated path + window too long. Use the early-production window (days&ndash;weeks) or trust the static-gauge selection.</td></tr>
+<tr><td>Gas march error: CGR + WGR &gt; 0</td><td>Gray&rsquo;s liquid terms divide by liquid rate &mdash; use a small CGR (0.1 stb/MMscf) for essentially dry gas.</td></tr>
+<tr><td>Reserve/forecast uses the wrong well</td><td>Both always read the current Well-model inputs &mdash; calibrate the well model first.</td></tr>
+</table></div>
+
+</main>
+</div>
+</body>
+</html>

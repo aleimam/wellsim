@@ -1,0 +1,17 @@
+# Render blueprint — deploys WellSim from the GitHub repo with a persistent
+# disk for the company case database, automatic TLS on thepwf.net.
+services:
+  - type: web
+    name: wellsim
+    runtime: node
+    plan: starter            # starter (or higher) is required for the disk
+    buildCommand: ""         # zero dependencies — nothing to build
+    startCommand: node src/server/server.js
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "3355"
+    disk:
+      name: wellsim-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
