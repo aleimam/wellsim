@@ -14,7 +14,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
-  <link rel="stylesheet" href="/style.css" />
+  <!-- two skins: classic (default, the original view) and mobile (/style.css, The PWF design).
+       The stored choice is applied before first paint to avoid a flash. -->
+  <link id="skin" rel="stylesheet" href="/classic.css" />
+  <script>try { if (localStorage.getItem('wellsim-skin') === 'modern') document.getElementById('skin').href = '/style.css'; } catch (e) {}</script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -30,6 +33,7 @@
       <a id="open-case" href="#" class="hdr-link">Open</a>
       <a id="print-report" href="#" class="hdr-link">Print report</a>
       <a id="acct-link" href="#" class="hdr-link">Sign in</a>
+      <a id="skin-link" href="#" class="hdr-link">Mobile view</a>
       <a id="help-link" href="/help.html" target="_blank" class="hdr-link">Help</a>
       <input type="file" id="open-case-file" accept=".json,application/json" style="display:none" />
     </nav>
