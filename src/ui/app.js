@@ -1746,15 +1746,13 @@ async function gasReserveRun() {
     return;
   }
 
-  // p/Z chart: fitted points + (selection 1) SITHP overlay + line to GIIP
+  // p/Z chart: fitted points + line to GIIP (the prod-data chart shows only
+  // its own points — no SITHP overlay, per user request)
   const mainName = r.mode === 'sithp' ? 'SITHP statics (zero-rate corr.)' : 'Production (back-calc Pr)';
   const mainColor = r.mode === 'sithp' ? '#C2540B' : '#00636D';
   const traces = [
     { x: r.rows.map((p) => p.gpBscf), y: r.rows.map((p) => p.pOverZ), name: mainName, mode: 'markers', marker: { size: 9, color: mainColor, symbol: r.mode === 'sithp' ? 'square' : 'circle' } },
   ];
-  if (r.mode === 'flowing' && r.sithp.some((s) => s.gpBscf != null)) {
-    traces.push({ x: r.sithp.map((s) => s.gpBscf), y: r.sithp.map((s) => s.pOverZ), name: 'SITHP statics', mode: 'markers', marker: { symbol: 'square', size: 10, color: '#C2540B' } });
-  }
   if (r.fit.giipBscf != null) {
     traces.push({ x: [0, r.fit.giipBscf], y: [r.fit.pziPsi, 0], name: 'p/Z line → GIIP', mode: 'lines', line: { color: '#2C7048', dash: 'dash', width: 2 } });
   }
