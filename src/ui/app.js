@@ -695,7 +695,8 @@ function currentSkin() {
 
 function setSkin(s) {
   try { localStorage.setItem('wellsim-skin', s); } catch (e) {}
-  document.getElementById('skin').href = s === 'modern' ? '/style.css' : '/classic.css';
+  const v = window.WELLSIM_ASSET_V ? '?v=' + window.WELLSIM_ASSET_V : '';
+  document.getElementById('skin').href = (s === 'modern' ? '/style.css' : '/classic.css') + v;
   document.getElementById('skin-link').textContent = s === 'modern' ? 'Classic view' : 'Mobile view';
   if (s === 'modern') setMobileView('inputs'); // Inputs is the default tab of the mobile view
   setTimeout(resizeVisibleCharts, 350); // re-fit charts once the new sheet applies
