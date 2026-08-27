@@ -814,6 +814,7 @@ function switchEspTab() {
   for (const id of ['oil-cr-nodal', 'oil-cr-gl', 'oil-cr-whp', 'oil-cr-esptrav'])
     document.getElementById(id).style.display = sens ? 'none' : '';
   document.getElementById('oil-cr-espsens').style.display = sens ? '' : 'none';
+  resizeVisibleCharts();
 }
 
 async function loadEspPumps() {
@@ -942,6 +943,7 @@ function switchOilModule() {
     document.getElementById('oil-cr-esptrav').style.display = 'none';
     document.getElementById('oil-cr-espsens').style.display = 'none';
   }
+  resizeVisibleCharts();
 }
 
 async function oilForecastRun() {
@@ -1523,6 +1525,7 @@ function switchGasModule() {
   document.getElementById('gas-cr-whp').style.display = m === 'well' ? '' : 'none';
   document.getElementById('gas-cr-pz').style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('gas-cr-fc').style.display = m === 'forecast' ? '' : 'none';
+  resizeVisibleCharts();
 }
 
 function switchGasIpr() {
@@ -2016,11 +2019,23 @@ async function acctSaveCase() {
   await acctRefresh();
 }
 
+// Plotly sizes a chart to its container at draw time; a chart drawn (or left)
+// inside a display:none panel keeps a stale width, so every panel/module
+// switch re-fits whatever charts are now visible.
+function resizeVisibleCharts() {
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.chart').forEach((el) => {
+      if (el.data && el.offsetParent !== null) Plotly.Plots.resize(el);
+    });
+  });
+}
+
 function switchTab(which) {
   for (const t of ['oil', 'water', 'gas']) {
     document.getElementById(`panel-${t}`).style.display = which === t ? '' : 'none';
     document.getElementById(`tab-${t}`).classList.toggle('active', which === t);
   }
+  resizeVisibleCharts();
 }
 
 function guard(fn) {

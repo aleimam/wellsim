@@ -3,7 +3,7 @@ body { margin: 0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; background:
 header { background: #16324f; color: #fff; padding: 10px 20px; display: flex; align-items: baseline; gap: 14px; }
 header h1 { margin: 0; font-size: 20px; letter-spacing: 0.5px; }
 header .sub { color: #9fb8cc; font-size: 12px; flex: 1; }
-nav { display: flex; gap: 6px; }
+nav { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .tab { background: #23486b; color: #cfe0ee; border: 0; padding: 7px 18px; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 14px; }
 .tab.active { background: #f4f6f8; color: #16324f; font-weight: 600; }
 .hdr-link { align-self: center; color: #cfe0ee; font-size: 12px; text-decoration: none; border: 1px solid #2c5a86; padding: 4px 12px; border-radius: 5px; margin-left: 4px; cursor: pointer; }
@@ -76,7 +76,8 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
 .senshead { font-size: 11px; color: #5c7387; margin: 6px 0 2px; font-weight: 600; }
 .presrow { display: flex; gap: 8px; }
 .presrow input { width: 90px; padding: 4px 6px; border: 1px solid #b9c7d2; border-radius: 4px; background: #eaf6ea; }
-.radio { display: inline-block; margin-right: 16px; font-size: 13px; }
+.radio { display: inline-flex; align-items: center; gap: 6px; margin-right: 16px; font-size: 13px; cursor: pointer; }
+input[type="radio"], input[type="checkbox"] { accent-color: #1f7a44; }
 
 .results .chart { background: #fff; border: 1px solid #d7dee5; border-radius: 8px; margin-bottom: 12px; min-height: 40px; }
 .chartrow { display: flex; gap: 10px; margin-bottom: 12px; align-items: stretch; }
@@ -118,10 +119,17 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
 
 /* ---------- mobile (phones) ---------- */
 @media (max-width: 640px) {
-  header { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
+  header { flex-wrap: wrap; padding: 8px 12px 10px; gap: 8px; }
   header .sub { display: none; }
-  nav { width: 100%; display: flex; }
-  .tab { flex: 1; padding: 10px 0; border-radius: 6px; text-align: center; }
+  /* header rows: the three well tabs get their own full row with real touch
+     targets; the utility links wrap onto a second row below them */
+  nav { width: 100%; }
+  .tab { flex: 1 1 30%; padding: 12px 0; min-height: 44px; border-radius: 6px; text-align: center; font-size: 14px; }
+  .hdr-link {
+    flex: 1 1 17%; margin-left: 0; min-height: 40px; padding: 8px 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   main { padding: 8px; }
   .panel { gap: 10px; }
 
@@ -130,10 +138,20 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
   .rows { columns: 1; }
   .frow { grid-template-columns: minmax(0, 1fr) 112px; margin-bottom: 4px; }
   .frow input, .presrow input, .sens input { font-size: 16px; padding: 6px 8px; }
+  .frow select { font-size: 16px; padding: 6px 4px; }
   .frow label { font-size: 12px; }
   .presrow { flex-wrap: wrap; }
   .presrow input { width: 31%; }
   fieldset, .group { overflow-x: auto; }
+
+  /* selection radios: finger-sized targets */
+  .radio { min-height: 40px; padding: 2px 0; margin-right: 12px; font-size: 14px; }
+  .radio input { width: 19px; height: 19px; }
+  .copybtn { min-height: 38px; padding: 8px 12px; font-size: 12px; }
+  .tbl-actions { gap: 8px; }
+
+  /* account panel: full-width sheet under the header */
+  #acct-panel { left: 8px; right: 8px; width: auto; border-radius: 0 0 8px 8px; }
 
   /* charts stack above their data tables, tables full width */
   .chartrow { flex-direction: column; }
@@ -144,7 +162,9 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
   .summary .card { flex: 1 1 44%; min-width: 0; padding: 6px 10px; }
   .summary .card .v { font-size: 15px; }
 
-  /* the main call-to-action stays reachable while scrolling the inputs */
-  .action { position: sticky; bottom: 8px; z-index: 10; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); }
+  /* the main call-to-action stays reachable while scrolling the inputs;
+     safe-area keeps it above iPhone home indicators (PWA standalone) */
+  .action { position: sticky; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 10; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); }
   .action.secondary { position: static; box-shadow: none; }
+  body { padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
