@@ -366,6 +366,7 @@ document.addEventListener('input', (e) => {
 
 /* ---- copyable side tables ---- */
 function renderTables(containerId, tables) {
+  mobileShowResults(); // any run that produced result tables lands the phone on them
   const el = document.getElementById(containerId);
   el.innerHTML = tables
     .map(
@@ -685,6 +686,30 @@ function showError(msg) {
 
 const fmt = (v, d = 1) => (v == null ? '—' : Number(v).toFixed(d));
 
+// ---- mobile Inputs | Results views (The PWF bottom-bar pattern) ----
+const isPhone = () => window.matchMedia('(max-width: 640px)').matches;
+
+function setMobileView(v) {
+  document.body.classList.toggle('view-inputs', v === 'inputs');
+  document.body.classList.toggle('view-results', v === 'results');
+  document.getElementById('mb-inputs').classList.toggle('active', v === 'inputs');
+  document.getElementById('mb-results').classList.toggle('active', v === 'results');
+  if (v === 'results') resizeVisibleCharts();
+}
+
+// after a successful run on a phone, jump straight to the results view
+function mobileShowResults() {
+  if (isPhone()) setMobileView('results');
+}
+
+// live headline result in the header (the PWF bar pattern)
+function setHeadline(value, caption) {
+  const el = document.getElementById('hdr-result');
+  el.querySelector('.hv').textContent = value;
+  el.querySelector('.hk').textContent = caption;
+  el.classList.remove('empty');
+}
+
 function summary(id, cards) {
   document.getElementById(id).innerHTML = cards
     .filter((c) => c)
@@ -692,25 +717,29 @@ function summary(id, cards) {
       (c) => `<div class="card${c.warn ? ' warn' : ''}"><div class="k">${c.k}</div><div class="v">${c.v}</div></div>`
     )
     .join('');
+  const first = cards.filter((c) => c)[0];
+  if (first) setHeadline(first.v, first.k);
+  mobileShowResults();
 }
 
 const LAYOUT = () => ({
   margin: window.innerWidth < 640 ? { l: 46, r: 10, t: 34, b: 40 } : { l: 60, r: 20, t: 40, b: 45 },
   height: window.innerWidth < 640 ? 280 : 380,
-  font: { family: 'Segoe UI, sans-serif', size: window.innerWidth < 640 ? 11 : 12 },
+  font: { family: '"IBM Plex Sans", "Segoe UI", sans-serif', size: window.innerWidth < 640 ? 11 : 12, color: '#0B1418' },
   legend: { orientation: 'h', y: -0.22 },
-  plot_bgcolor: '#fbfcfd',
+  plot_bgcolor: '#FBFCFC',
+  paper_bgcolor: '#FFFFFF',
 });
 
 function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
   const traces = [
-    { x: ipr.map(iprX), y: ipr.map((p) => p.pwfPsi), name: 'IPR', mode: 'lines', line: { color: '#1668b0', width: 3 } },
-    { x: vlp.map(vlpX), y: vlp.map((p) => p.pwfPsi), name: 'VLP', mode: 'lines+markers', line: { color: '#c23b22', width: 3 } },
+    { x: ipr.map(iprX), y: ipr.map((p) => p.pwfPsi), name: 'IPR', mode: 'lines', line: { color: '#00636D', width: 3 } },
+    { x: vlp.map(vlpX), y: vlp.map((p) => p.pwfPsi), name: 'VLP', mode: 'lines+markers', line: { color: '#C2540B', width: 3 } },
   ];
   if (op) {
     traces.push({
       x: [op.q], y: [op.pwfPsi], name: 'Operating point', mode: 'markers',
-      marker: { symbol: 'diamond', size: 14, color: '#111', line: { width: 2, color: '#fff' } },
+      marker: { symbol: 'diamond', size: 14, color: '#0B1418', line: { width: 2, color: '#fff' } },
     });
   }
   Plotly.newPlot(div, traces, { ...LAYOUT(), title: 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } }, { displaylogo: false, responsive: true });
@@ -732,14 +761,14 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX) {
 
 function plotWhp(div, xTitle, whp, thp) {
   const traces = [
-    { x: whp.map((p) => p.q), y: whp.map((p) => p.whpPsi), name: 'Available WHP', mode: 'lines+markers', line: { color: '#1f7a44', width: 3 } },
+    { x: whp.map((p) => p.q), y: whp.map((p) => p.whpPsi), name: 'Available WHP', mode: 'lines+markers', line: { color: '#2C7048', width: 3 } },
     { x: [whp[0]?.q, whp[whp.length - 1]?.q], y: [thp, thp], name: 'Operating THP', mode: 'lines', line: { color: '#888', dash: 'dash' } },
   ];
   const hasWht = whp.some((p) => p.whtF != null);
   if (hasWht) {
     traces.push({
       x: whp.map((p) => p.q), y: whp.map((p) => p.whtF), name: 'WHT (calc)', yaxis: 'y2',
-      mode: 'lines+markers', line: { color: '#c77f14', width: 2, dash: 'dot' }, marker: { size: 5 },
+      mode: 'lines+markers', line: { color: '#C2540B', width: 2, dash: 'dot' }, marker: { size: 5 },
     });
   }
   const base = LAYOUT();
@@ -757,7 +786,7 @@ function plotWhp(div, xTitle, whp, thp) {
         title: 'WHP, psi',
         range: [0, Math.max(...whp.map((p) => p.whpPsi), thp) * 1.05],
       },
-      yaxis2: { title: 'WHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#c77f14' }, tickfont: { color: '#c77f14' } },
+      yaxis2: { title: 'WHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#C2540B' }, tickfont: { color: '#C2540B' } },
     },
     { displaylogo: false, responsive: true }
   );
@@ -963,14 +992,14 @@ async function oilForecastRun() {
   const traces = [];
   if (hist.length) {
     traces.push(
-      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.qOilStbD), name: 'Rate (history)', mode: 'lines+markers', line: { color: '#1f7a44', width: 2 } },
-      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.presPsi), name: 'Pres (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#1668b0', width: 2 } }
+      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.qOilStbD), name: 'Rate (history)', mode: 'lines+markers', line: { color: '#2C7048', width: 2 } },
+      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.presPsi), name: 'Pres (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#00636D', width: 2 } }
     );
   }
   traces.push(
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.qOilStbD), name: 'F Rate', mode: 'lines', line: { color: '#1f7a44', width: 3, dash: 'dash' } },
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#1668b0', width: 2, dash: 'dot' } },
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gorScfStb), name: 'F GOR scf/stb', mode: 'lines', line: { color: '#c77f14', width: 2, dash: 'dash' } }
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.qOilStbD), name: 'F Rate', mode: 'lines', line: { color: '#2C7048', width: 3, dash: 'dash' } },
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gorScfStb), name: 'F GOR scf/stb', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
   );
   Plotly.newPlot('oil-chart-fc', traces, {
     ...LAYOUT(),
@@ -978,7 +1007,7 @@ async function oilForecastRun() {
     title: 'Tarner forecast — history + forecast',
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate stb/d · GOR scf/stb', rangemode: 'tozero' },
-    yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#1668b0' }, tickfont: { color: '#1668b0' } },
+    yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
   }, { displaylogo: false, responsive: true });
   renderTables('oil-table-fc', [
     {
@@ -1058,12 +1087,13 @@ async function oilReserveRun() {
       r.rlt.stoiipMMstb != null
         ? `<span class="method">STOIP — minimum connected (${methodName})</span><span class="val">${fmt(r.rlt.stoiipMMstb, 1)} MMstb</span>`
         : `<span class="method">STOIP (${methodName})</span><span class="val warn">no depletion signal</span>`;
+    if (r.rlt.stoiipMMstb != null) setHeadline(`${fmt(r.rlt.stoiipMMstb, 1)} MMstb`, 'STOIP min connected');
     // Pwf decline + slope line
     const tMax = Math.max(...r.rows.map((p) => p.dtDays));
     const pwf0 = r.rows[0].pwfPsi;
     Plotly.newPlot('oil-chart-rsv1', [
-      { x: r.rows.map((p) => p.dtDays), y: r.rows.map((p) => p.pwfPsi), name: 'Pwf', mode: 'markers', marker: { color: '#16324f', size: 8 } },
-      { x: [0, tMax], y: [pwf0, pwf0 - r.rlt.slopePsiDay * tMax], name: `slope m = ${fmt(r.rlt.slopePsiDay, 3)} psi/d`, mode: 'lines', line: { color: '#c0392b', width: 2, dash: 'dash' } },
+      { x: r.rows.map((p) => p.dtDays), y: r.rows.map((p) => p.pwfPsi), name: 'Pwf', mode: 'markers', marker: { color: '#0B1418', size: 8 } },
+      { x: [0, tMax], y: [pwf0, pwf0 - r.rlt.slopePsiDay * tMax], name: `slope m = ${fmt(r.rlt.slopePsiDay, 3)} psi/d`, mode: 'lines', line: { color: '#A93A2C', width: 2, dash: 'dash' } },
     ], { ...LAYOUT(), title: 'Reservoir limit — Pwf decline', xaxis: { title: 'dt, days' }, yaxis: { title: 'Pwf, psi' } }, { displaylogo: false, responsive: true });
     renderTables('oil-table-rsv1', [{
       title: 'Solved rows', headers: ['dt d', 'q stb/d', 'Pwf', 'pr', 'z'],
@@ -1085,21 +1115,22 @@ async function oilReserveRun() {
     fit.nAvgMMstb != null
       ? `<span class="method">STOIIP — minimum connected (${methodName})</span><span class="val">${fmt(fit.nAvgMMstb, 1)} MMstb</span>`
       : `<span class="method">STOIIP (${methodName})</span><span class="val warn">no depletion signal</span>`;
+  if (fit.nAvgMMstb != null) setHeadline(`${fmt(fit.nAvgMMstb, 1)} MMstb`, 'STOIIP min connected');
 
   const mb = r.rows.filter((p) => p.npMMstb > 0);
   const eoMax = Math.max(0, ...mb.map((p) => p.eo));
   Plotly.newPlot('oil-chart-rsv1', [
-    { x: mb.map((p) => p.eo), y: mb.map((p) => p.fMMbbl), name: 'F vs Eo', mode: 'markers', marker: { color: '#16324f', size: 8 } },
+    { x: mb.map((p) => p.eo), y: mb.map((p) => p.fMMbbl), name: 'F vs Eo', mode: 'markers', marker: { color: '#0B1418', size: 8 } },
     ...(fit.nSlopeMMstb != null
-      ? [{ x: [0, eoMax], y: [0, fit.nSlopeMMstb * eoMax], name: `slope N = ${fmt(fit.nSlopeMMstb, 1)} MMstb`, mode: 'lines', line: { color: '#c0392b', width: 2, dash: 'dash' } }]
+      ? [{ x: [0, eoMax], y: [0, fit.nSlopeMMstb * eoMax], name: `slope N = ${fmt(fit.nSlopeMMstb, 1)} MMstb`, mode: 'lines', line: { color: '#A93A2C', width: 2, dash: 'dash' } }]
       : []),
   ], { ...LAYOUT(), title: 'Havlena–Odeh — F vs Eo', xaxis: { title: 'Eo, bbl/stb' }, yaxis: { title: 'F, MMbbl' } }, { displaylogo: false, responsive: true });
 
   const nPts = mb.filter((p) => p.nMMstb != null);
   Plotly.newPlot('oil-chart-rsv2', [
-    { x: nPts.map((p) => p.npMMstb), y: nPts.map((p) => p.nMMstb), name: 'N per row', mode: 'lines+markers', marker: { color: '#1f7a44', size: 8 }, line: { color: '#1f7a44', width: 1 } },
+    { x: nPts.map((p) => p.npMMstb), y: nPts.map((p) => p.nMMstb), name: 'N per row', mode: 'lines+markers', marker: { color: '#2C7048', size: 8 }, line: { color: '#2C7048', width: 1 } },
     ...(fit.nAvgMMstb != null
-      ? [{ x: [0, Math.max(...nPts.map((p) => p.npMMstb), 0.001)], y: [fit.nAvgMMstb, fit.nAvgMMstb], name: `average N = ${fmt(fit.nAvgMMstb, 1)}`, mode: 'lines', line: { color: '#c77f14', width: 2, dash: 'dash' } }]
+      ? [{ x: [0, Math.max(...nPts.map((p) => p.npMMstb), 0.001)], y: [fit.nAvgMMstb, fit.nAvgMMstb], name: `average N = ${fmt(fit.nAvgMMstb, 1)}`, mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }]
       : []),
   ], { ...LAYOUT(), title: 'N vs Np — does the estimate stabilize?', xaxis: { title: 'Np, MMstb' }, yaxis: { title: 'N, MMstb' } }, { displaylogo: false, responsive: true });
 
@@ -1118,12 +1149,12 @@ async function liquidGl(c) {
   const ok = r.points.filter((p) => p.status === 'ok');
   const dead = r.points.filter((p) => p.status !== 'ok');
   const traces = [
-    { x: ok.map((p) => p.injRateMMscfd), y: ok.map((p) => p.qOilStbD), name: `Operating ${c.fluidName} rate`, mode: 'lines+markers', line: { color: '#1f7a44', width: 3 } },
+    { x: ok.map((p) => p.injRateMMscfd), y: ok.map((p) => p.qOilStbD), name: `Operating ${c.fluidName} rate`, mode: 'lines+markers', line: { color: '#2C7048', width: 3 } },
   ];
   if (r.optimum) {
     traces.push({
       x: [r.optimum.injRateMMscfd], y: [r.optimum.qOilStbD], name: 'Optimum', mode: 'markers',
-      marker: { symbol: 'star', size: 16, color: '#c77f14', line: { width: 1, color: '#7a4c07' } },
+      marker: { symbol: 'star', size: 16, color: '#C2540B', line: { width: 1, color: '#93400A' } },
     });
   }
   Plotly.newPlot(`${c.prefix}-chart-gl`, traces, {
@@ -1217,9 +1248,9 @@ async function liquidSolve(c) {
     if (r.espTraverse) {
       const t = r.espTraverse;
       Plotly.newPlot('oil-chart-esptrav', [
-        { x: t.stations.map((s) => s.pPsi), y: t.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#16324f', width: 2 } },
-        { x: t.backStations.map((s) => s.pPsi), y: t.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#1f7a44', width: 2, dash: 'dash' } },
-        { x: [t.dischargePsi, t.intakePsi], y: [t.pumpTvdFt, t.pumpTvdFt], name: `Pump ΔP ${fmt(t.dpPsi, 0)} psi`, mode: 'lines+markers', line: { color: '#c0392b', width: 3 }, marker: { size: 8 } },
+        { x: t.stations.map((s) => s.pPsi), y: t.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#0B1418', width: 2 } },
+        { x: t.backStations.map((s) => s.pPsi), y: t.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#2C7048', width: 2, dash: 'dash' } },
+        { x: [t.dischargePsi, t.intakePsi], y: [t.pumpTvdFt, t.pumpTvdFt], name: `Pump ΔP ${fmt(t.dpPsi, 0)} psi`, mode: 'lines+markers', line: { color: '#A93A2C', width: 3 }, marker: { size: 8 } },
       ], {
         ...LAYOUT(),
         title: 'Traverse gradient — manual pump ΔP merged at pump depth',
@@ -1270,12 +1301,12 @@ async function espRun() {
     traces.push({
       x: t.points.map((p) => p.rateBpd), y: t.points.map((p) => p.headFt),
       name: t.key === 'bep' ? 'BEP' : `${t.key}-thrust`, mode: 'lines',
-      line: { color: t.key === 'bep' ? '#1f7a44' : '#c77f14', width: 1.5, dash: 'dash' },
+      line: { color: t.key === 'bep' ? '#2C7048' : '#C2540B', width: 1.5, dash: 'dash' },
     });
   }
   traces.push({
     x: [r.opPoint.rateBpd], y: [r.opPoint.headFt], name: 'Operating point', mode: 'markers',
-    marker: { symbol: 'star', size: 16, color: '#c0392b', line: { width: 1, color: '#7a1f14' } },
+    marker: { symbol: 'star', size: 16, color: '#A93A2C', line: { width: 1, color: '#7a1f14' } },
   });
   Plotly.newPlot('oil-chart-gl', traces, {
     ...LAYOUT(),
@@ -1325,13 +1356,13 @@ async function espRun() {
   }]);
   // traverse on its OWN row (separate from the sensitivity view)
   const tv = [
-    { x: op.stations.map((s) => s.pPsi), y: op.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#16324f', width: 2 } },
-    { x: op.backStations.map((s) => s.pPsi), y: op.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#1f7a44', width: 2, dash: 'dash' } },
+    { x: op.stations.map((s) => s.pPsi), y: op.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#0B1418', width: 2 } },
+    { x: op.backStations.map((s) => s.pPsi), y: op.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#2C7048', width: 2, dash: 'dash' } },
   ];
   if (r.measured.pintPsi != null)
-    tv.push({ x: [r.measured.pintPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pint', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#c77f14' } });
+    tv.push({ x: [r.measured.pintPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pint', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#C2540B' } });
   if (r.measured.pdisPsi != null)
-    tv.push({ x: [r.measured.pdisPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pdis', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#c0392b' } });
+    tv.push({ x: [r.measured.pdisPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pdis', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#A93A2C' } });
   Plotly.newPlot('oil-chart-esptrav', tv, {
     ...LAYOUT(),
     title: 'Traverse gradient — top-down vs IPR back-calc',
@@ -1424,15 +1455,15 @@ async function waterInjSolve() {
     r.op ? { q: r.op.qBpd, pwfPsi: r.op.pwfPsi } : null,
     (p) => p.q, (p) => p.q);
   Plotly.newPlot('water-chart-whp', [
-    { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.thpReqPsi), name: 'Injection THP required', mode: 'lines+markers', line: { color: '#16324f', width: 3 } },
-    { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.bhtF), name: 'BHT (calc)', yaxis: 'y2', mode: 'lines', line: { color: '#1668b0', width: 2, dash: 'dot' } },
+    { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.thpReqPsi), name: 'Injection THP required', mode: 'lines+markers', line: { color: '#0B1418', width: 3 } },
+    { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.bhtF), name: 'BHT (calc)', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
   ], {
     ...LAYOUT(),
     margin: { ...LAYOUT().margin, r: window.innerWidth < 640 ? 40 : 55 },
     title: 'Injection THP required & bottomhole temperature',
     xaxis: { title: 'Injection rate, bbl/d' },
     yaxis: { title: 'THP, psi', rangemode: 'tozero' },
-    yaxis2: { title: 'BHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#1668b0' }, tickfont: { color: '#1668b0' } },
+    yaxis2: { title: 'BHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
   }, { displaylogo: false, responsive: true });
   renderTables('water-table-nodal', [
     {
@@ -1632,6 +1663,7 @@ async function gasReserveRun() {
     r.fit.giipBscf != null
       ? `<span class="method">GIP — minimum connected (${methodName})</span><span class="val">${fmt(r.fit.giipBscf, 1)} Bscf</span>`
       : `<span class="method">GIP (${methodName})</span><span class="val warn">no depletion signal</span>`;
+  if (r.fit.giipBscf != null) setHeadline(`${fmt(r.fit.giipBscf, 1)} Bscf`, 'GIP min connected');
   if (r.fit.giipBscf != null) {
     setComputed('gas-giipBscf', r.fit.giipBscf, 2);
     setComputed('gas-pziPsi', r.fit.pziPsi, 1);
@@ -1647,7 +1679,7 @@ async function gasReserveRun() {
     const slope = -r.rlt.slopePsiDay;
     Plotly.newPlot('gas-chart-pz', [
       { x: pts.map((p) => p.dtDays), y: pts.map((p) => p.pwfPsi), name: 'Pwf', mode: 'markers', marker: { size: 9, color: '#7038b0' } },
-      { x: [t0, t1], y: [my + slope * (t0 - mt), my + slope * (t1 - mt)], name: `slope ${fmt(r.rlt.slopePsiDay, 3)} psi/day`, mode: 'lines', line: { color: '#1f7a44', dash: 'dash' } },
+      { x: [t0, t1], y: [my + slope * (t0 - mt), my + slope * (t1 - mt)], name: `slope ${fmt(r.rlt.slopePsiDay, 3)} psi/day`, mode: 'lines', line: { color: '#2C7048', dash: 'dash' } },
     ], {
       ...LAYOUT(),
       title: 'Reservoir limit — Pwf vs time (all rows)',
@@ -1665,15 +1697,15 @@ async function gasReserveRun() {
 
   // p/Z chart: fitted points + (selection 1) SITHP overlay + line to GIIP
   const mainName = r.mode === 'sithp' ? 'SITHP statics (zero-rate corr.)' : 'Production (back-calc Pr)';
-  const mainColor = r.mode === 'sithp' ? '#c77f14' : '#1668b0';
+  const mainColor = r.mode === 'sithp' ? '#C2540B' : '#00636D';
   const traces = [
     { x: r.rows.map((p) => p.gpBscf), y: r.rows.map((p) => p.pOverZ), name: mainName, mode: 'markers', marker: { size: 9, color: mainColor, symbol: r.mode === 'sithp' ? 'square' : 'circle' } },
   ];
   if (r.mode === 'flowing' && r.sithp.some((s) => s.gpBscf != null)) {
-    traces.push({ x: r.sithp.map((s) => s.gpBscf), y: r.sithp.map((s) => s.pOverZ), name: 'SITHP statics', mode: 'markers', marker: { symbol: 'square', size: 10, color: '#c77f14' } });
+    traces.push({ x: r.sithp.map((s) => s.gpBscf), y: r.sithp.map((s) => s.pOverZ), name: 'SITHP statics', mode: 'markers', marker: { symbol: 'square', size: 10, color: '#C2540B' } });
   }
   if (r.fit.giipBscf != null) {
-    traces.push({ x: [0, r.fit.giipBscf], y: [r.fit.pziPsi, 0], name: 'p/Z line → GIIP', mode: 'lines', line: { color: '#1f7a44', dash: 'dash', width: 2 } });
+    traces.push({ x: [0, r.fit.giipBscf], y: [r.fit.pziPsi, 0], name: 'p/Z line → GIIP', mode: 'lines', line: { color: '#2C7048', dash: 'dash', width: 2 } });
   }
   Plotly.newPlot('gas-chart-pz', traces, {
     ...LAYOUT(),
@@ -1728,15 +1760,15 @@ async function gasForecastRun() {
   const traces = [];
   if (hist.length) {
     traces.push(
-      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.qMMscfd), name: 'Rate (history)', mode: 'lines+markers', line: { color: '#1f7a44', width: 2 } },
-      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.presPsi), name: 'Pres (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#1668b0', width: 2 } },
-      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.gpBscf), name: 'Gp (history)', mode: 'lines', line: { color: '#c77f14', width: 2 } }
+      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.qMMscfd), name: 'Rate (history)', mode: 'lines+markers', line: { color: '#2C7048', width: 2 } },
+      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.presPsi), name: 'Pres (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#00636D', width: 2 } },
+      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.gpBscf), name: 'Gp (history)', mode: 'lines', line: { color: '#C2540B', width: 2 } }
     );
   }
   traces.push(
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.qMMscfd), name: 'F Rate', mode: 'lines', line: { color: '#1f7a44', width: 3, dash: 'dash' } },
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#1668b0', width: 2, dash: 'dot' } },
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gpBscf), name: 'Cum gas', mode: 'lines', line: { color: '#c77f14', width: 2, dash: 'dash' } }
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.qMMscfd), name: 'F Rate', mode: 'lines', line: { color: '#2C7048', width: 3, dash: 'dash' } },
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gpBscf), name: 'Cum gas', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
   );
   Plotly.newPlot('gas-chart-fc', traces, {
     ...LAYOUT(),
@@ -1744,7 +1776,7 @@ async function gasForecastRun() {
     title: 'Gas forecast — history + forecast (p/Z tank + nodal)',
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate MMscf/d · Gp Bscf', rangemode: 'tozero' },
-    yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#1668b0' }, tickfont: { color: '#1668b0' } },
+    yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
   }, { displaylogo: false, responsive: true });
   renderTables('gas-table-fc', [
     {
@@ -2144,6 +2176,8 @@ switchGasModule();
 document.getElementById('tab-oil').onclick = () => switchTab('oil');
 document.getElementById('tab-water').onclick = () => switchTab('water');
 document.getElementById('tab-gas').onclick = () => switchTab('gas');
+document.getElementById('mb-inputs').onclick = () => setMobileView('inputs');
+document.getElementById('mb-results').onclick = () => setMobileView('results');
 document.getElementById('save-case').onclick = (e) => { e.preventDefault(); saveCaseAs(); };
 document.getElementById('open-case').onclick = (e) => { e.preventDefault(); document.getElementById('open-case-file').click(); };
 document.getElementById('open-case-file').onchange = (e) => {
