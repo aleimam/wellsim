@@ -825,12 +825,24 @@ const FAM_BLUES = ['#9ecae1', '#4292c6', '#084594'];
 const FAM_REDS = ['#fcae91', '#fb6a4a', '#a50f15'];
 
 function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
+  // On a phone these families can reach nine traces; with the full names
+  // the horizontal legend wraps to one row EACH and swallows the plot
+  // (measured: a 182x176 legend box over a 271x73 plot). Compact labels —
+  // "Req 4400" instead of "Required Pres1=4400 psi" — fit several per row.
+  const phone = window.innerWidth < 640;
+  const shortLabel = (s) => String(s).replace(/Pres\d+\s*=\s*/, '').replace(/\s*psi\s*$/, '');
+  const iprName = phone ? (opts.iprNameShort ?? opts.iprName ?? 'IPR') : (opts.iprName ?? 'IPR');
+  const vlpName = phone ? (opts.vlpNameShort ?? '') : (opts.vlpName ?? 'VLP');
+  const nameOf = (base, label) => {
+    const lab = phone ? shortLabel(label) : label;
+    return base ? `${base} ${lab}` : lab;
+  };
   const traces = [];
   iprFam.forEach((m, i) =>
-    traces.push({ x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi), name: `${opts.iprName ?? 'IPR'} ${m.label}`, mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 2.5 } })
+    traces.push({ x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi), name: nameOf(iprName, m.label), mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 2.5 } })
   );
   vlpFam.forEach((m, i) =>
-    traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: `${opts.vlpName ?? 'VLP'} ${m.label}`, mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
+    traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: nameOf(vlpName, m.label), mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
   );
   // the pressure axis tops out at Pri: in a producing system neither the
   // IPR nor the VLP can sit above the initial reservoir pressure, so a
@@ -847,12 +859,25 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
   if (opts.showBht && vlpFam.some((m) => m.curve.some((p) => p.bhtF != null))) {
     vlpFam.forEach((m, i) =>
       traces.push({
-        x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.bhtF), name: `BHT ${m.label}`,
+        x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.bhtF), name: nameOf('BHT', m.label),
         yaxis: 'y2', mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 1.5, dash: 'dash' },
       })
     );
     layout.yaxis2 = { title: 'BHT, °F', overlaying: 'y', side: 'right', showgrid: false };
     layout.margin = { ...layout.margin, r: window.innerWidth < 640 ? 40 : 55 };
+  }
+  if (phone) {
+    // give the legend its own room instead of letting it eat the plot:
+    // estimate how many rows it needs at this width, then grow the canvas
+    // and the bottom margin by exactly that much (the plot keeps its height)
+    const usable = Math.max(160, (layout.width ?? window.innerWidth - 18) - layout.margin.l - layout.margin.r);
+    const longest = Math.max(...traces.map((t) => t.name.length), 6);
+    const perRow = Math.max(1, Math.floor(usable / (longest * 5.6 + 30)));
+    const rows = Math.ceil(traces.length / perRow);
+    const legendPx = rows * 15 + 10;
+    layout.legend = { orientation: 'h', y: -0.16, yanchor: 'top', x: 0, font: { size: 9 }, tracegroupgap: 2 };
+    layout.margin = { ...layout.margin, b: 46 + legendPx };
+    layout.height = 260 + legendPx;
   }
   Plotly.newPlot(div, traces, layout, PLOT_CFG());
 }
@@ -1911,7 +1936,12 @@ async function waterSens() {
       // the injector deliberately pushes ABOVE the reservoir pressure, so
       // its axis stays auto-scaled — capping it at Pri would clip the very
       // curves it exists to show
-      ? { title: 'Injectivity & available-BHIP sensitivities', iprName: 'Required', vlpName: 'Available', showBht: true }
+      ? {
+          title: 'Injectivity & available-BHIP sensitivities',
+          iprName: 'Required', iprNameShort: 'Req',
+          vlpName: 'Available', vlpNameShort: 'Av',
+          showBht: true,
+        }
       : { priPsi: r.priPsi }
   );
   if (inj) {
