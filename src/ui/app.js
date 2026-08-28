@@ -688,23 +688,6 @@ const fmt = (v, d = 1) => (v == null ? '—' : Number(v).toFixed(d));
 // ---- mobile Inputs | Results views (The PWF bottom-bar pattern) ----
 const isPhone = () => window.matchMedia('(max-width: 640px)').matches;
 
-// ---- two skins: modern (default — The PWF design on every device) | classic (the original view) ----
-function currentSkin() {
-  try { return localStorage.getItem('wellsim-skin') === 'classic' ? 'classic' : 'modern'; } catch (e) { return 'modern'; }
-}
-
-function setSkin(s) {
-  try { localStorage.setItem('wellsim-skin', s); } catch (e) {}
-  const v = window.WELLSIM_ASSET_V ? '?v=' + window.WELLSIM_ASSET_V : '';
-  document.getElementById('skin').href = (s === 'modern' ? '/style.css' : '/classic.css') + v;
-  document.getElementById('skin-link').textContent = s === 'modern' ? 'Classic view' : 'Modern view';
-  if (s === 'modern') setMobileView('inputs'); // Inputs is the default tab of the mobile view
-  setTimeout(resizeVisibleCharts, 350); // re-fit charts once the new sheet applies
-}
-
-// the modern (PWF) skin is now the default on every device, so the old
-// small-screen offer prompt is retired; the header link switches skins
-
 function setMobileView(v) {
   document.body.classList.toggle('view-inputs', v === 'inputs');
   document.body.classList.toggle('view-results', v === 'results');
@@ -2224,8 +2207,6 @@ document.getElementById('tab-water').onclick = () => switchTab('water');
 document.getElementById('tab-gas').onclick = () => switchTab('gas');
 document.getElementById('mb-inputs').onclick = () => setMobileView('inputs');
 document.getElementById('mb-results').onclick = () => setMobileView('results');
-document.getElementById('skin-link').onclick = (e) => { e.preventDefault(); setSkin(currentSkin() === 'modern' ? 'classic' : 'modern'); };
-document.getElementById('skin-link').textContent = currentSkin() === 'modern' ? 'Classic view' : 'Modern view';
 document.getElementById('save-case').onclick = (e) => { e.preventDefault(); saveCaseAs(); };
 document.getElementById('open-case').onclick = (e) => { e.preventDefault(); document.getElementById('open-case-file').click(); };
 document.getElementById('open-case-file').onchange = (e) => {
