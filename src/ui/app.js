@@ -175,14 +175,17 @@ const OIL_ESP_MANUAL_FIELDS = [
   ['pumpDpPsi', 'Pump ΔP (manual)', 'psi', 1325.16],
   ['tubingGasScfD', 'Tubing gas (blank = formation)', 'scf/d', ''],
 ];
-// water ESP: no gas, so no catalog/separator/intake block — the pump is a
-// depth, a frequency and the dP it delivers there. A frequency sensitivity
-// scales that dP by the affinity law (f/f0)^2.
+// water ESP: the same 68-pump database as oil (a pump curve is fluid-blind;
+// water simply has no free gas, so no separator/intake-gas block). With a
+// pump selected the dP is solved from the curve; Manual dP keeps the typed
+// value and a frequency sensitivity scales it by the affinity law (f/f0)^2.
 const WATER_ESP_FIELDS = [
   ['pumpTvdM', 'Pump depth', 'mTVD', 2985],
   ['espFreqHz', 'Operating frequency', 'Hz', 50],
-  ['pumpDpPsi', 'Pump ΔP at that frequency', 'psi', 1325.16],
+  ['espStages', 'No. of stages', '-', 145],
+  ['espWearFactor', 'Wear factor', 'frac', 0],
 ];
+const WATER_ESP_MANUAL_FIELDS = [['pumpDpPsi', 'Pump ΔP (manual)', 'psi', 1325.16]];
 const ESP_CURVE_COLS = [
   { key: 'headFt', label: 'head ft/stage' },
   { key: 'rateBpd', label: 'rate bbl/d' },
@@ -921,16 +924,30 @@ function switchLift() {
 }
 
 // ---- ESP pump selection: database (background) | custom (add new) | manual ----
-const espPumpMode = () => {
-  const v = document.getElementById('oil-espPumpSel')?.value ?? '__manual';
+const pumpModeOf = (prefix) => {
+  const v = document.getElementById(`${prefix}-espPumpSel`)?.value ?? '__manual';
   return v === '__manual' ? 'manual' : v === '__custom' ? 'custom' : 'db';
 };
+const espPumpMode = () => pumpModeOf('oil');
 
 function switchEspPump() {
   const mode = espPumpMode();
   document.getElementById('oil-esp-custom').style.display = mode === 'custom' ? '' : 'none';
   document.getElementById('oil-esp-manual').style.display = mode === 'manual' ? '' : 'none';
   document.getElementById('oil-esp-matchrow').style.display = mode === 'manual' ? 'none' : '';
+}
+
+/** Water tab: the same catalog, minus the custom-curve builder. */
+function switchWaterEspPump() {
+  const mode = pumpModeOf('water');
+  document.getElementById('water-esp-manual').style.display = mode === 'manual' ? '' : 'none';
+  document.getElementById('water-esp-matchrow').style.display = mode === 'manual' ? 'none' : '';
+  // stages/wear only mean something against a pump curve
+  for (const id of ['water-espStages', 'water-espWearFactor']) {
+    const row = document.getElementById(id)?.closest('.frow');
+    if (row) row.style.display = mode === 'manual' ? 'none' : '';
+  }
+  refreshWaterSens();
 }
 
 // ---- ESP view: Model match (final charts) | Sensitivity (Pres cases) ----
@@ -946,24 +963,34 @@ function switchEspTab() {
   resizeVisibleCharts();
 }
 
+/** Fill the oil and water pump selectors from the shared 68-pump database
+ *  (the water tab has no custom-curve builder, so no "add new" option). */
 async function loadEspPumps() {
-  const sel = document.getElementById('oil-espPumpSel');
-  sel.innerHTML =
+  const oil = document.getElementById('oil-espPumpSel');
+  const water = document.getElementById('water-espPumpSel');
+  oil.innerHTML =
     '<option value="__manual">Manual ΔP (no pump model)</option>' +
     '<option value="__custom">Custom pump (add new)…</option>';
+  if (water) water.innerHTML = '<option value="__manual">Manual ΔP (no pump model)</option>';
   try {
     const r = await api('esp/pumps', {});
     for (const name of r.pumps) {
-      const o = document.createElement('option');
-      o.value = name;
-      o.textContent = name;
-      sel.appendChild(o);
+      for (const sel of [oil, water]) {
+        if (!sel) continue;
+        const o = document.createElement('option');
+        o.value = name;
+        o.textContent = name;
+        sel.appendChild(o);
+      }
     }
-    sel.value = 'ESP B 538-3600'; // demo default from the workbook
+    oil.value = 'ESP B 538-3600'; // demo default from the workbook
+    if (water) water.value = 'ESP B 538-3600';
   } catch {
-    sel.value = '__manual';
+    oil.value = '__manual';
+    if (water) water.value = '__manual';
   }
   switchEspPump();
+  switchWaterEspPump();
 }
 
 // ---- Water Well tab: the oil marches at their limiting case (API 10,
@@ -985,9 +1012,15 @@ function waterForm() {
     ...OIL_GL_FIELDS,
     ...OIL_GL_WELL_FIELDS,
     ...WATER_ESP_FIELDS,
+    ...WATER_ESP_MANUAL_FIELDS,
   ]);
   f.liftType = waterWellType() === 'injector' ? 'natural' : waterLiftType();
   f.fluid = 'water';
+  // the shared ESP database drives the water tab too; water is gas-free, so
+  // the separator has nothing to separate
+  f.espPumpMode = pumpModeOf('water');
+  f.espPumpName = document.getElementById('water-espPumpSel')?.value ?? '';
+  f.espSepEffPct = 0;
   // the water-well limits (the server enforces the same set)
   f.api = 10; f.wcPct = 100; f.gorScfStb = 0; f.rsiScfStb = 0; f.pbPsi = 0;
   return f;
@@ -1315,6 +1348,8 @@ async function liquidSolve(c) {
     { k: `AOF (${c.fluidName})`, v: `${fmt(r.aofOilStbD, 0)} ${water ? 'bbl/d' : 'stb/d'}` },
     r.esp ? { k: 'Pump discharge', v: `${fmt(r.esp.dischargePsi, 0)} psi` } : null,
     r.esp ? { k: 'Pump intake', v: `${fmt(r.esp.intakePsi, 0)} psi` } : null,
+    r.esp?.pumpName ? { k: `ΔP solved (${r.esp.pumpName})`, v: `${fmt(r.esp.pumpDpPsi, 0)} psi` } : null,
+    r.esp?.headFt != null ? { k: 'Head / thrust', v: `${fmt(r.esp.headFt, 0)} ft · ${r.esp.thrust ?? '—'}` } : null,
     r.multiLayer ? { k: 'Pr avg (multi-layer)', v: `${fmt(r.multiLayer.prAvgPsi, 0)} psi` } : null,
     r.multiLayer ? { k: 'J final', v: fmt(r.multiLayer.jFinal, 3) } : null,
     r.multiLayer ? { k: 'Blended WC / GOR', v: `${fmt(r.multiLayer.blended.wcPct, 1)}% / ${fmt(r.multiLayer.blended.gorScfStb, 0)}` } : null,
@@ -1545,6 +1580,22 @@ async function espStagesRun() {
       : `stages = ${r.stages} (exact ${fmt(r.stagesExact, 2)}) — design proof OK: ` +
         `intake ${fmt(r.intakePsi, 0)} psi ≥ ${fmt(r.minIntakePsi, 0)} psi floor. Applied to the stages input.`);
   document.getElementById('oil-espStages').value = String(r.stages);
+}
+
+/** Water tab: the same stage match against the shared pump database. */
+async function waterEspStagesRun() {
+  const r = await api('oil/espstages', waterForm());
+  const el = document.getElementById('water-esp-result');
+  if (r.error) { el.textContent = r.error; return; }
+  el.textContent =
+    `Stage match (new pump, wear 0) at test rate ${fmt(r.testQOilStbD, 0)} bbl/d:\n` +
+    (r.capped
+      ? `traverse match wants ${r.stagesMatch} stages, but that pulls the intake under the ` +
+        `${fmt(r.minIntakePsi, 0)} psi design floor — DESIGN CAPPED at ${r.stages} stages ` +
+        `(intake ${fmt(r.intakePsi, 0)} psi). Applied to the stages input.`
+      : `stages = ${r.stages} (exact ${fmt(r.stagesExact, 2)}) — design proof OK: ` +
+        `intake ${fmt(r.intakePsi, 0)} psi ≥ ${fmt(r.minIntakePsi, 0)} psi floor. Applied to the stages input.`);
+  document.getElementById('water-espStages').value = String(r.stages);
 }
 
 async function espWearRun() {
@@ -2227,6 +2278,9 @@ renderFieldRow('water-test', 'water', WATER_TEST_FIELDS);
 renderFieldRow('water-gl-fields', 'water', OIL_GL_WELL_FIELDS);
 renderFieldRow('water-gl-inputs', 'water', OIL_GL_FIELDS);
 renderFieldRow('water-esp-fields', 'water', WATER_ESP_FIELDS);
+renderFieldRow('water-esp-manual-fields', 'water', WATER_ESP_MANUAL_FIELDS);
+document.getElementById('water-espPumpSel').onchange = switchWaterEspPump;
+document.getElementById('water-btn-espstages').onclick = guard(waterEspStagesRun);
 refreshWaterSens();
 renderPresList('water-pres-list', 'water', [4400, 4000, 3600]);
 document.querySelectorAll('input[name="water-lift"]').forEach((r) => (r.onchange = switchWaterLift));

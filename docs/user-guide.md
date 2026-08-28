@@ -65,6 +65,15 @@ future-pressure IPR sensitivities keep J constant (water μ·B do not change
 with pressure). No gas/oil-PVT inputs appear (no GOR, API, Rsi, Pb, WC, oil
 viscosity — the liquid viscosity collapses to the sheets' hardcoded 0.5 cp
 water value). Defaults: FTHP 200 psi (producer) · 2000 bbl/d · Pri 4800 psi.
+**Water ESP** runs on the **same 68-pump database as the oil tab** — pick a
+pump from the dropdown and the ΔP is *solved* from its curve (stages ×
+affinity × wear) instead of typed, with head and the down-thrust/BEP/
+up-thrust window reported at the operating point; *Match stages* solves the
+stage count against the same design-floor proof. Water is gas-free, so
+there is no free-gas intake block and no separator — the curve works on the
+water volume at the intake. **Manual ΔP** remains in the dropdown for a
+pump you only know by its ΔP.
+
 A water well is head-dominated: it flows naturally only when Pr beats
 THP + the static water column (≈ 0.446 psi/ft at SG 1.05); otherwise the
 solver reports no-intersection — that is the physics, not an error.
@@ -143,12 +152,12 @@ inputs are required; there is no input THT.
    | Water — ESP | FTHP · frequency (Hz) · tubing ID |
    | Water — injector | injection THP · injected-water temperature · tubing ID |
 
-   **ESP frequency**: with a pump model selected, each set's coupled pump ΔP
-   is re-solved per rate at that frequency (affinity-scaled pump curve,
-   intake state included); on Manual ΔP — and on the water tab, which has no
-   gas and therefore no catalog/intake block — the quoted ΔP is scaled by the
-   affinity law (f/f₀)². Above the pump's flow range the head is zero, so the
-   frequency curves merge; that is the model being honest, not an error.
+   **ESP frequency**: with a pump selected (oil *or* water — both tabs read
+   the same 68-pump database), each set's coupled pump ΔP is re-solved per
+   rate at that frequency, affinity-scaled curve and intake state included;
+   on **Manual ΔP** the quoted ΔP is scaled by the affinity law (f/f₀)².
+   Above the pump's flow range the head is zero, so the frequency curves
+   merge; that is the model being honest, not an error.
 
    **Injector**: the injector runs its own sensitivity family — available
    BHIP vs rate for each set, against the injectivity line at future

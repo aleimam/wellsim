@@ -137,3 +137,52 @@ test('injector family curves carry every set through vlpSensitivityInjector', ()
 test('vlpSensitivityEsp is exported and splits freqHz out of march overrides', () => {
   assert.equal(typeof vlpSensitivityEsp, 'function');
 });
+
+// ---- water ESP driven by the shared 68-pump database ----
+const WATER_ESP = {
+  ...WATER_BASE, liftType: 'esp', espPumpMode: 'db', espPumpName: 'ESP B 538-3600',
+  espSepEffPct: 0, pumpTvdM: 2985, pumpDpPsi: 1325.16, espFreqHz: 50,
+  espStages: 145, espWearFactor: 0,
+};
+
+test('water ESP: the pump database drives a coupled dP (not the typed one)', () => {
+  const r = handlers['oil/nodal'](WATER_ESP);
+  assert.ok(!r.error, r.error);
+  assert.equal(r.esp.pumpName, 'ESP B 538-3600');
+  assert.ok(r.esp.pumpDpPsi > 0, 'a dP was solved');
+  assert.ok(Math.abs(r.esp.pumpDpPsi - 1325.16) > 1, 'solved dP is not the typed manual value');
+  assert.ok(r.esp.headFt > 0 && r.esp.thrust, 'head and thrust reported');
+  assert.ok(r.op && r.op.qOilStbD > 0, 'operating point found');
+  assert.ok(r.esp.dischargePsi > r.esp.intakePsi, 'the pump lifts pressure');
+});
+
+test('water ESP: gas-free intake — no free gas, water gradient', () => {
+  const r = handlers['oil/nodal'](WATER_ESP);
+  // discharge - intake must equal the solved dP (nothing else acts at the node)
+  assert.ok(Math.abs(r.esp.dischargePsi - r.esp.intakePsi - r.esp.pumpDpPsi) < 1.5);
+});
+
+test('water ESP: stage match works against the same catalog', () => {
+  const r = handlers['oil/espstages']({ ...WATER_ESP, testQOilStbD: 2000, espMinIntakePsi: 300 });
+  assert.ok(!r.error, r.error);
+  assert.ok(r.stages > 0 && Number.isInteger(r.stages), `stages ${r.stages}`);
+  assert.ok(r.intakePsi >= 300 - 1e-6, 'design floor respected');
+});
+
+test('water ESP: manual mode still honours the typed dP', () => {
+  const r = handlers['oil/nodal']({ ...WATER_ESP, espPumpMode: 'manual', espPumpName: '__manual' });
+  assert.ok(!r.error, r.error);
+  assert.equal(r.esp.pumpName, null);
+  assert.ok(Math.abs(r.esp.pumpDpPsi - 1325.16) < 1e-9, 'typed dP used verbatim');
+});
+
+test('water ESP sensitivity uses the coupled pump solve when one is selected', () => {
+  const r = handlers['oil/sensitivity']({
+    ...WATER_ESP,
+    vlpSets: [{ label: '50Hz', freqHz: 50 }, { label: '60Hz', freqHz: 60 }],
+  });
+  assert.equal(r.vlpFamily.length, 2);
+  const a = r.vlpFamily[0].curve[2].pwfPsi;
+  const b = r.vlpFamily[1].curve[2].pwfPsi;
+  assert.ok(b < a, `60 Hz must lower the water VLP: ${b} vs ${a}`);
+});

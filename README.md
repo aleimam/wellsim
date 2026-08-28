@@ -11,7 +11,7 @@ against the original workbook cells.
 
 | Module | Oil | Gas |
 |---|---|---|
-| **1 — Well model** (nodal analysis) | Natural flow ✔ · Gas lift ✔ · **ESP full stack** ✔ · **Water Well tab** ✔ (producer + injector) | Natural ✔ |
+| **1 — Well model** (nodal analysis) | Natural flow ✔ · Gas lift ✔ · **ESP full stack** ✔ (68-pump database, shared with water) · **Water Well tab** ✔ (producer + injector, ESP on the same catalog) | Natural ✔ |
 | **2 — Reserve estimate** (minimum connected volume) | ✔ 3 methods: Havlena–Odeh MB on prod data · MB on measured static pressures (memory gauge) · reservoir limit | ✔ 3 methods: p/Z on prod data · p/Z from SITHP statics · reservoir limit |
 | **3 — Forecast** | ✔ Tarner · Walsh generalized-MB with Rv (saturation-tracking MB + nodal) | ✔ p/Z tank + nodal, history + forecast chart |
 
@@ -30,7 +30,7 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-182 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+187 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries.
 

@@ -31,6 +31,7 @@ import {
   espSolveDp,
   matchStages,
   matchWearAndPi,
+  thrustStatus,
 } from '../core/vlp/esp.js';
 import { createOilInflow, createGasInflow, applyInflowFluids } from '../core/ipr/inflow.js';
 import { multiLayerOilRates, multiLayerGasRates } from '../core/ipr/multilayer.js';
@@ -265,13 +266,29 @@ export function oilNodal(f) {
   const cap = Math.min(aofOil * 0.999, 10000);
   if (!(cap > 50)) return { error: 'AOF too small — the well cannot flow above the 50 stb/d grid floor' };
   const rates = oilRateGrid(50, cap);
+  // ESP with a pump model: the dP is not an input but the coupled solution
+  // of the pump curve against the intake state, so the VLP point at each
+  // rate comes from espSolveDp. The oil tab drives this through its own
+  // /oil/esp view; the water tab (gas-free, no separator) solves it here.
+  const espPump = cfg.esp ? buildEspPump(f) : { pump: null };
+  if (cfg.esp && espPump.error) return espPump;
+  const espCoupled = cfg.esp && espPump.pump ? espOpts(f) : null;
   // one march per rate yields the VLP point AND the calculated WHT
   const marchPts = rates.map((q) => {
-    const m = oilMarch({ ...cfg, qOilStbD: q });
+    const m = espCoupled
+      ? espSolveDp({ ...cfg, qOilStbD: q }, espPump.pump, espCoupled).march
+      : oilMarch({ ...cfg, qOilStbD: q });
     return { q, pwfPsi: m.pwfPsi, whtF: m.whtF };
   });
   const vlp = marchPts.map(({ q, pwfPsi }) => ({ q, pwfPsi }));
-  const op = oilOperatingPoint(cfg, ipr, { capStbD: cap });
+  const op = espCoupled
+    ? (() => {
+        const e = espOperatingPoint(cfg, ipr, espPump.pump, espCoupled);
+        return e.status === 'ok'
+          ? { status: 'ok', qOp: e.qOilStbD, pwfPsi: e.pwfTraversePsi, esp: e }
+          : { status: e.status };
+      })()
+    : oilOperatingPoint(cfg, ipr, { capStbD: cap });
   const whp = marchPts.map((p) => {
     const pwfIpr = pwfAtQGross(p.q / oilFrac, ipr);
     return {
@@ -282,7 +299,14 @@ export function oilNodal(f) {
       whtF: p.whtF,
     };
   });
-  const opMarch = op.status === 'ok' ? oilMarch({ ...cfg, qOilStbD: op.qOp }) : null;
+  // at the operating rate: the coupled ESP march when a pump drives the
+  // well, otherwise the plain march (the dP is then the user's input)
+  const opSolve = op.status === 'ok' && espCoupled
+    ? espSolveDp({ ...cfg, qOilStbD: op.qOp }, espPump.pump, espCoupled)
+    : null;
+  const opMarch = op.status === 'ok' ? (opSolve ? opSolve.march : oilMarch({ ...cfg, qOilStbD: op.qOp })) : null;
+  const espDpPsi = opSolve ? opSolve.dpPsi : cfg.esp?.pumpDpPsi;
+  const espCfgAtOp = opSolve ? { ...cfg, esp: { ...cfg.esp, pumpDpPsi: opSolve.dpPsi, tubingGasScfD: opSolve.tubingGasScfD } } : cfg;
   return {
     pbPsi: pb,
     computed: { pbPsi: pb, prPsi: ipr.prPsi, perfTvdM: cfg.perfTvdM },
@@ -294,18 +318,26 @@ export function oilNodal(f) {
     op: op.status === 'ok' ? { qOilStbD: op.qOp, pwfPsi: op.pwfPsi, whtF: opMarch.whtF } : null,
     esp:
       cfg.esp && opMarch
-        ? { dischargePsi: opMarch.dischargePsi, intakePsi: opMarch.intakePsi, pumpDpPsi: cfg.esp.pumpDpPsi }
+        ? {
+            dischargePsi: opMarch.dischargePsi,
+            intakePsi: opMarch.intakePsi,
+            pumpDpPsi: espDpPsi,
+            pumpName: espPump.pump?.name ?? null,
+            headFt: opSolve?.headFt ?? null,
+            qGrossPumpBpd: opSolve?.state.qGrossPumpBpd ?? null,
+            thrust: opSolve ? thrustStatus(espPump.pump, espCoupled.freqHz, opSolve.state.qGrossPumpBpd).status : null,
+          }
         : null,
-    // manual-dP ESP: the input dP is merged into the march at the pump
-    // depth — show that traverse (top-down + the IPR back-calc branch)
+    // the dP (input on manual, solved with a pump) sits at the pump depth in
+    // the march — show that traverse (top-down + the IPR back-calc branch)
     espTraverse:
       cfg.esp && opMarch
         ? {
             stations: opMarch.stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
-            backStations: espBackMarch(cfg, op.pwfPsi ?? opMarch.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
+            backStations: espBackMarch(espCfgAtOp, op.pwfPsi ?? opMarch.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
             dischargePsi: opMarch.dischargePsi,
             intakePsi: opMarch.intakePsi,
-            dpPsi: cfg.esp.pumpDpPsi,
+            dpPsi: espDpPsi,
             pumpTvdFt: cfg.esp.pumpTvdM * 3.281,
           }
         : null,
