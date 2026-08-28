@@ -913,6 +913,9 @@ function switchLift() {
   const t = oilLiftType();
   document.getElementById('oil-lift-gl').style.display = t === 'gaslift' ? '' : 'none';
   document.getElementById('oil-lift-esp').style.display = t === 'esp' ? '' : 'none';
+  if (t !== 'esp')
+    for (const id of ['oil-cr-senspump', 'oil-cr-senstrav'])
+      document.getElementById(id).style.display = 'none';
   refreshOilSens();
   // per-lift GOR default: ESP wells 300, natural/gas-lift 5000 — swap only
   // while the field still holds the other type's default (user values kept)
@@ -1004,7 +1007,7 @@ function switchWaterLift() {
   // the ESP chart rows belong to the ESP lift only — stale ones would
   // otherwise linger after switching back to natural flow
   if (t !== 'esp')
-    for (const id of ['water-cr-esppump', 'water-cr-esptrav'])
+    for (const id of ['water-cr-esppump', 'water-cr-esptrav', 'water-cr-senspump', 'water-cr-senstrav'])
       document.getElementById(id).style.display = 'none';
   refreshWaterSens();
 }
@@ -1113,14 +1116,14 @@ function switchOilModule() {
   document.getElementById('oil-mod-reserve').style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('oil-mod-forecast').style.display = m === 'forecast' ? '' : 'none';
   document.getElementById('panel-oil').classList.toggle('mode-reserve', m === 'reserve');
-  for (const id of ['oil-summary', 'oil-cr-nodal', 'oil-cr-gl', 'oil-chart-sens', 'oil-cr-whp'])
+  for (const id of ['oil-summary', 'oil-cr-nodal', 'oil-cr-gl', 'oil-cr-sens', 'oil-cr-whp'])
     document.getElementById(id).style.display = m === 'well' ? '' : 'none';
   for (const id of ['oil-cr-rsv1', 'oil-cr-rsv2'])
     document.getElementById(id).style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('oil-cr-fc').style.display = m === 'forecast' ? '' : 'none';
   if (m !== 'well') {
-    document.getElementById('oil-cr-esptrav').style.display = 'none';
-    document.getElementById('oil-cr-espsens').style.display = 'none';
+    for (const id of ['oil-cr-esptrav', 'oil-cr-espsens', 'oil-cr-senspump', 'oil-cr-senstrav'])
+      document.getElementById(id).style.display = 'none';
   }
   resizeVisibleCharts();
 }
@@ -1767,12 +1770,100 @@ const oilCalibrate = () => liquidCalibrate(OIL_CTX);
 const waterCalibrate = () =>
   waterWellType() === 'injector' ? waterInjCalibrateRun() : liquidCalibrate(WATER_CTX);
 
+/** The solved node of every VLP set, below the sensitivity chart, plus the
+ *  ESP pump-curve and traverse families when a pump drives the well. */
+function renderSensResults(prefix, r, rateLabel) {
+  const fam = r.vlpFamily ?? [];
+  const anyEsp = fam.some((m) => m.esp);
+  const anyTrav = fam.some((m) => m.traverse);
+  renderTables(`${prefix}-table-sens`, [{
+    title: 'Nodal solution per VLP set',
+    headers: anyEsp
+      ? ['set', rateLabel, 'Pwf psi', 'WHP psi', 'WHT °F', 'Hz', 'ΔP psi', 'head ft', 'Pint psi', 'Pdis psi', 'thrust']
+      : ['set', rateLabel, 'Pwf psi', 'WHP psi', 'WHT °F'],
+    rows: fam.map((m) => {
+      const base = m.op
+        ? [m.label, fmt(m.op.qOilStbD, 0), fmt(m.op.pwfPsi, 1), fmt(m.op.whpPsi, 1), fmt(m.op.whtF, 1)]
+        : [m.label, m.opStatus ?? '—', '—', '—', '—'];
+      if (!anyEsp) return base;
+      return m.esp
+        ? [...base, fmt(m.esp.freqHz, 0), fmt(m.esp.dpPsi, 0), fmt(m.esp.headFt, 0), fmt(m.esp.intakePsi, 0), fmt(m.esp.dischargePsi, 0), m.esp.thrust]
+        : [...base, '—', '—', '—', '—', '—', '—'];
+    }),
+  }]);
+  // pump curve per set (each set may run at its own frequency)
+  const pumpRow = document.getElementById(`${prefix}-cr-senspump`);
+  const travRow = document.getElementById(`${prefix}-cr-senstrav`);
+  const hasCurves = fam.some((m) => m.pumpCurve);
+  pumpRow.style.display = hasCurves ? '' : 'none';
+  travRow.style.display = anyTrav ? '' : 'none';
+  if (hasCurves) {
+    const traces = [];
+    fam.forEach((m, i) => {
+      if (!m.pumpCurve) return;
+      traces.push({
+        x: m.pumpCurve.points.map((p) => p.rateBpd), y: m.pumpCurve.points.map((p) => p.headFt),
+        name: `${m.label} @ ${m.pumpCurve.freqHz} Hz`, mode: 'lines',
+        line: { color: FAM_REDS[i % 3], width: 2.5 },
+      });
+      if (m.esp)
+        traces.push({
+          x: [m.esp.qGrossPumpBpd], y: [m.esp.headFt], name: `${m.label} node`, mode: 'markers',
+          marker: { symbol: 'star', size: 14, color: FAM_REDS[i % 3], line: { width: 1, color: '#0B1418' } },
+        });
+    });
+    for (const t of r.thrustLines ?? [])
+      traces.push({
+        x: t.points.map((p) => p.rateBpd), y: t.points.map((p) => p.headFt),
+        name: t.key === 'bep' ? 'BEP' : `${t.key}-thrust`, mode: 'lines',
+        line: { color: t.key === 'bep' ? '#2C7048' : '#C2540B', width: 1.5, dash: 'dash' },
+      });
+    Plotly.newPlot(`${prefix}-chart-senspump`, traces, {
+      ...LAYOUT(),
+      title: `Pump curve per sensitivity — ${r.pumpName ?? 'pump'}, ${r.espOpts?.stages ?? '—'} stages`,
+      xaxis: { title: 'Rate @ pump, bbl/d' },
+      yaxis: { title: 'Head, ft', rangemode: 'tozero' },
+    }, PLOT_CFG());
+    renderTables(`${prefix}-table-senspump`, [{
+      title: 'ESP at each solved node', headers: ['set', 'Hz', 'q@pump bbl/d', 'head ft', 'ΔP psi', 'grad psi/ft', 'free gas %', 'thrust'],
+      rows: fam.filter((m) => m.esp).map((m) => [
+        m.label, fmt(m.esp.freqHz, 0), fmt(m.esp.qGrossPumpBpd, 0), fmt(m.esp.headFt, 0),
+        fmt(m.esp.dpPsi, 0), fmt(m.esp.gradPsiFt, 4), fmt(m.esp.freeGasPct, 2), m.esp.thrust,
+      ]),
+    }]);
+  }
+  // traverse per set, each with its pump step at pump depth
+  if (anyTrav) {
+    const tv = [];
+    fam.forEach((m, i) => {
+      if (!m.traverse) return;
+      const t = m.traverse;
+      tv.push({ x: t.stations.map((s) => s.pPsi), y: t.stations.map((s) => s.tvdFt), name: `${m.label} top-down`, mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2 } });
+      tv.push({ x: t.backStations.map((s) => s.pPsi), y: t.backStations.map((s) => s.tvdFt), name: `${m.label} IPR back-calc`, mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 1.6, dash: 'dash' } });
+      tv.push({ x: [t.intakePsi, t.dischargePsi], y: [t.pumpTvdFt, t.pumpTvdFt], name: `${m.label} ΔP ${fmt(t.dpPsi, 0)} psi`, mode: 'lines+markers', line: { color: FAM_REDS[i % 3], width: 3 }, marker: { size: 8 } });
+    });
+    Plotly.newPlot(`${prefix}-chart-senstrav`, tv, {
+      ...LAYOUT(),
+      title: 'Traverse per sensitivity — top-down vs IPR back-calc',
+      xaxis: { title: 'Pressure, psi' },
+      yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
+    }, PLOT_CFG());
+    renderTables(`${prefix}-table-senstrav`, [{
+      title: 'Pump node per set', headers: ['set', 'pump TVD ft', 'Pint psi', 'Pdis psi', 'ΔP psi'],
+      rows: fam.filter((m) => m.traverse).map((m) => [
+        m.label, fmt(m.traverse.pumpTvdFt, 0), fmt(m.traverse.intakePsi, 1), fmt(m.traverse.dischargePsi, 1), fmt(m.traverse.dpPsi, 1),
+      ]),
+    }]);
+  }
+}
+
 async function oilSens() {
   const body = oilForm();
   body.vlpSets = collectSens('oil', oilSensCols(), OIL_SENS_ROWS.length);
   body.presList = collectPres('oil', 3);
   const r = await api('oil/sensitivity', body);
   plotSens('oil-chart-sens', 'Oil rate, stb/d', r.iprFamily, r.vlpFamily, (p) => p.qOilStbD);
+  renderSensResults('oil', r, 'q oil stb/d');
 }
 
 async function waterSens() {
@@ -1793,6 +1884,14 @@ async function waterSens() {
       ? { title: 'Injectivity & available-BHIP sensitivities', iprName: 'Required', vlpName: 'Available', showBht: true }
       : {}
   );
+  if (inj) {
+    // the injector has no producing node/pump: only the families are drawn
+    for (const id of ['water-cr-senspump', 'water-cr-senstrav'])
+      document.getElementById(id).style.display = 'none';
+    document.getElementById('water-table-sens').innerHTML = '';
+  } else {
+    renderSensResults('water', r, 'q water bbl/d');
+  }
 }
 
 function gasIprMode() {

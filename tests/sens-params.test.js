@@ -186,3 +186,58 @@ test('water ESP sensitivity uses the coupled pump solve when one is selected', (
   const b = r.vlpFamily[1].curve[2].pwfPsi;
   assert.ok(b < a, `60 Hz must lower the water VLP: ${b} vs ${a}`);
 });
+
+// ---- sensitivity view: a solved node (and ESP data) per VLP set ----
+test('sensitivity solves a nodal point for every VLP set', () => {
+  const r = handlers['oil/sensitivity']({
+    ...OIL_BASE, gorScfStb: 5000, liftType: 'natural',
+    vlpSets: [{ label: 'A' }, { label: 'B', thpPsi: 300 }],
+  });
+  assert.equal(r.vlpFamily.length, 2);
+  for (const m of r.vlpFamily) {
+    assert.equal(m.opStatus, 'ok', `${m.label} ${m.opStatus}`);
+    assert.ok(m.op.qOilStbD > 0 && m.op.pwfPsi > 0 && m.op.whtF > 0);
+    assert.ok(Number.isFinite(m.op.whpPsi));
+  }
+  // a lower FTHP must lift the rate
+  assert.ok(r.vlpFamily[1].op.qOilStbD > r.vlpFamily[0].op.qOilStbD);
+  assert.equal(r.thrustLines, null, 'no pump: no thrust envelope');
+});
+
+test('ESP sensitivity carries pump data, traverse and a per-set pump curve', () => {
+  const r = handlers['oil/sensitivity']({
+    ...OIL_BASE, liftType: 'esp', espPumpMode: 'db', espPumpName: 'ESP B 538-3600',
+    pumpAhM: 2993.08, pumpDpPsi: 1325.16, espFreqHz: 50, espStages: 145, espWearFactor: 0,
+    vlpSets: [{ label: '50Hz', freqHz: 50 }, { label: '60Hz', freqHz: 60 }],
+  });
+  assert.equal(r.pumpName, 'ESP B 538-3600');
+  assert.equal(r.thrustLines.length, 3, 'down/BEP/up envelope');
+  for (const m of r.vlpFamily) {
+    assert.equal(m.opStatus, 'ok');
+    assert.ok(m.esp.dpPsi > 0 && m.esp.headFt > 0, 'pump solved at the node');
+    assert.ok(m.esp.dischargePsi > m.esp.intakePsi);
+    assert.ok(m.traverse.stations.length > 10 && m.traverse.backStations.length >= 2);
+    assert.ok(m.traverse.pumpTvdFt > 0);
+    assert.ok(m.pumpCurve.points.length > 3);
+    assert.equal(m.pumpCurve.freqHz, m.esp.freqHz);
+  }
+  // more frequency = more head = a higher rate at the node
+  const [a, b] = r.vlpFamily;
+  assert.ok(b.esp.headFt > a.esp.headFt, `60 Hz head ${b.esp.headFt} vs ${a.esp.headFt}`);
+  assert.ok(b.op.qOilStbD > a.op.qOilStbD, '60 Hz lifts more');
+});
+
+test('water ESP sensitivity solves the same way on the shared catalog', () => {
+  const r = handlers['oil/sensitivity']({
+    ...WATER_ESP,
+    vlpSets: [{ label: '50Hz', freqHz: 50 }, { label: '60Hz', freqHz: 60 }],
+  });
+  assert.equal(r.fluid, 'water');
+  assert.equal(r.pumpName, 'ESP B 538-3600');
+  for (const m of r.vlpFamily) {
+    assert.equal(m.opStatus, 'ok');
+    assert.ok(m.esp.freeGasPct < 1e-9, 'water carries no free gas');
+    assert.ok(m.traverse.stations.length > 10);
+    assert.ok(m.pumpCurve.points.length > 3);
+  }
+});

@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-08-28p" />
+  <link rel="stylesheet" href="/style.css?v=2026-08-28q" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -193,7 +193,9 @@
         <div id="oil-summary" class="summary"></div>
         <div class="chartrow" id="oil-cr-nodal"><div id="oil-chart-nodal" class="chart"></div><div id="oil-table-nodal" class="datatable"></div></div>
         <div class="chartrow" id="oil-cr-gl"><div id="oil-chart-gl" class="chart"></div><div id="oil-table-gl" class="datatable"></div></div>
-        <div id="oil-chart-sens" class="chart"></div>
+        <div class="chartrow stack" id="oil-cr-sens"><div id="oil-chart-sens" class="chart"></div><div id="oil-table-sens" class="datatable"></div></div>
+        <div class="chartrow stack" id="oil-cr-senspump" style="display:none"><div id="oil-chart-senspump" class="chart"></div><div id="oil-table-senspump" class="datatable"></div></div>
+        <div class="chartrow stack" id="oil-cr-senstrav" style="display:none"><div id="oil-chart-senstrav" class="chart"></div><div id="oil-table-senstrav" class="datatable"></div></div>
         <div class="chartrow" id="oil-cr-whp"><div id="oil-chart-whp" class="chart"></div><div id="oil-table-whp" class="datatable"></div></div>
         <div class="chartrow" id="oil-cr-rsv1" style="display:none"><div id="oil-chart-rsv1" class="chart"></div><div id="oil-table-rsv1" class="datatable"></div></div>
         <div class="chartrow" id="oil-cr-rsv2" style="display:none"><div id="oil-chart-rsv2" class="chart"></div><div id="oil-table-rsv2" class="datatable"></div></div>
@@ -264,7 +266,9 @@
         <div id="water-summary" class="summary"></div>
         <div class="chartrow" id="water-cr-nodal"><div id="water-chart-nodal" class="chart"></div><div id="water-table-nodal" class="datatable"></div></div>
         <div class="chartrow" id="water-cr-gl"><div id="water-chart-gl" class="chart"></div><div id="water-table-gl" class="datatable"></div></div>
-        <div id="water-chart-sens" class="chart"></div>
+        <div class="chartrow stack" id="water-cr-sens"><div id="water-chart-sens" class="chart"></div><div id="water-table-sens" class="datatable"></div></div>
+        <div class="chartrow stack" id="water-cr-senspump" style="display:none"><div id="water-chart-senspump" class="chart"></div><div id="water-table-senspump" class="datatable"></div></div>
+        <div class="chartrow stack" id="water-cr-senstrav" style="display:none"><div id="water-chart-senstrav" class="chart"></div><div id="water-table-senstrav" class="datatable"></div></div>
         <div class="chartrow" id="water-cr-whp"><div id="water-chart-whp" class="chart"></div><div id="water-table-whp" class="datatable"></div></div>
         <div class="chartrow" id="water-cr-esppump" style="display:none"><div id="water-chart-esppump" class="chart"></div><div id="water-table-esppump" class="datatable"></div></div>
         <div class="chartrow" id="water-cr-esptrav" style="display:none"><div id="water-chart-esptrav" class="chart"></div><div id="water-table-esptrav" class="datatable"></div></div>
@@ -371,6 +375,6 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/app.js?v=2026-08-28p"></script>
+  <script src="/app.js?v=2026-08-28q"></script>
 </body>
 </html>

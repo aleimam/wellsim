@@ -173,6 +173,18 @@ inputs are required; there is no input THT.
    temperature**, not the pressure; those BHT families are plotted on the
    chart's second axis.
 
+   **Every set is solved, not just drawn.** Below the sensitivity chart a
+   table gives each VLP set its own **nodal solution** against the current
+   IPR — rate, Pwf, WHP and calculated WHT — so you read what the change
+   actually produces, not only how the curve moved. On an ESP well the
+   table also carries the frequency, solved ΔP, head, intake and discharge
+   pressures and the thrust verdict per set, and two more charts appear:
+   the **pump curve per sensitivity** (each set's curve at its own
+   frequency, its node starred, over the shared thrust envelope) and the
+   **traverse per sensitivity** (each set's top-down march and IPR
+   back-calc with its pump ΔP step at pump depth). Both work the same on
+   the oil and water tabs.
+
    Alongside the VLP sets, both producers and injectors sweep future
    reservoir pressures (defaults 2662.5 / 1775 / 887.5 psi = 0.75·0.5·0.25 × Pr).
    Future IPRs use the workbook's future-J chain (J_2x with μ·Bo at the future

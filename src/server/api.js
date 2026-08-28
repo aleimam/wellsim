@@ -78,6 +78,7 @@ import {
   vlpSensitivityEsp,
   vlpSensitivityInjector,
   espDpAtFreq,
+  mergeCfg,
   oilIprSensitivity,
   gasIprSensitivity,
   futureOilJ,
@@ -508,7 +509,83 @@ export function oilSensitivity(f) {
   } else {
     vlpFamily = vlpSensitivityOil(cfg, sets, { rates });
   }
-  return { vlpFamily, iprFamily };
+  // Each VLP set gets its own NODAL SOLUTION against the current IPR, and
+  // for ESP wells the pump data, traverse and pump curve at that node — the
+  // sensitivity view then answers "what does this change actually produce?"
+  const espPumpS = cfg.esp ? buildEspPump(f) : { pump: null };
+  const espOptsS = cfg.esp && espPumpS.pump ? espOpts(f) : null;
+  for (let i = 0; i < vlpFamily.length; i++) {
+    const m = vlpFamily[i];
+    const ov = sets[i]?.overrides ?? {};
+    const { freqHz, ...marchOv } = ov;
+    const setCfg = mergeCfg(cfg, marchOv);
+    const setOpts = espOptsS ? { ...espOptsS, ...(freqHz != null ? { freqHz } : {}) } : null;
+    const oilFracSet = setCfg.fluid === 'water' ? 1 : 1 - setCfg.wcPct / 100;
+    try {
+      const op = setOpts
+        ? (() => {
+            const e = espOperatingPoint(setCfg, ipr, espPumpS.pump, setOpts);
+            return e.status === 'ok' ? { status: 'ok', qOp: e.qOilStbD, pwfPsi: e.pwfTraversePsi, e } : { status: e.status };
+          })()
+        : oilOperatingPoint(setCfg, ipr, { capStbD: Math.min(qMaxGross(ipr) * oilFracSet * 0.999, 10000) });
+      if (op.status !== 'ok') { m.opStatus = op.status; m.op = null; continue; }
+      m.opStatus = 'ok';
+      const solve = setOpts ? espSolveDp({ ...setCfg, qOilStbD: op.qOp }, espPumpS.pump, setOpts) : null;
+      const march = solve ? solve.march : oilMarch({ ...setCfg, qOilStbD: op.qOp });
+      m.op = {
+        qOilStbD: op.qOp,
+        pwfPsi: op.pwfPsi,
+        whtF: march.whtF,
+        whpPsi: pwfAtQGross(op.qOp / oilFracSet, ipr) - march.pwfPsi + setCfg.thpPsi,
+      };
+      if (solve) {
+        const cfgAt = { ...setCfg, esp: { ...setCfg.esp, pumpDpPsi: solve.dpPsi, tubingGasScfD: solve.tubingGasScfD } };
+        m.esp = {
+          dpPsi: solve.dpPsi,
+          headFt: solve.headFt,
+          intakePsi: march.intakePsi,
+          dischargePsi: march.dischargePsi,
+          qGrossPumpBpd: solve.state.qGrossPumpBpd,
+          freeGasPct: solve.state.freeGasPct,
+          gradPsiFt: solve.state.gradPsiFt,
+          freqHz: setOpts.freqHz,
+          thrust: thrustStatus(espPumpS.pump, setOpts.freqHz, solve.state.qGrossPumpBpd).status,
+        };
+        m.pumpCurve = { freqHz: setOpts.freqHz, points: pumpCurveAt(espPumpS.pump, setOpts) };
+        m.traverse = {
+          stations: march.stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
+          backStations: espBackMarch(cfgAt, op.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
+          pumpTvdFt: espPumpTvdM(setCfg) * 3.281,
+          dpPsi: solve.dpPsi,
+          intakePsi: march.intakePsi,
+          dischargePsi: march.dischargePsi,
+        };
+      } else if (cfg.esp) {
+        // manual-dP ESP: the traverse still shows the input dP at pump depth
+        m.traverse = {
+          stations: march.stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
+          backStations: espBackMarch(setCfg, op.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
+          pumpTvdFt: espPumpTvdM(setCfg) * 3.281,
+          dpPsi: setCfg.esp.pumpDpPsi,
+          intakePsi: march.intakePsi,
+          dischargePsi: march.dischargePsi,
+        };
+      }
+    } catch (e) {
+      m.opStatus = 'error';
+      m.op = null;
+      m.error = e.message;
+    }
+  }
+  return {
+    vlpFamily,
+    iprFamily,
+    // shared thrust envelope for the sensitivity pump-curve chart
+    thrustLines: espPumpS.pump && espOptsS ? pumpCurveFamily(espPumpS.pump, espOptsS).thrustLines : null,
+    pumpName: espPumpS.pump?.name ?? null,
+    espOpts: espOptsS,
+    fluid: cfg.fluid ?? 'oil',
+  };
 }
 
 /** Water-injector VLP sensitivities: available BHIP families per parameter
