@@ -14,9 +14,16 @@ export function tvdToAhFt(tvdFt, { devStartM = 0, devAngleDeg = 0 }) {
   );
 }
 
+/** Along-hole depth (m) -> TVD (m) on the same trajectory. Vertical above
+ *  the kick-off, then the constant deviation angle ('VLP-IPR'!I3 form). */
+export function ahToTvdM(ahM, { devStartM = 0, devAngleDeg = 0 }) {
+  if (ahM <= devStartM) return ahM;
+  return devStartM + (ahM - devStartM) * Math.cos((devAngleDeg * EXCEL_PI) / 180);
+}
+
 /** Top-perf TVD (m) from along-hole depth (m). 'VLP-IPR'!I3. */
 export function perfTvdM({ topPerfAhM, devStartM = 0, devAngleDeg = 0 }) {
-  return devStartM + (topPerfAhM - devStartM) * Math.cos((devAngleDeg * EXCEL_PI) / 180);
+  return ahToTvdM(topPerfAhM, { devStartM, devAngleDeg });
 }
 
 /**

@@ -161,7 +161,7 @@ const OIL_GL_WELL_FIELDS = [
 ];
 
 const OIL_ESP_FIELDS = [
-  ['pumpTvdM', 'Pump depth', 'mTVD', 2985],
+  ['pumpAhM', 'Pump depth', 'mAH', 2993.08],
   ['espFreqHz', 'Operating frequency', 'Hz', 50],
   ['espStages', 'No. of stages', '-', 145],
   ['espWearFactor', 'Wear factor', 'frac', 0],
@@ -180,7 +180,7 @@ const OIL_ESP_MANUAL_FIELDS = [
 // pump selected the dP is solved from the curve; Manual dP keeps the typed
 // value and a frequency sensitivity scales it by the affinity law (f/f0)^2.
 const WATER_ESP_FIELDS = [
-  ['pumpTvdM', 'Pump depth', 'mTVD', 2985],
+  ['pumpAhM', 'Pump depth', 'mAH', 2993.08],
   ['espFreqHz', 'Operating frequency', 'Hz', 50],
   ['espStages', 'No. of stages', '-', 145],
   ['espWearFactor', 'Wear factor', 'frac', 0],

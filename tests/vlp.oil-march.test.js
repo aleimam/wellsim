@@ -300,3 +300,31 @@ test('flowing wellhead temperature is CALCULATED (single oil temp model)', () =>
   const back = espBackMarch(ESP, 1624.45782984539);
   assert.equal(back.stations[back.stations.length - 1].tF, top.stations[27].tF);
 });
+
+// ---- pump setting depth entered as MEASURED (along-hole) depth ----
+test('ESP pump depth: AH input converts to the same TVD physics', () => {
+  // deviated trajectory: kick-off 1910 m at 7 deg (the demo well)
+  const dev = { devStartM: 1910, devAngleDeg: 7, perfTvdM: 3100 };
+  const ahOf = (tvdM) => 1910 + (tvdM - 1910) / Math.cos((7 * (22 / 7)) / 180);
+  const base = { ...ESP, ...dev };
+  const byTvd = oilMarch({ ...base, esp: { ...ESP.esp, pumpTvdM: 2985 } });
+  const byAh = oilMarch({ ...base, esp: { ...ESP.esp, pumpAhM: ahOf(2985), pumpTvdM: undefined } });
+  close(byAh.pwfPsi, byTvd.pwfPsi, 1e-9);
+  close(byAh.intakePsi, byTvd.intakePsi, 1e-9);
+  close(byAh.dischargePsi, byTvd.dischargePsi, 1e-9);
+  // a DEEPER measured depth must place the pump deeper (higher intake P)
+  const deeper = oilMarch({ ...base, esp: { ...ESP.esp, pumpAhM: ahOf(2985) + 200, pumpTvdM: undefined } });
+  assert.ok(deeper.intakePsi > byTvd.intakePsi, 'deeper pump sees more head');
+});
+
+test('ESP pump depth: AH wins when both are given, and one is required', () => {
+  const dev = { devStartM: 1910, devAngleDeg: 7, perfTvdM: 3100 };
+  const both = oilMarch({ ...ESP, ...dev, esp: { ...ESP.esp, pumpAhM: 2993.08, pumpTvdM: 1 } });
+  const ahOnly = oilMarch({ ...ESP, ...dev, esp: { ...ESP.esp, pumpAhM: 2993.08, pumpTvdM: undefined } });
+  close(both.pwfPsi, ahOnly.pwfPsi, 1e-12);
+  assert.throws(
+    () => oilMarch({ ...ESP, ...dev, esp: { pumpDpPsi: 100 } }),
+    /pumpAhM/,
+    'a pump depth is still required'
+  );
+});

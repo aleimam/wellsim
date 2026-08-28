@@ -179,7 +179,7 @@ pre.eq code { background: none; padding: 0; }
   <h1>WellSim Manual</h1>
   <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a zero-dependency web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
   <div class="statusrow">
-    <span class="chip"><b>187</b> regression tests passing</span>
+    <span class="chip"><b>189</b> regression tests passing</span>
     <span class="chip"><b>43/43</b> sheet-parity sensitivities</span>
     <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
     <span class="chip">port 3355 &middot; zero npm dependencies</span>
@@ -204,7 +204,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-node --test                             # 187 tests
+node --test                             # 189 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is distributed separately as <code>WellSim-1.0.zip</code>.</p>
 
@@ -243,7 +243,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 <tr><td>IPR (Darcy)</td><td class="num">Pri 3550 &middot; K 50 mD &middot; H 42.653 ft &middot; Re 1640.5 &middot; Rw 0.5104 &middot; skin 0</td></tr>
 <tr><td>Test</td><td class="num">2100 stb/d @ 700 psi &middot; Pwf blank = get&nbsp;Pwf</td></tr>
 <tr><td>Gas lift</td><td class="num">injection 2490.92 mTVD &middot; sweep to 2 MMscf/d in 10 steps</td></tr>
-<tr><td>ESP</td><td class="num">pump 2985 mTVD &middot; &Delta;P 1325.16 psi (manual) &middot; tubing gas blank = formation &middot; selecting ESP swaps the GOR default 5000&rarr;300 scf/stb (back on natural/gas lift)</td></tr>
+<tr><td>ESP</td><td class="num">pump 2993.08 <b>mAH</b> (= 2985 mTVD on the demo trajectory) &middot; &Delta;P 1325.16 psi (manual) &middot; tubing gas blank = formation &middot; selecting ESP swaps the GOR default 5000&rarr;300 scf/stb (back on natural/gas lift)</td></tr>
 </table></div>
 
 <h4>Workflow</h4>
@@ -349,6 +349,8 @@ Bg (oil MB)     = 0.0283·Z·(T+460)/(P+14.5)/5.615    [bbl/scf]</pre>
 
 <h2 id="eq-wellbore">Trajectory, temperatures &amp; marches</h2>
 <pre class="eq">TVD = kickoff + (AH − kickoff)·cos(θ·(22/7)/180)
+  — also places the ESP pump: its setting depth is entered as MEASURED
+    depth (mAH) and converted to TVD on this trajectory
 Ramey WHT (always calculated):
   K10 = (OD_ft·3.14·U)/((w/24)·Cp)      K11 = e^(−K10·L₁)   (L₁ = FIRST station spacing — sheet quirk)
   T_shelf(x) = T_soil + (T_res−T_soil)·TVD(x)/TVD_tot

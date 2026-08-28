@@ -10,7 +10,7 @@ import {
 } from '../core/vlp/water-injector.js';
 import { gasPvt } from '../core/pvt/gas.js';
 import { perfTvdM } from '../core/vlp/wellpath.js';
-import { oilMarch, espBackMarch } from '../core/vlp/oil-march.js';
+import { oilMarch, espBackMarch, espPumpTvdM } from '../core/vlp/oil-march.js';
 import { gasMarch } from '../core/vlp/gas-march.js';
 import {
   createOilIpr,
@@ -138,7 +138,12 @@ function buildOilCfg(f) {
     cfg.gasLift = { injDepthTvdM: num(f.injDepthTvdM), injRateMMscfd: num(f.injRateMMscfd) ?? 0 };
   }
   if (lift === 'esp') {
-    cfg.esp = { pumpTvdM: num(f.pumpTvdM), pumpDpPsi: num(f.pumpDpPsi) };
+    // pump setting depth is entered as MEASURED (along-hole) depth; the
+    // march converts it on the trajectory. pumpTvdM stays accepted so
+    // cases saved before the switch still load.
+    cfg.esp = { pumpDpPsi: num(f.pumpDpPsi) };
+    if (num(f.pumpAhM) != null) cfg.esp.pumpAhM = num(f.pumpAhM);
+    else if (num(f.pumpTvdM) != null) cfg.esp.pumpTvdM = num(f.pumpTvdM);
     if (num(f.tubingGasScfD) != null) cfg.esp.tubingGasScfD = num(f.tubingGasScfD);
   }
   return cfg;
@@ -364,7 +369,7 @@ export function oilNodal(f) {
             dischargePsi: opMarch.dischargePsi,
             intakePsi: opMarch.intakePsi,
             dpPsi: espDpPsi,
-            pumpTvdFt: cfg.esp.pumpTvdM * 3.281,
+            pumpTvdFt: espPumpTvdM(cfg) * 3.281,
           }
         : null,
     opStatus: op.status,
@@ -1280,7 +1285,7 @@ export function oilEsp(f) {
     measured: {
       pintPsi: num(f.espMeasPintPsi) ?? null,
       pdisPsi: num(f.espMeasPdisPsi) ?? null,
-      pumpTvdFt: (num(f.pumpTvdM) ?? 0) * 3.281,
+      pumpTvdFt: espPumpTvdM(cfg) * 3.281,
     },
     pbPsi: pb,
     prPsi: ipr.prPsi,

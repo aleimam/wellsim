@@ -129,7 +129,7 @@ Chen above.
 | IPR — Darcy | Pri 3550 psi · Pr blank = Pri · K 50 mD · H 42.653 ft · Re 1640.5 ft · Rw 0.5104 ft · Skin 0 |
 | Match factors | Head 1 · Friction 1 |
 | Gas lift | Injection depth 2490.92 mTVD · Injection rate 0 · sweep to 2 MMscf/d in 10 steps |
-| ESP | Pump depth 2985 mTVD · Pump ΔP 1325.16 psi (manual) · Tubing gas blank = formation gas · selecting ESP swaps the GOR default 5000 → **300 scf/stb** (back on natural/gas lift; a typed value is kept) |
+| ESP | Pump depth 2993.08 **mAH** (measured/along-hole — the depth a pump is actually run and reported at; = 2985 mTVD on this trajectory) · Pump ΔP 1325.16 psi (manual) · Tubing gas blank = formation gas · selecting ESP swaps the GOR default 5000 → **300 scf/stb** (back on natural/gas lift; a typed value is kept) |
 
 **Well-head temperature is always calculated** (Ramey chain) — the heat-transfer
 inputs are required; there is no input THT.
@@ -179,7 +179,13 @@ inputs are required; there is no input THT.
    pressure).
 4. **Gas lift** — set injection depth/rate; *Run gas-lift performance curve* sweeps
    injection rates and reports the optimum and the incremental dQ/dInj.
-5. **ESP** — the full pump stack. The **68-pump database runs in the
+5. **ESP** — the full pump stack. **Pump setting depth is entered as
+   measured (along-hole) depth, mAH** — the depth a pump is actually run
+   and reported at — and the march converts it to TVD on the well's own
+   trajectory (vertical to the kick-off, then the deviation angle), the
+   same conversion used for the perforations. Cases saved before this
+   change still load: a stored TVD pump depth is honoured as-is.
+   The **68-pump database runs in the
    background** (WD/WG/WE/FLEX/ESP-B families from ESP_DataBase): pick a pump
    from the dropdown, **add a new pump** as a custom per-stage curve (up to 11
    head/rate points at a reference frequency), or fall back to Manual ΔP.

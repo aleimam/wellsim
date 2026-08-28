@@ -44,7 +44,7 @@ import {
 } from '../pvt/gas.js';
 import { SCF_TO_M3, BBL_TO_M3, LBFT3_PER_KGM3 } from '../pvt/constants.js';
 import { waterDensityLbft3, liquidViscosityCp } from '../pvt/water.js';
-import { buildGrid } from './wellpath.js';
+import { buildGrid, ahToTvdM } from './wellpath.js';
 import { ashryHeadFactor } from './ashry.js';
 import { AIR_LB_PER_SCF, LIQ_LB_PER_FT3, chenFanning, frictionGradient, rameyTemperatures, requireInputs } from './common.js';
 
@@ -74,7 +74,11 @@ export function validateOilCfg(cfg) {
     throw new Error('oil march: wcPct must be < 100 (rates are oil-based; use fluid:"water" for a water well)');
   if (cfg.qOilStbD <= 0) throw new Error('oil march: qOilStbD must be > 0');
   if (cfg.gasLift) requireInputs(cfg.gasLift, ['injDepthTvdM'], 'oil march gasLift');
-  if (cfg.esp) requireInputs(cfg.esp, ['pumpTvdM', 'pumpDpPsi'], 'oil march esp');
+  if (cfg.esp) {
+    if (cfg.esp.pumpAhM == null && cfg.esp.pumpTvdM == null)
+      throw new Error('oil march esp: missing required input(s): pumpAhM');
+    requireInputs(cfg.esp, ['pumpDpPsi'], 'oil march esp');
+  }
 }
 
 /** Rates, masses and constants derived from the input block (BHP!C5:C16, I/M/P/R rows). */
@@ -209,6 +213,16 @@ export function computeOilTemps(cfg, grid, totTvdFt, flow) {
   });
 }
 
+/** Pump setting depth as TVD (m). The input is the MEASURED (along-hole)
+ *  depth pumpAhM — how a pump is actually run and reported — converted on
+ *  the well's own trajectory. cfg.esp.pumpTvdM is still honoured so saved
+ *  cases (and the workbook pins) keep working. */
+export function espPumpTvdM(cfg) {
+  const e = cfg.esp ?? {};
+  if (e.pumpAhM != null) return ahToTvdM(e.pumpAhM, cfg);
+  return e.pumpTvdM;
+}
+
 function oilSegments(cfg, totTvdFt) {
   if (cfg.gasLift) {
     const injFt = cfg.gasLift.injDepthTvdM * 3.281;
@@ -218,7 +232,7 @@ function oilSegments(cfg, totTvdFt) {
     ];
   }
   if (cfg.esp) {
-    const pumpFt = cfg.esp.pumpTvdM * 3.281;
+    const pumpFt = espPumpTvdM(cfg) * 3.281;
     return [
       { toTvdFt: pumpFt, steps: cfg.esp.stepsAbove ?? 26, zone: 'esp' },
       { toTvdFt: pumpFt, steps: 0, zone: 'esp', node: 'pumpIntake' },
