@@ -70,6 +70,7 @@ import {
   reservoirLimitOil,
 } from '../core/reserve/oil-reserve.js';
 import { tarnerForecast } from '../core/reserve/tarner.js';
+import { walshForecast } from '../core/reserve/walsh.js';
 import {
   vlpSensitivityOil,
   vlpSensitivityGas,
@@ -966,15 +967,14 @@ export function oilForecastApi(f) {
   if (n == null || !(n > 0))
     return { error: 'STOIIP N not given and no production rows to derive it from — run the Reserve module first or type N' };
   const startGpMMscf = history.length ? history[history.length - 1].gpBscf * 1000 : 0;
-  const fc = tarnerForecast({
-    // the Tarner stream is oil+gas (the sheet's F8 W.C input, default 0) —
+  // method (one active): 'tarner' (default) | 'walsh' — the Walsh sheet of
+  // the "Walsh and turner variable Pwf" workbook (generalized MB with Rv)
+  const method = f.fcMethod === 'walsh' ? 'walsh' : 'tarner';
+  const shared = {
+    // the forecast stream is oil+gas (the sheet's W.C input, default 0) —
     // the march must not inherit the well model's producing water cut
     cfg: { ...cfg, wcPct: num(f.fcWcPct) ?? 0 },
     pvt,
-    darcy: {
-      permMd: num(f.permMd), thicknessFt: num(f.thicknessFt),
-      reFt: num(f.reFt), rwFt: num(f.rwFt), skin: num(f.skin) ?? 0,
-    },
     nMMstb: n,
     priPsi: ipr.priPsi,
     swi: num(f.swiFrac) ?? 0.15,
@@ -990,9 +990,20 @@ export function oilForecastApi(f) {
     fthpPsi: num(f.forecastFthpPsi) ?? cfg.thpPsi,
     minPwfPsi: num(f.minPwfPsi) ?? 500,
     abandonQoStbD: num(f.abandonQoStbD) ?? 50,
-  });
+  };
+  const fc =
+    method === 'walsh'
+      ? walshForecast({ ...shared, jStbDPsi: ipr.j })
+      : tarnerForecast({
+          ...shared,
+          darcy: {
+            permMd: num(f.permMd), thicknessFt: num(f.thicknessFt),
+            reFt: num(f.reFt), rwFt: num(f.rwFt), skin: num(f.skin) ?? 0,
+          },
+        });
   return {
     ...fc,
+    method,
     history,
     nMMstb: n,
     startDay: startDay ?? 0,

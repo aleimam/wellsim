@@ -977,6 +977,7 @@ function oilForm() {
   f.espCurve = collectGrid('oil-espcurve', ESP_CURVE_COLS, ESP_CURVE_ROWS.length);
   f.presSource = document.querySelector('input[name="oil-pressource"]:checked')?.value ?? 'prod';
   f.pwfMode = document.querySelector('input[name="oil-pwfmode"]:checked')?.value ?? 'vlp';
+  f.fcMethod = document.querySelector('input[name="oil-fcmethod"]:checked')?.value ?? 'tarner';
   f.mlMode = mlMode('oil');
   f.mlLayers = collectGrid('oil-ml', OIL_ML_COLS, OIL_ML_ROWS.length);
   f.prodRows = collectGrid('oil-prod', OIL_PROD_COLS, oilProdCount);
@@ -1016,8 +1017,11 @@ function switchOilModule() {
 async function oilForecastRun() {
   const r = await api('oil/forecast', oilForm());
   document.getElementById('oil-fc-result').textContent =
-    `EUR = ${fmt(r.eurMMstb, 2)} MMstb (${fmt(r.recoveryPct, 1)}% of N ${fmt(r.nMMstb, 1)}), status: ${r.status}\n` +
-    `J1 (mobility PI) = ${fmt(r.j1, 3)}. Start: Np ${fmt(r.startNpMMstb, 3)} MMstb, Pres ${fmt(r.startPresPsi, 0)} psi.`;
+    `${r.method === 'walsh' ? 'Walsh (generalized MB, Rv)' : 'Tarner'}: EUR = ${fmt(r.eurMMstb, 2)} MMstb (${fmt(r.recoveryPct, 1)}% of N ${fmt(r.nMMstb, 1)}), status: ${r.status}\n` +
+    (r.method === 'walsh'
+      ? `J (constant PI) = ${fmt(r.j, 3)}. `
+      : `J1 (mobility PI) = ${fmt(r.j1, 3)}. `) +
+    `Start: Np ${fmt(r.startNpMMstb, 3)} MMstb, Pres ${fmt(r.startPresPsi, 0)} psi.`;
   setComputed('oil-nMMstb', r.nMMstb, 2);
   setComputed('oil-startNpMMstb', r.startNpMMstb, 3);
   setComputed('oil-startPresPsi', r.startPresPsi, 1);
