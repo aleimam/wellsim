@@ -749,19 +749,25 @@ function summary(id, cards) {
 // width minus page padding and borders): charts fit the view exactly and never
 // re-fit as panels toggle. Desktop keeps fluid autosizing. The phone bottom
 // margin leaves room for the axis title AND the legend below it (no overlap).
+// phones and touch tablets: no zoom/pan (an accidental finger-drag froze
+// charts at a wrong scale) and no modebar (its icons sat on chart titles).
+// Big-screen mouse users keep both.
+const TOUCH_UI = () =>
+  window.innerWidth < 640 || (((navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window) && window.innerWidth < 1024);
+
 const LAYOUT = () => ({
   margin: window.innerWidth < 640 ? { l: 46, r: 12, t: 34, b: 88 } : { l: 60, r: 20, t: 40, b: 45 },
   ...(window.innerWidth < 640
     ? { autosize: false, width: window.innerWidth - 18, height: 300 }
     : { height: 380 }),
+  ...(TOUCH_UI() ? { dragmode: false } : {}),
   font: { family: '"IBM Plex Sans", "Segoe UI", sans-serif', size: window.innerWidth < 640 ? 11 : 12, color: '#0B1418' },
   legend: window.innerWidth < 640 ? { orientation: 'h', y: -0.42 } : { orientation: 'h', y: -0.22 },
   plot_bgcolor: '#FBFCFC',
   paper_bgcolor: '#FFFFFF',
 });
 
-// phones: no Plotly modebar (its icons sat on the chart titles); desktop keeps it
-const PLOT_CFG = () => ({ displaylogo: false, responsive: true, displayModeBar: window.innerWidth < 640 ? false : undefined });
+const PLOT_CFG = () => ({ displaylogo: false, responsive: true, displayModeBar: TOUCH_UI() ? false : undefined, scrollZoom: false });
 
 function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
   const traces = [
