@@ -688,40 +688,22 @@ const fmt = (v, d = 1) => (v == null ? '—' : Number(v).toFixed(d));
 // ---- mobile Inputs | Results views (The PWF bottom-bar pattern) ----
 const isPhone = () => window.matchMedia('(max-width: 640px)').matches;
 
-// ---- two skins: classic (default, the original view) | modern (mobile / The PWF design) ----
+// ---- two skins: modern (default — The PWF design on every device) | classic (the original view) ----
 function currentSkin() {
-  try { return localStorage.getItem('wellsim-skin') === 'modern' ? 'modern' : 'classic'; } catch (e) { return 'classic'; }
+  try { return localStorage.getItem('wellsim-skin') === 'classic' ? 'classic' : 'modern'; } catch (e) { return 'modern'; }
 }
 
 function setSkin(s) {
   try { localStorage.setItem('wellsim-skin', s); } catch (e) {}
   const v = window.WELLSIM_ASSET_V ? '?v=' + window.WELLSIM_ASSET_V : '';
   document.getElementById('skin').href = (s === 'modern' ? '/style.css' : '/classic.css') + v;
-  document.getElementById('skin-link').textContent = s === 'modern' ? 'Classic view' : 'Mobile view';
+  document.getElementById('skin-link').textContent = s === 'modern' ? 'Classic view' : 'Modern view';
   if (s === 'modern') setMobileView('inputs'); // Inputs is the default tab of the mobile view
   setTimeout(resizeVisibleCharts, 350); // re-fit charts once the new sheet applies
 }
 
-// phones get a one-time offer of the mobile-optimized view; the answer is
-// remembered, and the header link switches skins any time on any device
-function offerMobileSkin() {
-  let stored = null;
-  try { stored = localStorage.getItem('wellsim-skin'); } catch (e) { return; }
-  if (stored || !isPhone()) return;
-  const bar = document.createElement('div');
-  bar.id = 'skin-offer';
-  bar.style.cssText =
-    'position:fixed;bottom:0;left:0;right:0;z-index:60;background:#16324f;color:#fff;' +
-    'padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px));font:14px/1.4 "Segoe UI",system-ui,sans-serif;' +
-    'display:flex;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 -4px 18px rgba(0,0,0,.35)';
-  bar.innerHTML =
-    '<span style="flex:1;min-width:150px">Small screen detected — switch to the mobile-optimized view?</span>' +
-    '<button id="skin-yes" style="flex:1;min-height:44px;padding:10px 14px;border:0;border-radius:6px;background:#1f7a44;color:#fff;font-weight:600;cursor:pointer">Mobile view</button>' +
-    '<button id="skin-no" style="flex:1;min-height:44px;padding:10px 14px;border:1px solid #7fa0bd;border-radius:6px;background:none;color:#cfe0ee;cursor:pointer">Keep classic</button>';
-  document.body.appendChild(bar);
-  document.getElementById('skin-yes').onclick = () => { setSkin('modern'); bar.remove(); };
-  document.getElementById('skin-no').onclick = () => { setSkin('classic'); bar.remove(); };
-}
+// the modern (PWF) skin is now the default on every device, so the old
+// small-screen offer prompt is retired; the header link switches skins
 
 function setMobileView(v) {
   document.body.classList.toggle('view-inputs', v === 'inputs');
@@ -2233,8 +2215,7 @@ document.getElementById('tab-gas').onclick = () => switchTab('gas');
 document.getElementById('mb-inputs').onclick = () => setMobileView('inputs');
 document.getElementById('mb-results').onclick = () => setMobileView('results');
 document.getElementById('skin-link').onclick = (e) => { e.preventDefault(); setSkin(currentSkin() === 'modern' ? 'classic' : 'modern'); };
-document.getElementById('skin-link').textContent = currentSkin() === 'modern' ? 'Classic view' : 'Mobile view';
-offerMobileSkin();
+document.getElementById('skin-link').textContent = currentSkin() === 'modern' ? 'Classic view' : 'Modern view';
 document.getElementById('save-case').onclick = (e) => { e.preventDefault(); saveCaseAs(); };
 document.getElementById('open-case').onclick = (e) => { e.preventDefault(); document.getElementById('open-case-file').click(); };
 document.getElementById('open-case-file').onchange = (e) => {
