@@ -807,6 +807,65 @@ const LAYOUT = () => ({
 
 const PLOT_CFG = () => ({ displaylogo: false, responsive: true, displayModeBar: TOUCH_UI() ? false : undefined, scrollZoom: false });
 
+/**
+ * Phone legend placement, applied to EVERY chart. A horizontal legend
+ * defaults to sitting just under the plot, where it lands on the x-axis
+ * title and — with many traces (the 11-trace pump curve) — swallows the
+ * drawing area itself. So: estimate how many rows the legend needs at this
+ * width, start it BELOW the tick-label + axis-title block, and grow the
+ * canvas by exactly the legend's height, leaving the plot area intact.
+ */
+function applyPhoneLegend(layout, traces) {
+  if (window.innerWidth >= 640 || !Array.isArray(traces) || !traces.length) return layout;
+  const PLOT_H = 176;      // drawing area kept for the curves
+  const AXIS_BLOCK = 55;   // x tick labels + axis title below the plot floor
+  const LEGEND_GAP = 8;
+  const margin = { ...(layout.margin ?? {}) };
+  const usable = Math.max(160, (layout.width ?? window.innerWidth - 18) - (margin.l ?? 46) - (margin.r ?? 12));
+  const named = traces.filter((t) => t.showlegend !== false && t.name);
+  if (!named.length) return layout;
+  const longest = Math.max(...named.map((t) => String(t.name).length), 6);
+  const perRow = Math.max(1, Math.floor(usable / (longest * 5.6 + 30)));
+  const rows = Math.ceil(named.length / perRow);
+  const legendH = rows * 16 + 6;
+  const legendTop = AXIS_BLOCK + LEGEND_GAP;
+  layout.legend = { orientation: 'h', y: -(legendTop / PLOT_H), yanchor: 'top', x: 0, font: { size: 9 }, tracegroupgap: 2 };
+  margin.b = legendTop + legendH + 8;
+  layout.margin = margin;
+  layout.height = (margin.t ?? 34) + PLOT_H + margin.b;
+  return layout;
+}
+
+/**
+ * Draw a chart. On phones the legend placement is estimated first (above)
+ * and then CORRECTED from the drawing: text width per label is only ever a
+ * guess, so after the plot exists we measure where the legend actually
+ * landed against the axis title and nudge it down (growing the canvas by
+ * the same amount) if it is still riding on the title.
+ */
+function plot(div, traces, layout) {
+  const p = Plotly.newPlot(div, traces, applyPhoneLegend(layout, traces), PLOT_CFG());
+  if (window.innerWidth >= 640) return p;
+  return p.then((gd) => {
+    const el = gd ?? (typeof div === 'string' ? document.getElementById(div) : div);
+    if (!el || !el.layout || el.offsetParent === null) return el;
+    const title = el.querySelector('.g-xtitle');
+    const legend = el.querySelector('g.legend');
+    if (!title || !legend) return el;
+    const t = title.getBoundingClientRect();
+    const l = legend.getBoundingClientRect();
+    const encroach = t.bottom + 6 - l.top; // >0 means the legend sits too high
+    if (encroach <= 0) return el;
+    const plotH = (el.layout.height ?? 300) - (el.layout.margin?.t ?? 34) - (el.layout.margin?.b ?? 60);
+    if (plotH <= 0) return el;
+    return Plotly.relayout(el, {
+      'legend.y': (el.layout.legend?.y ?? -0.36) - encroach / plotH,
+      'margin.b': (el.layout.margin?.b ?? 60) + encroach,
+      height: (el.layout.height ?? 300) + encroach,
+    }).then(() => el);
+  });
+}
+
 function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
   const traces = [
     { x: ipr.map(iprX), y: ipr.map((p) => p.pwfPsi), name: 'IPR', mode: 'lines', line: { color: '#00636D', width: 3 } },
@@ -818,7 +877,7 @@ function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
       marker: { symbol: 'diamond', size: 14, color: '#0B1418', line: { width: 2, color: '#fff' } },
     });
   }
-  Plotly.newPlot(div, traces, { ...LAYOUT(), title: 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } }, PLOT_CFG());
+  plot(div, traces, { ...LAYOUT(), title: 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } });
 }
 
 const FAM_BLUES = ['#9ecae1', '#4292c6', '#084594'];
@@ -866,33 +925,8 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
     layout.yaxis2 = { title: 'BHT, °F', overlaying: 'y', side: 'right', showgrid: false };
     layout.margin = { ...layout.margin, r: window.innerWidth < 640 ? 40 : 55 };
   }
-  if (phone) {
-    // Give the legend its own room BELOW the axis title instead of letting
-    // it eat the plot or sit on the title. Everything is measured from the
-    // plot floor: the tick labels + x-axis title occupy ~55 px, so the
-    // legend starts past that, and the canvas grows by exactly the legend's
-    // height — the plot area itself stays a constant PLOT_H.
-    const PLOT_H = 176;      // drawing area kept for the curves
-    const AXIS_BLOCK = 55;   // x tick labels + axis title below the plot
-    const LEGEND_GAP = 8;
-    const usable = Math.max(160, (layout.width ?? window.innerWidth - 18) - layout.margin.l - layout.margin.r);
-    const longest = Math.max(...traces.map((t) => t.name.length), 6);
-    const perRow = Math.max(1, Math.floor(usable / (longest * 5.6 + 30)));
-    const rows = Math.ceil(traces.length / perRow);
-    const legendH = rows * 16 + 6;
-    const legendTop = AXIS_BLOCK + LEGEND_GAP; // px below the plot floor
-    layout.legend = {
-      orientation: 'h',
-      y: -(legendTop / PLOT_H), // Plotly measures y in plot-height fractions
-      yanchor: 'top',
-      x: 0,
-      font: { size: 9 },
-      tracegroupgap: 2,
-    };
-    layout.margin = { ...layout.margin, b: legendTop + legendH + 8 };
-    layout.height = layout.margin.t + PLOT_H + layout.margin.b;
-  }
-  Plotly.newPlot(div, traces, layout, PLOT_CFG());
+  // (the phone legend placement is applied for every chart in plot())
+  plot(div, traces, layout);
 }
 
 function plotWhp(div, xTitle, whp, thp) {
@@ -908,7 +942,7 @@ function plotWhp(div, xTitle, whp, thp) {
     });
   }
   const base = LAYOUT();
-  Plotly.newPlot(
+  plot(
     div,
     traces,
     {
@@ -923,9 +957,7 @@ function plotWhp(div, xTitle, whp, thp) {
         range: [0, Math.max(...whp.map((p) => p.whpPsi), thp) * 1.05],
       },
       yaxis2: { title: 'WHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#C2540B' }, tickfont: { color: '#C2540B' } },
-    },
-    PLOT_CFG()
-  );
+    });
 }
 
 // ---------- actions ----------
@@ -1207,14 +1239,14 @@ async function oilForecastRun() {
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gorScfStb), name: 'F GOR scf/stb', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
   );
-  Plotly.newPlot('oil-chart-fc', traces, {
+  plot('oil-chart-fc', traces, {
     ...LAYOUT(),
     margin: { ...LAYOUT().margin, r: window.innerWidth < 640 ? 40 : 55 },
     title: 'Tarner forecast — history + forecast',
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate stb/d · GOR scf/stb', rangemode: 'tozero' },
     yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
-  }, PLOT_CFG());
+  });
   mobileShowResults();
   renderTables('oil-table-fc', [
     {
@@ -1299,10 +1331,10 @@ async function oilReserveRun() {
     // Pwf decline + slope line
     const tMax = Math.max(...r.rows.map((p) => p.dtDays));
     const pwf0 = r.rows[0].pwfPsi;
-    Plotly.newPlot('oil-chart-rsv1', [
+    plot('oil-chart-rsv1', [
       { x: r.rows.map((p) => p.dtDays), y: r.rows.map((p) => p.pwfPsi), name: 'Pwf', mode: 'markers', marker: { color: '#0B1418', size: 8 } },
       { x: [0, tMax], y: [pwf0, pwf0 - r.rlt.slopePsiDay * tMax], name: `slope m = ${fmt(r.rlt.slopePsiDay, 3)} psi/d`, mode: 'lines', line: { color: '#A93A2C', width: 2, dash: 'dash' } },
-    ], { ...LAYOUT(), title: 'Reservoir limit — Pwf decline', xaxis: { title: 'dt, days' }, yaxis: { title: 'Pwf, psi' } }, PLOT_CFG());
+    ], { ...LAYOUT(), title: 'Reservoir limit — Pwf decline', xaxis: { title: 'dt, days' }, yaxis: { title: 'Pwf, psi' } });
     renderTables('oil-table-rsv1', [{
       title: 'Solved rows', headers: ['dt d', 'q stb/d', 'Pwf', 'pr', 'z'],
       rows: r.rows.map((p) => [fmt(p.dtDays, 1), fmt(p.qOilStbD, 0), fmt(p.pwfPsi, 0), fmt(p.presPsi, 0), fmt(p.z, 3)]),
@@ -1328,20 +1360,20 @@ async function oilReserveRun() {
 
   const mb = r.rows.filter((p) => p.npMMstb > 0);
   const eoMax = Math.max(0, ...mb.map((p) => p.eo));
-  Plotly.newPlot('oil-chart-rsv1', [
+  plot('oil-chart-rsv1', [
     { x: mb.map((p) => p.eo), y: mb.map((p) => p.fMMbbl), name: 'F vs Eo', mode: 'markers', marker: { color: '#0B1418', size: 8 } },
     ...(fit.nSlopeMMstb != null
       ? [{ x: [0, eoMax], y: [0, fit.nSlopeMMstb * eoMax], name: `slope N = ${fmt(fit.nSlopeMMstb, 1)} MMstb`, mode: 'lines', line: { color: '#A93A2C', width: 2, dash: 'dash' } }]
       : []),
-  ], { ...LAYOUT(), title: 'Havlena–Odeh — F vs Eo', xaxis: { title: 'Eo, bbl/stb' }, yaxis: { title: 'F, MMbbl' } }, PLOT_CFG());
+  ], { ...LAYOUT(), title: 'Havlena–Odeh — F vs Eo', xaxis: { title: 'Eo, bbl/stb' }, yaxis: { title: 'F, MMbbl' } });
 
   const nPts = mb.filter((p) => p.nMMstb != null);
-  Plotly.newPlot('oil-chart-rsv2', [
+  plot('oil-chart-rsv2', [
     { x: nPts.map((p) => p.npMMstb), y: nPts.map((p) => p.nMMstb), name: 'N per row', mode: 'lines+markers', marker: { color: '#2C7048', size: 8 }, line: { color: '#2C7048', width: 1 } },
     ...(fit.nAvgMMstb != null
       ? [{ x: [0, Math.max(...nPts.map((p) => p.npMMstb), 0.001)], y: [fit.nAvgMMstb, fit.nAvgMMstb], name: `average N = ${fmt(fit.nAvgMMstb, 1)}`, mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }]
       : []),
-  ], { ...LAYOUT(), title: 'N vs Np — does the estimate stabilize?', xaxis: { title: 'Np, MMstb' }, yaxis: { title: 'N, MMstb' } }, PLOT_CFG());
+  ], { ...LAYOUT(), title: 'N vs Np — does the estimate stabilize?', xaxis: { title: 'Np, MMstb' }, yaxis: { title: 'N, MMstb' } });
 
   renderTables('oil-table-rsv1', [{
     title: 'Material balance', headers: ['dt d', 'pr psi', 'Np MMstb', 'F MMbbl', 'Eo', 'N MMstb'],
@@ -1366,12 +1398,12 @@ async function liquidGl(c) {
       marker: { symbol: 'star', size: 16, color: '#C2540B', line: { width: 1, color: '#93400A' } },
     });
   }
-  Plotly.newPlot(`${c.prefix}-chart-gl`, traces, {
+  plot(`${c.prefix}-chart-gl`, traces, {
     ...LAYOUT(),
     title: `Gas-lift performance — ${c.fluidName} rate vs injection`,
     xaxis: { title: 'Injection rate, MMscf/d' },
     yaxis: { title: `${c.fluidName[0].toUpperCase() + c.fluidName.slice(1)} rate, bbl/d` },
-  }, PLOT_CFG());
+  });
   const inc = r.incremental[r.incremental.length - 1];
   document.getElementById(`${c.prefix}-gl-result`).textContent =
     (r.optimum
@@ -1460,7 +1492,7 @@ async function liquidSolve(c) {
     document.getElementById('oil-cr-espsens').style.display = 'none';
     if (r.espTraverse) {
       const t = r.espTraverse;
-      Plotly.newPlot('oil-chart-esptrav', [
+      plot('oil-chart-esptrav', [
         { x: t.stations.map((s) => s.pPsi), y: t.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#0B1418', width: 2 } },
         { x: t.backStations.map((s) => s.pPsi), y: t.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#2C7048', width: 2, dash: 'dash' } },
         { x: [t.dischargePsi, t.intakePsi], y: [t.pumpTvdFt, t.pumpTvdFt], name: `Pump ΔP ${fmt(t.dpPsi, 0)} psi`, mode: 'lines+markers', line: { color: '#A93A2C', width: 3 }, marker: { size: 8 } },
@@ -1469,7 +1501,7 @@ async function liquidSolve(c) {
         title: 'Traverse gradient — manual pump ΔP merged at pump depth',
         xaxis: { title: 'Pressure, psi' },
         yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
-      }, PLOT_CFG());
+      });
       renderTables('oil-table-esptrav', [{
         title: 'Traverse', headers: ['TVD ft', 'P psi'],
         rows: t.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
@@ -1521,12 +1553,12 @@ async function espRun() {
     x: [r.opPoint.rateBpd], y: [r.opPoint.headFt], name: 'Operating point', mode: 'markers',
     marker: { symbol: 'star', size: 16, color: '#A93A2C', line: { width: 1, color: '#7a1f14' } },
   });
-  Plotly.newPlot('oil-chart-gl', traces, {
+  plot('oil-chart-gl', traces, {
     ...LAYOUT(),
     title: `Pump curve — ${r.pump.name}, ${r.opts.stages} stages, wear ${fmt(r.opts.wearFactor, 2)}`,
     xaxis: { title: 'Rate @ pump, bbl/d' },
     yaxis: { title: 'Head, ft', rangemode: 'tozero' },
-  }, PLOT_CFG());
+  });
   // results block shown beside the pump curve: the solved NODE, then the
   // pump's own state at that node (the same parameter set the sensitivity
   // cases report, so the two views are directly comparable)
@@ -1573,12 +1605,12 @@ async function espRun() {
     tv.push({ x: [r.measured.pintPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pint', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#C2540B' } });
   if (r.measured.pdisPsi != null)
     tv.push({ x: [r.measured.pdisPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pdis', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#A93A2C' } });
-  Plotly.newPlot('oil-chart-esptrav', tv, {
+  plot('oil-chart-esptrav', tv, {
     ...LAYOUT(),
     title: 'Traverse gradient — top-down vs IPR back-calc',
     xaxis: { title: 'Pressure, psi' },
     yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
-  }, PLOT_CFG());
+  });
   renderTables('oil-table-esptrav', [{
     title: 'Traverse', headers: ['TVD ft', 'P psi'],
     rows: op.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
@@ -1606,12 +1638,12 @@ async function espSensRun() {
       });
     }
   });
-  Plotly.newPlot('oil-chart-espsens', traces, {
+  plot('oil-chart-espsens', traces, {
     ...LAYOUT(),
     title: `ESP Pres sensitivity — ${r.pump.name}, ${r.opts.stages} stages @ ${r.opts.freqHz} Hz (solved nodes)`,
     xaxis: { title: 'Oil rate, stb/d', rangemode: 'tozero' },
     yaxis: { title: 'Pwf, psi', rangemode: 'tozero' },
-  }, PLOT_CFG());
+  });
   mobileShowResults();
   renderTables('oil-table-espsens', [{
     title: 'ESP data at the solved node',
@@ -1666,12 +1698,12 @@ function waterEspCharts(r) {
         x: [e.opPoint.rateBpd], y: [e.opPoint.headFt], name: 'Operating point', mode: 'markers',
         marker: { symbol: 'star', size: 16, color: '#A93A2C', line: { width: 1, color: '#7a1f14' } },
       });
-    Plotly.newPlot('water-chart-esppump', traces, {
+    plot('water-chart-esppump', traces, {
       ...LAYOUT(),
       title: `Pump curve — ${e.pumpName}, ${e.opts.stages} stages, wear ${fmt(e.opts.wearFactor, 2)}`,
       xaxis: { title: 'Rate @ pump, bbl/d' },
       yaxis: { title: 'Head, ft', rangemode: 'tozero' },
-    }, PLOT_CFG());
+    });
     renderTables('water-table-esppump', [
       {
         title: 'Solution point', headers: ['item', 'value'],
@@ -1688,7 +1720,7 @@ function waterEspCharts(r) {
   }
   const tr = r.espTraverse;
   if (e && tr) {
-    Plotly.newPlot('water-chart-esptrav', [
+    plot('water-chart-esptrav', [
       { x: tr.stations.map((s) => s.pPsi), y: tr.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#0B1418', width: 2 } },
       { x: tr.backStations.map((s) => s.pPsi), y: tr.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#2C7048', width: 2, dash: 'dash' } },
       { x: [tr.intakePsi, tr.dischargePsi], y: [tr.pumpTvdFt, tr.pumpTvdFt], name: `Pump ΔP ${fmt(tr.dpPsi, 0)} psi`, mode: 'lines+markers', line: { color: '#C2540B', width: 3 }, marker: { size: 9 } },
@@ -1697,7 +1729,7 @@ function waterEspCharts(r) {
       title: 'Traverse gradient — top-down vs IPR back-calc',
       xaxis: { title: 'Pressure, psi' },
       yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
-    }, PLOT_CFG());
+    });
     renderTables('water-table-esptrav', [{
       title: 'Traverse', headers: ['TVD ft', 'P psi'],
       rows: tr.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
@@ -1747,7 +1779,7 @@ async function waterInjSolve() {
   plotNodal('water-chart-nodal', 'Injection rate, bbl/d', r.injCurve, r.vlpCurve,
     r.op ? { q: r.op.qBpd, pwfPsi: r.op.pwfPsi } : null,
     (p) => p.q, (p) => p.q);
-  Plotly.newPlot('water-chart-whp', [
+  plot('water-chart-whp', [
     { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.thpReqPsi), name: 'Injection THP required', mode: 'lines+markers', line: { color: '#0B1418', width: 3 } },
     { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.bhtF), name: 'BHT (calc)', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
   ], {
@@ -1757,7 +1789,7 @@ async function waterInjSolve() {
     xaxis: { title: 'Injection rate, bbl/d' },
     yaxis: { title: 'THP, psi', rangemode: 'tozero' },
     yaxis2: { title: 'BHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
-  }, PLOT_CFG());
+  });
   renderTables('water-table-nodal', [
     {
       title: 'Injectivity (required)', headers: ['q bbl/d', 'Pwf psi'],
@@ -1882,12 +1914,12 @@ function renderSensResults(prefix, r, rateLabel) {
         name: t.key === 'bep' ? 'BEP' : `${t.key}-thrust`, mode: 'lines',
         line: { color: t.key === 'bep' ? '#2C7048' : '#C2540B', width: 1.5, dash: 'dash' },
       });
-    Plotly.newPlot(`${prefix}-chart-senspump`, traces, {
+    plot(`${prefix}-chart-senspump`, traces, {
       ...LAYOUT(),
       title: `Pump curve per sensitivity — ${r.pumpName ?? 'pump'}, ${r.espOpts?.stages ?? '—'} stages`,
       xaxis: { title: 'Rate @ pump, bbl/d' },
       yaxis: { title: 'Head, ft', rangemode: 'tozero' },
-    }, PLOT_CFG());
+    });
     // the full pump state at each set's solved node, one column per set
     const pts = fam.filter((m) => m.esp?.point);
     const labels = pumpPointRows(pts[0]?.esp.point).map((r) => r[0]);
@@ -1907,12 +1939,12 @@ function renderSensResults(prefix, r, rateLabel) {
       tv.push({ x: t.backStations.map((s) => s.pPsi), y: t.backStations.map((s) => s.tvdFt), name: `${m.label} IPR back-calc`, mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 1.6, dash: 'dash' } });
       tv.push({ x: [t.intakePsi, t.dischargePsi], y: [t.pumpTvdFt, t.pumpTvdFt], name: `${m.label} ΔP ${fmt(t.dpPsi, 0)} psi`, mode: 'lines+markers', line: { color: FAM_REDS[i % 3], width: 3 }, marker: { size: 8 } });
     });
-    Plotly.newPlot(`${prefix}-chart-senstrav`, tv, {
+    plot(`${prefix}-chart-senstrav`, tv, {
       ...LAYOUT(),
       title: 'Traverse per sensitivity — top-down vs IPR back-calc',
       xaxis: { title: 'Pressure, psi' },
       yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
-    }, PLOT_CFG());
+    });
     renderTables(`${prefix}-table-senstrav`, [{
       title: 'Pump node per set', headers: ['set', 'pump TVD ft', 'Pint psi', 'Pdis psi', 'ΔP psi'],
       rows: fam.filter((m) => m.traverse).map((m) => [
@@ -2109,7 +2141,7 @@ async function gasReserveRun() {
     const t0 = pts[0].dtDays;
     const t1 = pts[pts.length - 1].dtDays;
     const slope = -r.rlt.slopePsiDay;
-    Plotly.newPlot('gas-chart-pz', [
+    plot('gas-chart-pz', [
       { x: pts.map((p) => p.dtDays), y: pts.map((p) => p.pwfPsi), name: 'Pwf', mode: 'markers', marker: { size: 9, color: '#7038b0' } },
       { x: [t0, t1], y: [my + slope * (t0 - mt), my + slope * (t1 - mt)], name: `slope ${fmt(r.rlt.slopePsiDay, 3)} psi/day`, mode: 'lines', line: { color: '#2C7048', dash: 'dash' } },
     ], {
@@ -2117,7 +2149,7 @@ async function gasReserveRun() {
       title: 'Reservoir limit — Pwf vs time (all rows)',
       xaxis: { title: 'dt, days' },
       yaxis: { title: 'Pwf, psi' },
-    }, PLOT_CFG());
+    });
     renderTables('gas-table-pz', [
       {
         title: 'Reservoir limit', headers: ['dt d', 'q', 'Pwf', 'pr', 'z'],
@@ -2137,12 +2169,12 @@ async function gasReserveRun() {
   if (r.fit.giipBscf != null) {
     traces.push({ x: [0, r.fit.giipBscf], y: [r.fit.pziPsi, 0], name: 'p/Z line → GIIP', mode: 'lines', line: { color: '#2C7048', dash: 'dash', width: 2 } });
   }
-  Plotly.newPlot('gas-chart-pz', traces, {
+  plot('gas-chart-pz', traces, {
     ...LAYOUT(),
     title: `p/Z vs Gp — minimum connected GIIP (${r.mode === 'sithp' ? 'SITHP' : 'prod data'} selection)`,
     xaxis: { title: 'Gp, Bscf', rangemode: 'tozero' },
     yaxis: { title: 'p/Z, psi', rangemode: 'tozero' },
-  }, PLOT_CFG());
+  });
   renderTables('gas-table-pz', [
     r.mode === 'sithp'
       ? {
@@ -2200,14 +2232,14 @@ async function gasForecastRun() {
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gpBscf), name: 'Cum gas', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
   );
-  Plotly.newPlot('gas-chart-fc', traces, {
+  plot('gas-chart-fc', traces, {
     ...LAYOUT(),
     margin: { ...LAYOUT().margin, r: window.innerWidth < 640 ? 40 : 55 },
     title: 'Gas forecast — history + forecast (p/Z tank + nodal)',
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate MMscf/d · Gp Bscf', rangemode: 'tozero' },
     yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
-  }, PLOT_CFG());
+  });
   mobileShowResults();
   renderTables('gas-table-fc', [
     {
