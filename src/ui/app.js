@@ -725,6 +725,10 @@ async function api(path, body) {
     showError(data.error);
     throw new Error(data.error);
   }
+  // whatever this call is about to draw, make sure it ends up fitted to its
+  // box (a run can finish while its panel is hidden — see refitCharts)
+  setTimeout(refitCharts, 120);
+  setTimeout(refitCharts, 700);
   return data;
 }
 
@@ -2435,15 +2439,54 @@ async function acctSaveCase() {
   await acctRefresh();
 }
 
-// Plotly sizes a chart to its container at draw time; a chart drawn (or left)
-// inside a display:none panel keeps a stale width, so every panel/module
-// switch re-fits whatever charts are now visible.
-function resizeVisibleCharts() {
-  requestAnimationFrame(() => {
-    document.querySelectorAll('.chart').forEach((el) => {
-      if (el.data && el.offsetParent !== null) Plotly.Plots.resize(el);
-    });
+// Plotly sizes a chart to its container AT DRAW TIME and afterwards only
+// reacts to window resizes. So a chart drawn while its panel was hidden —
+// or one whose row later changes width (the half-page reserve grid, the
+// two-column layout) — keeps a stale SVG: too narrow leaves dead space,
+// too wide SPILLS OVER the table beside it. Re-fit on demand...
+// ...by re-fitting any VISIBLE chart whose drawing no longer matches its
+// box. Mismatch-driven rather than blind, so it is cheap enough to run
+// after every render as well as on every tab/module switch — that is what
+// catches a solve which finished while its panel was still hidden (Plotly
+// then draws at its 700 px fallback and would otherwise stay that way).
+function refitCharts() {
+  document.querySelectorAll('.chart').forEach((el) => {
+    if (!el.data || el.offsetParent === null) return;
+    const boxW = el.getBoundingClientRect().width;
+    if (boxW <= 0) return;
+    const svg = el.querySelector('svg.main-svg');
+    if (!svg || Math.abs(svg.getBoundingClientRect().width - boxW) > 2) Plotly.Plots.resize(el);
   });
+}
+
+function resizeVisibleCharts() {
+  requestAnimationFrame(refitCharts);
+  // a second pass once the layout has settled (panel shown, fonts applied)
+  setTimeout(refitCharts, 250);
+}
+
+// ...and automatically: watch every chart's own box and re-fit whenever it
+// no longer matches the drawing. Phones keep their deliberately fixed
+// chart size (LAYOUT sets width there), so this only governs wider screens.
+const chartResizeObserver =
+  typeof ResizeObserver === 'undefined'
+    ? null
+    : new ResizeObserver((entries) => {
+        if (window.innerWidth < 640) return;
+        for (const entry of entries) {
+          const el = entry.target;
+          if (!el.data || el.offsetParent === null) continue;
+          const svg = el.querySelector('svg.main-svg');
+          if (!svg) continue;
+          const boxW = el.getBoundingClientRect().width;
+          if (boxW > 0 && Math.abs(svg.getBoundingClientRect().width - boxW) > 2)
+            requestAnimationFrame(() => Plotly.Plots.resize(el));
+        }
+      });
+
+function observeCharts() {
+  if (!chartResizeObserver) return;
+  document.querySelectorAll('.chart').forEach((el) => chartResizeObserver.observe(el));
 }
 
 function switchTab(which) {
@@ -2627,6 +2670,9 @@ document.getElementById('gas-btn-calibrate').onclick = guard(gasCalibrate);
 document.getElementById('gas-btn-sens').onclick = guard(gasSens);
 document.getElementById('gas-btn-reserve').onclick = guard(gasReserveRun);
 document.getElementById('gas-btn-forecast').onclick = guard(gasForecastRun);
+
+// keep every chart fitted to its own box, however the layout changes
+observeCharts();
 
 // first load: solve the prefilled oil case
 guard(oilSolve)();
