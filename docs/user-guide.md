@@ -248,31 +248,43 @@ Defaults: Sg 0.1 · So 0.8 · Sw 0.15 · Co 1e-6 · Cw 1e-6 · Cf 3e-6 (1/psi).
 
 ---
 
-## 3b. Oil — Forecast (Module 3, Tarner)
+## 3b. Oil — Forecast (Module 3: Tarner | Walsh)
 
-Select **Oil Well → Forecast**. Saturation-tracking material-balance forecast
-(the workbook Tarner sheet). **N and the start state** (date, Np, Pres) are
-grey input-or-calculated, chained off the Reserve module's Havlena–Odeh fit
-and Pres solver. Per step, the sheet's two GoalSeek residuals are solved
-deterministically: pressure closes the gas balance (Gp by the GOR trapezoid
-= Gp from MB) and saturation closes So = (1−Swi)(N−Np)Bo/(N·Boi(1−ct·Δp)),
-with the sheet's Kro(So)/Krg(Sg) polynomials,
-GOR = Rs + (Krg/Kro)(μoBo/μgBg), and rate qo = J1·(Kro/μo)/Bo·(P−Pwf),
-J1 = 0.00708Kh/(ln(Re/Rw)−0.75+S).
+Select **Oil Well → Forecast**, then pick the **Method (one active)**.
+**N and the start state** (date, Np, Pres) are grey input-or-calculated,
+chained off the Reserve module's fit and Pres solver; both methods share
+the same inputs, and per step both solve the same two residuals
+deterministically (Brent/alternation instead of GoalSeek loops): pressure
+closes the gas balance (Gp by the GOR trapezoid = Gp from MB) and
+saturation closes the MB saturation, with the sheet's Kro(So)/Krg(Sg)
+polynomials and the rate coupled to the trial pressure. **PVT (Rs/Bo/Bg/μ)
+is evaluated at the trial pressure inside the solve** — the
+training-material policy ("all the PVT data must be evaluated at the
+assumed reservoir pressure").
 
-**Forecast Pwf source (one active):** *Nodal at forecast FTHP* (VLP-coupled —
-the workbook author's commented-out intent, default) or *Fixed minimum Pwf*
-(the sheet's active behavior). Defaults: step 30 d · FTHP 150 psi ·
-**forecast W.C 0 %** (the Tarner stream is oil+gas; the march must not
-inherit the well model's producing water cut) · min Pwf 500 · Swi 0.15 ·
-Cw 2.63e-6 · Cf 3.25e-6 / psi · abandonment 50 stb/d. The chart overlays
-history + forecast (rate and GOR left, Pres right) with the table below.
-Deviations from the saved sheet: **PVT stepped at the nearest solved Pres** —
-each step evaluates Rs/Bo/Bg/μ once at the previous step's converged pressure
-and holds them through the solve (the sheet froze them at initial values);
-Brent/alternation to convergence instead of five GoalSeek loops; the rate
-stays coupled to the trial pressure within each step, exactly like the
-sheet's K/M columns under GoalSeek.
+- **Tarner (default)** — the classic method (workbook Tarner sheet):
+  standard MB, So = (1−Swi)(N−Np)Bo/(N·Boi(1−ct·Δp)),
+  GOR = Rs + (Krg/Kro)(μoBo/μgBg), rate qo = J1·(Kro/μo)/Bo·(P−Pwf) with
+  the mobility PI J1 = 0.00708Kh/(ln(Re/Rw)−0.75+S).
+- **Walsh (generalized MB, Rv)** — Walsh's generalized material balance
+  (PETSOC 95-01-07) from the "Walsh and turner variable Pwf" workbook:
+  the volatilized oil-gas ratio Rv(P) (the workbook's tuned polynomial)
+  enters both the Gp and So equations through (Bg−Rv·Bo) terms; the
+  producing GOR carries the Foo correction; the rate uses the **constant
+  calibrated PI on total mobility** — qt = J·λt·(P−Pwf),
+  qo = qt·λo/(λt·Bo). Workbook quirks preserved: μg = μo (the sheet's
+  Gas-Visc column reads the oil-viscosity cell) and Bg in cf/scf.
+  Validation: 7 cell-pinned tests reproduce the sheet's first solved row
+  to 9+ digits; replaying the sheet's Pwf column tracks its 64-step
+  trajectory within ≈1% on pressure (EUR −2.2%).
+
+**Forecast Pwf source (one active):** *Nodal at forecast FTHP* (VLP-coupled,
+default — the Walsh workbook's "variable Pwf") or *Fixed minimum Pwf*.
+Defaults: step 30 d · FTHP 150 psi · **forecast W.C 0 %** (the forecast
+stream is oil+gas; the march must not inherit the well model's producing
+water cut) · min Pwf 500 · Swi 0.15 · Cw 2.63e-6 · Cf 3.25e-6 / psi ·
+abandonment 50 stb/d. The chart overlays history + forecast (rate and GOR
+left, Pres right) with the table below.
 
 ## 4. Gas — Well model
 

@@ -18,12 +18,14 @@
 // forecast FTHP — the author's commented-out intent) or 'fixed' (the
 // sheet's active behavior: a constant minimum Pwf).
 //
-// PVT scheme (user directive 2026-08-27): the sheet froze its S:W PVT
-// columns; WellSim steps them forward — each step evaluates Rs/Bo/Bg/mu
-// ONCE at the NEAREST SOLVED Pres (the previous step's converged pressure)
-// and holds them through that step's solve. With PVT and Pwf frozen per
-// step, the rate stays coupled to the trial pressure inside the solve,
-// exactly like the sheet's K/M formulas under GoalSeek.
+// PVT scheme (updated 2026-08-28, per the training material — Tarner
+// slides: "all the PVT data must be evaluated at the assumed reservoir
+// pressure p2"): Rs/Bo/Bg/mu are evaluated AT THE TRIAL PRESSURE inside
+// the solve, the same policy as the Walsh method. (History: the saved
+// sheet froze PVT at initial values; an earlier port evaluated at the
+// previous step's converged pressure.) Pwf stays frozen per step, and the
+// rate stays coupled to the trial pressure, like the sheet's K/M columns
+// under GoalSeek.
 
 import { brent } from '../solvers/brent.js';
 import { operatingPoint } from '../nodal/nodal.js';
@@ -181,26 +183,27 @@ export function tarnerForecast(opts) {
   const startDay = opts.startDay ?? 0;
 
   for (let i = 0; i < maxSteps; i++) {
-    // 1) PVT once per step at the NEAREST SOLVED Pres, then Pwf for the step
+    // 1) PVT at the beginning-of-step pressure for the Pwf solve
     const f = pvtAt(p, ctx);
     const pw = solvePwf(p, so, f, prevGor);
     if (pw.dead) { status = 'died'; break; }
     const pwf = pw.pwfPsi;
 
-    // 2) the macro's GoalSeek pair with PVT and Pwf frozen: the rate stays
-    //    coupled to the trial pressure (sheet K/M under GoalSeek) — So by
-    //    substitution (AF), P by Brent on the Gp residual (AE)
+    // 2) the macro's GoalSeek pair with Pwf frozen and PVT evaluated AT THE
+    //    TRIAL PRESSURE (training-material policy): So by substitution (AF),
+    //    P by Brent on the Gp residual (AE), rate coupled to pTry
     let pNew = p;
     let soNew = so;
     let converged = false;
     for (let k = 0; k < 25; k++) {
-      const m = mobAt(soNew, swi, f);
-      const jo = (j1 * m.lambdaO) / f.bo;
-      const qoOf = (pTry) => Math.max(jo * (pTry - pwf), 0);
+      const soK = soNew;
       const resid = (pTry) => {
-        const npT = np + (qoOf(pTry) * stepDays) / 1e6;
+        const fT = pvtAt(pTry, ctx);
+        const m = mobAt(soK, swi, fT);
+        const qoT = Math.max(((j1 * m.lambdaO) / fT.bo) * (pTry - pwf), 0);
+        const npT = np + (qoT * stepDays) / 1e6;
         const gpInt = gp + ((prevGor + m.gor) / 2) * (npT - np);
-        const gpMb = gpFromMb({ nMMstb, npMMstb: npT, rsi, rs: f.rs, bo: f.bo, boi, bg: f.bg, ct: ctOf(pTry) });
+        const gpMb = gpFromMb({ nMMstb, npMMstb: npT, rsi, rs: fT.rs, bo: fT.bo, boi, bg: fT.bg, ct: ctOf(pTry) });
         return gpInt - gpMb;
       };
       const lo = Math.max(minPwfPsi * 0.25, 60);
@@ -209,8 +212,10 @@ export function tarnerForecast(opts) {
       let pSolved;
       if (rLo * rHi <= 0) pSolved = brent(resid, lo, p, { tol: 1e-7 }).root;
       else pSolved = Math.abs(rLo) < Math.abs(rHi) ? lo : p;
-      const npT = np + (qoOf(pSolved) * stepDays) / 1e6;
-      const soMb = clampSo(soFromMb({ swi, nMMstb, npMMstb: npT, bo: f.bo, boi, ct: ctOf(pSolved) }));
+      const fS = pvtAt(pSolved, ctx);
+      const mS = mobAt(soK, swi, fS);
+      const npT = np + (Math.max(((j1 * mS.lambdaO) / fS.bo) * (pSolved - pwf), 0) * stepDays) / 1e6;
+      const soMb = clampSo(soFromMb({ swi, nMMstb, npMMstb: npT, bo: fS.bo, boi, ct: ctOf(pSolved) }));
       const dP = Math.abs(pSolved - pNew);
       const dSo = Math.abs(soMb - soNew);
       pNew = pSolved;
@@ -218,10 +223,11 @@ export function tarnerForecast(opts) {
       if (dP < 1e-6 && dSo < 1e-10) { converged = true; break; }
     }
 
-    // 3) book the step at the converged state (rate at the solved P,
+    // 3) book the step at the converged state (rate and PVT at the solved P,
     //    exactly as the sheet's M column reads at the GoalSeek'd H)
-    const mEnd = mobAt(soNew, swi, f);
-    const qo = Math.max(((j1 * mEnd.lambdaO) / f.bo) * (pNew - pwf), 0);
+    const fEnd = pvtAt(pNew, ctx);
+    const mEnd = mobAt(soNew, swi, fEnd);
+    const qo = Math.max(((j1 * mEnd.lambdaO) / fEnd.bo) * (pNew - pwf), 0);
     if (qo < abandonQoStbD) { status = qo <= 0 ? 'died' : 'abandoned'; break; }
     const npNew = np + (qo * stepDays) / 1e6;
     if (npNew >= nMMstb * 0.999) { status = 'depleted'; break; }

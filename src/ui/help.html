@@ -159,7 +159,7 @@ pre.eq code { background: none; padding: 0; }
   <a href="#oil-reserve">Oil &mdash; reserve</a>
   <a href="#gas-well">Gas &mdash; well model</a>
   <a href="#gas-reserve">Gas &mdash; reserve</a>
-  <a href="#oil-forecast">Oil &mdash; forecast</a>
+  <a href="#oil-forecast">Oil &mdash; forecast (Tarner | Walsh)</a>
   <a href="#gas-forecast">Gas &mdash; forecast</a>
   <div class="tochead">Reference</div>
   <a href="#eq-const">Constants</a>
@@ -179,7 +179,7 @@ pre.eq code { background: none; padding: 0; }
   <h1>WellSim Manual</h1>
   <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a zero-dependency web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
   <div class="statusrow">
-    <span class="chip"><b>167</b> regression tests passing</span>
+    <span class="chip"><b>174</b> regression tests passing</span>
     <span class="chip"><b>43/43</b> sheet-parity sensitivities</span>
     <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
     <span class="chip">port 3355 &middot; zero npm dependencies</span>
@@ -196,7 +196,7 @@ pre.eq code { background: none; padding: 0; }
     <td class="ok">&check; Havlena&ndash;Odeh MB &middot; static-gauge MB &middot; reservoir limit</td>
     <td class="ok">&check; p/Z prod data &middot; p/Z from SITHP &middot; reservoir limit</td></tr>
 <tr><td><b>3 &mdash; Forecast</b></td>
-    <td class="ok">&check; Tarner (saturation-tracking MB + nodal)</td>
+    <td class="ok">&check; Tarner &middot; Walsh generalized-MB (Rv) &mdash; saturation-tracking MB + nodal</td>
     <td class="ok">&check; p/Z tank + nodal, history overlay</td></tr>
 </table></div>
 
@@ -204,7 +204,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-node --test                             # 167 tests
+node --test                             # 174 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is distributed separately as <code>WellSim-1.0.zip</code>.</p>
 
@@ -290,8 +290,15 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
     <p>GIIP = q&#772;/(Ct&middot;m)/1000. Defaults Sg 0.85 / So 0 / Sw 0.15; Cg grey = from two Bg points; slim table + Pwf-decline chart.</p></div>
 </div>
 
-<h2 id="oil-forecast"><span class="sect">Oil</span> &mdash; Forecast (Tarner)</h2>
-<p>Saturation-tracking material-balance forecast (the workbook Tarner sheet). N and the start state (date, Np, Pres) are grey input-or-calculated, chained off the Reserve module. Per step the two sheet residuals are solved deterministically: pressure closes the gas balance (Gp by GOR trapezoid = Gp from MB), saturation closes So = (1&minus;Swi)(N&minus;Np)Bo/(N&middot;Boi(1&minus;ct&Delta;p)); rel-perm from the sheet&rsquo;s Kro(So)/Krg(Sg) polynomials; GOR = Rs + (Krg/Kro)(&mu;oBo/&mu;gBg); rate qo = J1&middot;(Kro/&mu;o)/Bo&middot;(P&minus;Pwf) with J1 = 0.00708Kh/(ln(Re/Rw)&minus;0.75+S). Forecast Pwf source (one active): <b>nodal at forecast FTHP</b> (VLP-coupled &mdash; the author&rsquo;s commented-out intent, default) or <b>fixed minimum Pwf</b> (the sheet&rsquo;s active behavior). Defaults: step 30 d &middot; FTHP 150 psi &middot; forecast W.C 0 &middot; min Pwf 500 &middot; Swi 0.15 &middot; Cw 2.63e-6 &middot; Cf 3.25e-6 &middot; abandonment 50 stb/d. Deviations: PVT stepped at the NEAREST SOLVED Pres &mdash; each step evaluates Rs/Bo/Bg/&mu; once at the previous step&rsquo;s converged pressure and holds them through the solve (user directive; the saved sheet froze them at initial values); Brent/alternation to convergence instead of 5 GoalSeek loops; the rate stays coupled to the trial pressure within each step, exactly like the sheet&rsquo;s K/M columns under GoalSeek. Chart: history + forecast (rate, GOR, Pres) on a calendar axis, table below.</p>
+<h2 id="oil-forecast"><span class="sect">Oil</span> &mdash; Forecast (Tarner | Walsh)</h2>
+<p>Saturation-tracking material-balance forecast with a <b>Method selector (one active)</b>. N and the start state (date, Np, Pres) are grey input-or-calculated, chained off the Reserve module; both methods share the same inputs and the same Pwf source selection: <b>nodal at forecast FTHP</b> (VLP-coupled, default) or <b>fixed minimum Pwf</b>. Per step, both solve the same two residuals deterministically: pressure closes the gas balance (Gp by GOR trapezoid = Gp from MB), saturation closes the MB saturation; rel-perm from the sheet&rsquo;s Kro(So)/Krg(Sg) polynomials; Brent/alternation to convergence instead of GoalSeek loops, the rate coupled to the trial pressure. PVT (Rs/Bo/Bg/&mu;) is evaluated <b>at the trial pressure</b> inside the solve &mdash; the training-material policy (&ldquo;all PVT data evaluated at the assumed reservoir pressure&rdquo;).</p>
+<div class="selgrid">
+  <div class="selcard"><span class="n">1</span><h5>Tarner (default)</h5>
+    <p>The classic method (workbook Tarner sheet): standard MB, So = (1&minus;Swi)(N&minus;Np)Bo/(N&middot;Boi(1&minus;ct&Delta;p)), GOR = Rs + (Krg/Kro)(&mu;oBo/&mu;gBg), rate from the mobility PI J1 = 0.00708Kh/(ln(Re/Rw)&minus;0.75+S).</p></div>
+  <div class="selcard"><span class="n">2</span><h5>Walsh (generalized MB, Rv)</h5>
+    <p>Walsh&rsquo;s generalized material balance (PETSOC 95-01-07) with the volatilized oil-gas ratio Rv(P): (Bg&minus;Rv&middot;Bo) terms in both the Gp and So equations, Foo-corrected GOR, and the CONSTANT calibrated PI on total mobility (qt = J&middot;&lambda;t&middot;&Delta;p, qo = qt&middot;&lambda;o/(&lambda;t&middot;Bo)). Rv from the workbook&rsquo;s tuned polynomial. Quirks preserved: &mu;g = &mu;o (the sheet&rsquo;s Gas-Visc column reads the oil-viscosity cell); Bg in cf/scf.</p></div>
+</div>
+<p>Defaults: step 30 d &middot; FTHP 150 psi &middot; forecast W.C 0 &middot; min Pwf 500 &middot; Swi 0.15 &middot; Cw 2.63e-6 &middot; Cf 3.25e-6 &middot; abandonment 50 stb/d. Validation: 7 cell-pinned tests reproduce the Walsh sheet&rsquo;s first solved row to 9+ digits; replaying the sheet&rsquo;s Pwf column tracks its 64-step trajectory within &asymp;1% on pressure (EUR &minus;2.2%, attributable to the sheet reading PVT from its parallel Tarner column). Chart: history + forecast (rate, GOR, Pres) on a calendar axis, table below.</p>
 
 <h2 id="gas-forecast"><span class="sect">Gas</span> &mdash; Forecast</h2>
 <p>p/Z tank coupled to the nodal model, <b>chained off the end of history</b>: start date / start Gp / start Pres are grey input-or-calculated (last prod date, cumulative, minimum solved Pres). Defaults: step 30 d &middot; FTHP 300 psi &middot; plateau 12 MMscf/d &middot; abandonment 1 MMscf/d &middot; max 60 steps &middot; GIIP &amp; p&#7522;/Z&#7522; grey = from the reserve fit.</p>

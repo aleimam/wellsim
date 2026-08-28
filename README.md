@@ -13,7 +13,7 @@ against the original workbook cells.
 |---|---|---|
 | **1 — Well model** (nodal analysis) | Natural flow ✔ · Gas lift ✔ · **ESP full stack** ✔ · **Water Well tab** ✔ (producer + injector) | Natural ✔ |
 | **2 — Reserve estimate** (minimum connected volume) | ✔ 3 methods: Havlena–Odeh MB on prod data · MB on measured static pressures (memory gauge) · reservoir limit | ✔ 3 methods: p/Z on prod data · p/Z from SITHP statics · reservoir limit |
-| **3 — Forecast** | ✔ Tarner (saturation-tracking MB + nodal) | ✔ p/Z tank + nodal, history + forecast chart |
+| **3 — Forecast** | ✔ Tarner · Walsh generalized-MB with Rv (saturation-tracking MB + nodal) | ✔ p/Z tank + nodal, history + forecast chart |
 
 ## Run
 
@@ -30,7 +30,7 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-167 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+174 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries.
 
@@ -53,7 +53,7 @@ src/core/ipr/         oil-ipr (composite Vogel + Darcy J), gas-ipr (Darcy Pr^2 +
 src/core/nodal/       nodal (operating point), calibrate (get_Pwf), sensitivity, gaslift
 src/core/reserve/     gas-reserve (Pres solver, p/Z, SITHP march, reservoir limit, forecast)
                       oil-reserve (Pres solver, Havlena-Odeh MB, static MB, reservoir limit)
-                      tarner (oil forecast)
+                      tarner (oil forecast), walsh (generalized-MB forecast)
 src/core/solvers/     brent
 src/server/           server.js (built-in http), api.js (form -> core mapping),
                       accounts.js (company case database: register/login, case CRUD)
