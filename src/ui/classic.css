@@ -131,11 +131,22 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
      iOS focus auto-zoom */
   .rows { columns: 1; }
   .frow { grid-template-columns: minmax(0, 1fr) 112px; margin-bottom: 4px; }
-  .frow input, .presrow input, .sens input { font-size: 16px; padding: 6px 8px; }
+  .frow input, .presrow input { font-size: 16px; padding: 6px 8px; }
   .frow label { font-size: 12px; }
   .presrow { flex-wrap: wrap; }
   .presrow input { width: 31%; }
   fieldset, .group { overflow-x: auto; }
+
+  /* dense grid tables (reserve prod data, static surveys, multi-rate tests,
+     layers): compact cells with sensible column widths — the table scrolls
+     sideways inside its card instead of bloating */
+  .sens { width: auto; min-width: 100%; }
+  .sens th { font-size: 9px; padding: 2px 3px; white-space: nowrap; }
+  .sens td { padding: 1px 2px; }
+  .sens input { font-size: 13px; padding: 5px 4px; min-width: 56px; min-height: 32px; }
+  .sens td:first-child input { min-width: 92px; }
+  #gas-prod-table td:first-child input, #oil-prod-table td:first-child input,
+  #gas-sithp-table td:first-child input, #oil-static-table td:first-child input { min-width: 96px; text-align: left; }
 
   /* charts stack above their data tables, tables full width */
   .chartrow { flex-direction: column; }
