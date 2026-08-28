@@ -176,6 +176,44 @@ export function espSolveDp(cfg, pump, { stages, freqHz, wearFactor = 0, sepEffPc
  * the IPR at CONSTANT Pres, marched up to the intake) meets the top-down
  * one (THP down through the pump with the coupled dP).
  */
+/**
+ * The pump's complete state AT A SOLVED NODE — the numbers an engineer
+ * signs off on: what the pump is, how it is run, what it delivers there,
+ * and whether the duty point is inside its envelope.
+ *
+ * Hydraulic horsepower is the fluid power the pump adds:
+ *   HHP = q[bbl/d] * dP[psi] / 58766   (58766 = 1 hp in bbl-psi/day)
+ * Shaft/motor power needs the pump's efficiency curve, which the workbook
+ * database does not carry — so only the hydraulic duty is reported.
+ */
+export function espSolutionPoint(pump, opts, solve) {
+  const th = thrustStatus(pump, opts.freqHz, solve.state.qGrossPumpBpd);
+  const fr = opts.freqHz / pump.refFreqHz;
+  return {
+    pumpName: pump.name,
+    stages: opts.stages,
+    freqHz: opts.freqHz,
+    refFreqHz: pump.refFreqHz,
+    wearFactor: opts.wearFactor ?? 0,
+    sepEffPct: opts.sepEffPct ?? 0,
+    headFt: solve.headFt,
+    headPerStageFt: opts.stages > 0 ? solve.headFt / opts.stages : null,
+    dpPsi: solve.dpPsi,
+    qGrossPumpBpd: solve.state.qGrossPumpBpd,
+    qGrossPumpNoSepBpd: solve.state.qGrossPumpNoSepBpd,
+    gradPsiFt: solve.state.gradPsiFt,
+    freeGasPct: solve.state.freeGasPct,
+    freeGasPctSep: solve.state.freeGasPctSep,
+    sepRequired: solve.state.sepRequired ?? null,
+    thrust: th.status,
+    thrustDownBpd: th.downBpd,
+    thrustBepBpd: pump.points[THRUST.bep].rateBpd * fr,
+    thrustUpBpd: th.upBpd,
+    hydraulicHp: (solve.state.qGrossPumpBpd * solve.dpPsi) / 58766,
+    dpConverged: solve.converged ?? null,
+  };
+}
+
 export function espOperatingPoint(cfg, ipr, pump, opts) {
   const oilFrac = oilFraction(cfg);
   const R = (q) => {

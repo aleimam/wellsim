@@ -1477,27 +1477,24 @@ async function espRun() {
     xaxis: { title: 'Rate @ pump, bbl/d' },
     yaxis: { title: 'Head, ft', rangemode: 'tozero' },
   }, PLOT_CFG());
-  // results block shown beside the pump curve
-  renderTables('oil-table-gl', [{
-    title: 'ESP results', headers: ['item', 'value'],
-    rows: [
-      ['Qoil surface, stb/d', fmt(op.qOilStbD, 0)],
-      ['Qgross surface, bbl/d', fmt(op.qGrossStbD, 0)],
-      ['Qgross @ pump (no sep)', fmt(op.state.qGrossPumpNoSepBpd, 0)],
-      ['Qgross @ pump (after sep)', fmt(op.state.qGrossPumpBpd, 0)],
-      ['Free gas @ intake, %', fmt(op.state.freeGasPct, 2)],
-      ['Separator', op.state.sepRequired ? 'Required' : 'Not required'],
-      ['Pump intake (traverse), psi', fmt(op.pintTraversePsi, 1)],
-      ['Pump intake (IPR), psi', fmt(op.pintIprPsi, 1)],
-      ['Pump discharge, psi', fmt(op.pdisPsi, 1)],
-      ['Pwf traverse / IPR, psi', `${fmt(op.pwfTraversePsi, 1)} / ${fmt(op.pwfIprPsi, 1)}`],
-      ['Theoretical head, ft', fmt(op.headFt, 1)],
-      ['Pump ΔP, psi', fmt(op.dpPsi, 1)],
-      ['Composite gradient, psi/ft', fmt(op.state.gradPsiFt, 4)],
-      ['Thrust window, bbl/d', `${fmt(op.thrust.downBpd, 0)} – ${fmt(op.thrust.upBpd, 0)}`],
-      ['ΔP fixed point', op.dpConverged ? 'converged' : 'NOT converged'],
-    ],
-  }]);
+  // results block shown beside the pump curve: the solved NODE, then the
+  // pump's own state at that node (the same parameter set the sensitivity
+  // cases report, so the two views are directly comparable)
+  renderTables('oil-table-gl', [
+    {
+      title: 'Solution point', headers: ['item', 'value'],
+      rows: [
+        ['Qoil surface, stb/d', fmt(op.qOilStbD, 0)],
+        ['Qgross surface, bbl/d', fmt(op.qGrossStbD, 0)],
+        ['Pwf traverse / IPR, psi', `${fmt(op.pwfTraversePsi, 1)} / ${fmt(op.pwfIprPsi, 1)}`],
+        ['Pump intake (traverse), psi', fmt(op.pintTraversePsi, 1)],
+        ['Pump intake (IPR), psi', fmt(op.pintIprPsi, 1)],
+        ['Pump discharge, psi', fmt(op.pdisPsi, 1)],
+        ['WHT (calc), °F', fmt(op.whtF, 1)],
+      ],
+    },
+    { title: 'Pump @ solution point', headers: ['parameter', 'value'], rows: pumpPointRows(r.point) },
+  ]);
   // FINAL model-match charts: IPR vs the coupled ESP-VLP + wellhead curve
   plotNodal('oil-chart-nodal', 'Oil rate, stb/d', r.iprCurve, r.vlpCurve,
     { q: op.qOilStbD, pwfPsi: op.pwfTraversePsi },
@@ -1625,24 +1622,19 @@ function waterEspCharts(r) {
       xaxis: { title: 'Rate @ pump, bbl/d' },
       yaxis: { title: 'Head, ft', rangemode: 'tozero' },
     }, PLOT_CFG());
-    renderTables('water-table-esppump', [{
-      title: 'ESP results (water)', headers: ['item', 'value'],
-      rows: [
-        ['Pump', e.pumpName],
-        ['Frequency, Hz', fmt(e.opts.freqHz, 0)],
-        ['Stages', fmt(e.opts.stages, 0)],
-        ['Wear factor', fmt(e.opts.wearFactor, 2)],
-        ['Rate @ pump, bbl/d', fmt(e.qGrossPumpBpd, 0)],
-        ['Theoretical head, ft', fmt(e.headFt, 1)],
-        ['Pump ΔP, psi', fmt(e.pumpDpPsi, 1)],
-        ['Pump intake, psi', fmt(e.intakePsi, 1)],
-        ['Pump discharge, psi', fmt(e.dischargePsi, 1)],
-        ['Water gradient, psi/ft', fmt(e.gradPsiFt, 4)],
-        ['Free gas @ intake, %', fmt(e.freeGasPct, 2)],
-        ['Thrust', e.thrust ?? '—'],
-        ['ΔP fixed point', e.dpConverged ? 'converged' : 'NOT converged'],
-      ],
-    }]);
+    renderTables('water-table-esppump', [
+      {
+        title: 'Solution point', headers: ['item', 'value'],
+        rows: [
+          ['Q water surface, bbl/d', r.op ? fmt(r.op.qOilStbD, 0) : '—'],
+          ['Pwf, psi', r.op ? fmt(r.op.pwfPsi, 1) : '—'],
+          ['Pump intake, psi', fmt(e.intakePsi, 1)],
+          ['Pump discharge, psi', fmt(e.dischargePsi, 1)],
+          ['WHT (calc), °F', r.op ? fmt(r.op.whtF, 1) : '—'],
+        ],
+      },
+      { title: 'Pump @ solution point', headers: ['parameter', 'value'], rows: pumpPointRows(e.point) },
+    ]);
   }
   const tr = r.espTraverse;
   if (e && tr) {
@@ -1770,6 +1762,28 @@ const oilCalibrate = () => liquidCalibrate(OIL_CTX);
 const waterCalibrate = () =>
   waterWellType() === 'injector' ? waterInjCalibrateRun() : liquidCalibrate(WATER_CTX);
 
+/** The pump's state at a solved node, as table rows — the same parameter
+ *  set everywhere it is reported (match case and every sensitivity). */
+function pumpPointRows(p) {
+  if (!p) return [];
+  return [
+    ['Pump', p.pumpName],
+    ['Stages', fmt(p.stages, 0)],
+    ['Frequency, Hz', `${fmt(p.freqHz, 0)} (curve ref ${fmt(p.refFreqHz, 0)})`],
+    ['Wear factor', fmt(p.wearFactor, 3)],
+    ['Head total / per stage, ft', `${fmt(p.headFt, 1)} / ${fmt(p.headPerStageFt, 2)}`],
+    ['Pump ΔP, psi', fmt(p.dpPsi, 1)],
+    ['Rate @ pump (after sep), bbl/d', fmt(p.qGrossPumpBpd, 0)],
+    ['Rate @ pump (no sep), bbl/d', fmt(p.qGrossPumpNoSepBpd, 0)],
+    ['Composite gradient, psi/ft', fmt(p.gradPsiFt, 4)],
+    ['Free gas @ intake, %', `${fmt(p.freeGasPct, 2)}${p.sepRequired ? ' (separator required)' : ''}`],
+    ['Separator efficiency, %', fmt(p.sepEffPct, 0)],
+    ['Thrust', `${p.thrust} — window ${fmt(p.thrustDownBpd, 0)} / BEP ${fmt(p.thrustBepBpd, 0)} / ${fmt(p.thrustUpBpd, 0)} bbl/d`],
+    ['Hydraulic power, hp', fmt(p.hydraulicHp, 1)],
+    ['ΔP fixed point', p.dpConverged ? 'converged' : 'NOT converged'],
+  ];
+}
+
 /** The solved node of every VLP set, below the sensitivity chart, plus the
  *  ESP pump-curve and traverse families when a pump drives the well. */
 function renderSensResults(prefix, r, rateLabel) {
@@ -1824,12 +1838,13 @@ function renderSensResults(prefix, r, rateLabel) {
       xaxis: { title: 'Rate @ pump, bbl/d' },
       yaxis: { title: 'Head, ft', rangemode: 'tozero' },
     }, PLOT_CFG());
+    // the full pump state at each set's solved node, one column per set
+    const pts = fam.filter((m) => m.esp?.point);
+    const labels = pumpPointRows(pts[0]?.esp.point).map((r) => r[0]);
     renderTables(`${prefix}-table-senspump`, [{
-      title: 'ESP at each solved node', headers: ['set', 'Hz', 'q@pump bbl/d', 'head ft', 'ΔP psi', 'grad psi/ft', 'free gas %', 'thrust'],
-      rows: fam.filter((m) => m.esp).map((m) => [
-        m.label, fmt(m.esp.freqHz, 0), fmt(m.esp.qGrossPumpBpd, 0), fmt(m.esp.headFt, 0),
-        fmt(m.esp.dpPsi, 0), fmt(m.esp.gradPsiFt, 4), fmt(m.esp.freeGasPct, 2), m.esp.thrust,
-      ]),
+      title: 'Pump @ each solved node',
+      headers: ['parameter', ...pts.map((m) => m.label)],
+      rows: labels.map((lab, i) => [lab, ...pts.map((m) => pumpPointRows(m.esp.point)[i][1])]),
     }]);
   }
   // traverse per set, each with its pump step at pump depth

@@ -173,6 +173,18 @@ inputs are required; there is no input THT.
    temperature**, not the pressure; those BHT families are plotted on the
    chart's second axis.
 
+   **Pump @ solution point.** Wherever an ESP node is solved — the model
+   match *and* every sensitivity case — the pump's complete state is
+   reported in one identical parameter set: pump, stages, frequency (with
+   the curve's reference frequency), wear, head total and per stage, ΔP,
+   rate at the pump before and after separation, composite gradient, free
+   gas at intake, separator efficiency, thrust with its down/BEP/up
+   window, hydraulic power, and whether the ΔP fixed point converged. In
+   the sensitivity view each set gets its own column, so the trade-off
+   reads straight across. (Hydraulic power is the fluid power the pump
+   adds, q·ΔP/58766; shaft power would need the pump's efficiency curve,
+   which the workbook database does not carry.)
+
    **Every set is solved, not just drawn.** Below the sensitivity chart a
    table gives each VLP set its own **nodal solution** against the current
    IPR — rate, Pwf, WHP and calculated WHT — so you read what the change

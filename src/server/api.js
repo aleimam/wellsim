@@ -32,6 +32,7 @@ import {
   matchStages,
   matchWearAndPi,
   thrustStatus,
+  espSolutionPoint,
 } from '../core/vlp/esp.js';
 import { createOilInflow, createGasInflow, applyInflowFluids } from '../core/ipr/inflow.js';
 import { multiLayerOilRates, multiLayerGasRates } from '../core/ipr/multilayer.js';
@@ -350,6 +351,8 @@ export function oilNodal(f) {
             headFt: opSolve?.headFt ?? null,
             qGrossPumpBpd: opSolve?.state.qGrossPumpBpd ?? null,
             thrust: opSolve ? thrustStatus(espPump.pump, espCoupled.freqHz, opSolve.state.qGrossPumpBpd).status : null,
+            // the pump's full state at the solved node
+            point: opSolve ? espSolutionPoint(espPump.pump, espCoupled, opSolve) : null,
             // pump-curve family + thrust envelope so the caller can draw the
             // curve from this one solve (the water tab has no separate ESP view)
             ...(opSolve ? pumpCurveFamily(espPump.pump, espCoupled) : {}),
@@ -550,6 +553,7 @@ export function oilSensitivity(f) {
           gradPsiFt: solve.state.gradPsiFt,
           freqHz: setOpts.freqHz,
           thrust: thrustStatus(espPumpS.pump, setOpts.freqHz, solve.state.qGrossPumpBpd).status,
+          point: espSolutionPoint(espPumpS.pump, setOpts, solve),
         };
         m.pumpCurve = { freqHz: setOpts.freqHz, points: pumpCurveAt(espPumpS.pump, setOpts) };
         m.traverse = {
@@ -1351,6 +1355,11 @@ export function oilEsp(f) {
   });
   return {
     op,
+    // the pump's full state at the matched node (same shape the sensitivity
+    // cases carry, so both views report identical parameters)
+    point: espSolutionPoint(bp.pump, opts, {
+      headFt: op.headFt, dpPsi: op.dpPsi, state: op.state, converged: op.dpConverged,
+    }),
     pump: { name: bp.pump.name, refFreqHz: bp.pump.refFreqHz },
     opts,
     family,

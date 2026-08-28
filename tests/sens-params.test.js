@@ -241,3 +241,50 @@ test('water ESP sensitivity solves the same way on the shared catalog', () => {
     assert.ok(m.pumpCurve.points.length > 3);
   }
 });
+
+// ---- the pump's full state at a solved node, match case and sensitivities ----
+const POINT_KEYS = [
+  'pumpName', 'stages', 'freqHz', 'refFreqHz', 'wearFactor', 'headFt', 'headPerStageFt',
+  'dpPsi', 'qGrossPumpBpd', 'qGrossPumpNoSepBpd', 'gradPsiFt', 'freeGasPct',
+  'thrust', 'thrustDownBpd', 'thrustBepBpd', 'thrustUpBpd', 'hydraulicHp', 'dpConverged',
+];
+const OIL_ESP = {
+  ...OIL_BASE, liftType: 'esp', espPumpMode: 'db', espPumpName: 'ESP B 538-3600',
+  pumpAhM: 2993.08, pumpDpPsi: 1325.16, espFreqHz: 50, espStages: 145, espWearFactor: 0, espSepEffPct: 95,
+};
+
+test('match case reports the pump state at the solution point', () => {
+  const r = handlers['oil/esp'](OIL_ESP);
+  assert.ok(!r.error, r.error);
+  for (const k of POINT_KEYS) assert.ok(r.point[k] != null, `missing ${k}`);
+  assert.equal(r.point.pumpName, 'ESP B 538-3600');
+  assert.equal(r.point.stages, 145);
+  // head per stage and hydraulic power must be self-consistent
+  assert.ok(Math.abs(r.point.headPerStageFt * r.point.stages - r.point.headFt) < 1e-6);
+  assert.ok(Math.abs(r.point.hydraulicHp - (r.point.qGrossPumpBpd * r.point.dpPsi) / 58766) < 1e-9);
+  assert.ok(r.point.thrustDownBpd < r.point.thrustBepBpd && r.point.thrustBepBpd < r.point.thrustUpBpd);
+});
+
+test('sensitivity cases report the SAME pump parameter set', () => {
+  const r = handlers['oil/sensitivity']({
+    ...OIL_ESP, vlpSets: [{ label: '50Hz', freqHz: 50 }, { label: '60Hz', freqHz: 60 }],
+  });
+  for (const m of r.vlpFamily) {
+    for (const k of POINT_KEYS) assert.ok(m.esp.point[k] != null, `${m.label} missing ${k}`);
+    assert.equal(m.esp.point.freqHz, m.esp.freqHz);
+  }
+  // the frequency the set runs at must drive its head and power
+  const [a, b] = r.vlpFamily.map((m) => m.esp.point);
+  assert.ok(b.headPerStageFt > a.headPerStageFt, 'more Hz = more head per stage');
+  assert.ok(b.hydraulicHp > a.hydraulicHp, 'and more hydraulic power');
+});
+
+test('water ESP reports the same pump state (match + sensitivity)', () => {
+  const nodal = handlers['oil/nodal'](WATER_ESP);
+  for (const k of POINT_KEYS) assert.ok(nodal.esp.point[k] != null, `match missing ${k}`);
+  const sens = handlers['oil/sensitivity']({ ...WATER_ESP, vlpSets: [{ label: 'A', freqHz: 50 }] });
+  for (const k of POINT_KEYS) assert.ok(sens.vlpFamily[0].esp.point[k] != null, `sens missing ${k}`);
+  // gas-free water: nothing separated, so both pump rates agree
+  const p = nodal.esp.point;
+  assert.ok(Math.abs(p.qGrossPumpBpd - p.qGrossPumpNoSepBpd) < 1e-6);
+});
