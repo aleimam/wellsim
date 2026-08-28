@@ -900,18 +900,18 @@ function fitPhoneLegend(el) {
   }).then(() => el);
 }
 
-function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
+function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX, opts = {}) {
   const traces = [
-    { x: ipr.map(iprX), y: ipr.map((p) => p.pwfPsi), name: 'IPR', mode: 'lines', line: { color: '#00636D', width: 3 } },
-    { x: vlp.map(vlpX), y: vlp.map((p) => p.pwfPsi), name: 'VLP', mode: 'lines+markers', line: { color: '#C2540B', width: 3 } },
+    { x: ipr.map(iprX), y: ipr.map((p) => p.pwfPsi), name: opts.iprName ?? 'IPR', mode: 'lines', line: { color: '#00636D', width: 3 } },
+    { x: vlp.map(vlpX), y: vlp.map((p) => p.pwfPsi), name: opts.vlpName ?? 'VLP', mode: 'lines+markers', line: { color: '#C2540B', width: 3 } },
   ];
   if (op) {
     traces.push({
-      x: [op.q], y: [op.pwfPsi], name: 'Operating point', mode: 'markers',
+      x: [op.q], y: [op.pwfPsi], name: opts.opName ?? 'Operating point', mode: 'markers',
       marker: { symbol: 'diamond', size: 14, color: '#0B1418', line: { width: 2, color: '#fff' } },
     });
   }
-  plot(div, traces, { ...LAYOUT(), title: 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } });
+  plot(div, traces, { ...LAYOUT(), title: opts.title ?? 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } });
 }
 
 const FAM_BLUES = ['#9ecae1', '#4292c6', '#084594'];
@@ -1152,6 +1152,41 @@ function waterForm() {
 
 // producer | injector selection: the injector hides lift and sensitivities
 // (injection has no artificial lift; injectivity replaces the IPR curve)
+/** An injector has no artificial lift and no pump: the gas-lift, ESP
+ *  pump-curve, traverse and ESP-sensitivity rows belong to the producer.
+ *  Hide AND purge them so a previous producer run cannot linger in the
+ *  injector's results. */
+const WATER_PRODUCER_ONLY_ROWS = [
+  'water-cr-gl', 'water-cr-esppump', 'water-cr-esptrav',
+  'water-cr-senspump', 'water-cr-senstrav',
+];
+/** Wipe every water result — used when the well TYPE changes, because
+ *  the shared rows (nodal, wellhead) then mean something different. */
+function clearWaterResults() {
+  document.getElementById('water-summary').innerHTML = '';
+  document.querySelectorAll('#panel-water .results .chart').forEach((c) => {
+    if (c.data) Plotly.purge(c);
+  });
+  document.querySelectorAll('#panel-water .results .datatable').forEach((t) => {
+    t.innerHTML = '';
+  });
+  clearWaterProducerResults();
+}
+
+function clearWaterProducerResults() {
+  for (const id of WATER_PRODUCER_ONLY_ROWS) {
+    const row = document.getElementById(id);
+    if (!row) continue;
+    row.style.display = 'none';
+    row.querySelectorAll('.chart').forEach((c) => {
+      if (c.data) Plotly.purge(c);
+    });
+    row.querySelectorAll('.datatable').forEach((t) => {
+      t.innerHTML = '';
+    });
+  }
+}
+
 function switchWaterType() {
   const inj = waterWellType() === 'injector';
   document.getElementById('water-lift-fieldset').style.display = inj ? 'none' : '';
@@ -1167,6 +1202,7 @@ function switchWaterType() {
   if (ph) ph.textContent = inj
     ? 'Future reservoir pressures, psi (injectivity line; J constant)'
     : 'Future reservoir pressures, psi (J constant — water μ·B do not change)';
+  clearWaterResults();
   if (!inj) switchWaterLift();
   refreshWaterSens();
   const row = document.getElementById('water-injTempF')?.closest('.frow');
@@ -1801,6 +1837,7 @@ const waterSolve = () => (waterWellType() === 'injector' ? waterInjSolve() : liq
 // injector nodal: available BHIP (falls with rate — friction) crossing the
 // injectivity line Pr + q/J (rises); THP-required and calculated BHT below
 async function waterInjSolve() {
+  clearWaterProducerResults();
   const r = await api('water/injector', waterForm());
   summary('water-summary', [
     { k: 'Injection rate', v: r.op ? `${fmt(r.op.qBpd, 0)} bbl/d` : r.opStatus, warn: !r.op },
@@ -1812,7 +1849,8 @@ async function waterInjSolve() {
   ]);
   plotNodal('water-chart-nodal', 'Injection rate, bbl/d', r.injCurve, r.vlpCurve,
     r.op ? { q: r.op.qBpd, pwfPsi: r.op.pwfPsi } : null,
-    (p) => p.q, (p) => p.q);
+    (p) => p.q, (p) => p.q,
+    { title: 'Injectivity — bottomhole node', iprName: 'Required (Pr + q/J)', vlpName: 'Available BHIP', opName: 'Injection point' });
   plot('water-chart-whp', [
     { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.thpReqPsi), name: 'Injection THP required', mode: 'lines+markers', line: { color: '#0B1418', width: 3 } },
     { x: r.thpCurve.map((p) => p.q), y: r.thpCurve.map((p) => p.bhtF), name: 'BHT (calc)', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },

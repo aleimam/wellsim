@@ -99,7 +99,7 @@ required Pr + q/J (rises). Charts: the injectivity nodal plot, and the
 works from an injection test (BHIP input-or-marched → J injectivity →
 matched K). Lift types hide for the injector (no artificial lift on
 injection), and the **sensitivities become the injector's own** — injection
-THP, injected-water temperature and tubing ID (see §3 above). If THP + head
+THP, injected-water temperature and tubing ID (see §3 above). The injector shows **only three result rows** — the injectivity node, the available-BHIP sensitivities and the injection-THP-required curve; the gas-lift, ESP pump-curve and ESP-traverse rows are producer-only and are cleared for it, and switching well type wipes the previous type’s results so nothing stale is mistaken for the injector’s. If THP + head
 cannot reach Pr the solver reports the
 **THP deficit** — the extra surface pressure (or pump) needed to start
 injection. Friction uses laminar Fanning (16/Re) below the transition,
