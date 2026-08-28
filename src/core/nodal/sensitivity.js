@@ -15,6 +15,8 @@
 
 import { oilMarch } from '../vlp/oil-march.js';
 import { gasMarch } from '../vlp/gas-march.js';
+import { waterInjectorMarch } from '../vlp/water-injector.js';
+import { espSolveDp } from '../vlp/esp.js';
 import { oilRateGrid, gasRateGrid } from './nodal.js';
 import {
   deadOilViscosityCp,
@@ -46,6 +48,49 @@ export function vlpSensitivityOil(baseCfg, sets, { rates } = {}) {
       q,
       pwfPsi: oilMarch(mergeCfg(baseCfg, { ...s.overrides, qOilStbD: q })).pwfPsi,
     })),
+  }));
+}
+
+/** Pump head follows the affinity law, so a dP quoted at refFreqHz scales
+ *  as (f/f0)^2. Used where no pump curve is available (manual-dP ESP). */
+export function espDpAtFreq(dpBasePsi, freqHz, refFreqHz) {
+  if (!(freqHz > 0) || !(refFreqHz > 0)) return dpBasePsi;
+  return dpBasePsi * (freqHz / refFreqHz) ** 2;
+}
+
+/** ESP VLP sensitivity: like the oil family, but each set may also override
+ *  the pump FREQUENCY — the coupled dP is then re-solved per rate at that
+ *  frequency (affinity-scaled pump curve), so the VLP curve is the real
+ *  ESP-coupled one, not a fixed-dP march. */
+export function vlpSensitivityEsp(baseCfg, pump, baseOpts, sets, { rates } = {}) {
+  const grid = rates ?? oilRateGrid(50, 10000);
+  return sets.map((s, i) => {
+    const { freqHz, ...marchOverrides } = s.overrides ?? {};
+    const opts = freqHz != null ? { ...baseOpts, freqHz } : baseOpts;
+    return {
+      label: s.label ?? `VLP${i + 1}`,
+      overrides: s.overrides,
+      curve: grid.map((q) => ({
+        q,
+        pwfPsi: espSolveDp(mergeCfg(baseCfg, { ...marchOverrides, qOilStbD: q }), pump, opts).march.pwfPsi,
+      })),
+    };
+  });
+}
+
+/** Water-injector VLP sensitivity: the AVAILABLE bottomhole injection
+ *  pressure vs rate for each set (THP, injection-water temperature, tubing
+ *  ID). Injection marches down, so the curve falls with rate through
+ *  friction — the mirror of a producer's VLP. */
+export function vlpSensitivityInjector(baseCfg, sets, { rates } = {}) {
+  const grid = rates ?? oilRateGrid(50, 10000);
+  return sets.map((s, i) => ({
+    label: s.label ?? `VLP${i + 1}`,
+    overrides: s.overrides,
+    curve: grid.map((q) => {
+      const m = waterInjectorMarch(mergeCfg(baseCfg, { ...s.overrides, qOilStbD: q }));
+      return { q, pwfPsi: m.pwfPsi, bhtF: m.bhtF };
+    }),
   }));
 }
 

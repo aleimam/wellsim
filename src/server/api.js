@@ -74,6 +74,9 @@ import { walshForecast } from '../core/reserve/walsh.js';
 import {
   vlpSensitivityOil,
   vlpSensitivityGas,
+  vlpSensitivityEsp,
+  vlpSensitivityInjector,
+  espDpAtFreq,
   oilIprSensitivity,
   gasIprSensitivity,
   futureOilJ,
@@ -388,10 +391,18 @@ export function oilSensitivity(f) {
   const oilFrac = water ? 1 : 1 - cfg.wcPct / 100;
   const cap = Math.min(qMaxGross(ipr) * oilFrac * 0.999, 10000);
   const rates = oilRateGrid(50, Math.max(cap, 100));
+  // VLP parameter sets, lift- and fluid-aware:
+  //   oil natural   FTHP, GOR, W.C, tubing ID
+  //   oil gas lift  + injection gas rate
+  //   oil ESP       + frequency (Hz)
+  //   water         FTHP, tubing ID (+ inj gas / Hz by lift; no GOR/WC —
+  //                 water marches at the limiting case)
   const sets = (f.vlpSets ?? []).map((s, i) => {
     const o = {};
-    for (const k of ['thpPsi', 'wcPct', 'gorScfStb', 'tubingIdIn']) if (num(s[k]) != null) o[k] = num(s[k]);
+    for (const k of ['thpPsi', 'tubingIdIn']) if (num(s[k]) != null) o[k] = num(s[k]);
+    if (!water) for (const k of ['wcPct', 'gorScfStb']) if (num(s[k]) != null) o[k] = num(s[k]);
     if (num(s.injRateMMscfd) != null && cfg.gasLift) o.gasLift = { injRateMMscfd: num(s.injRateMMscfd) };
+    if (num(s.freqHz) != null && cfg.esp) o.freqHz = num(s.freqHz);
     return { label: s.label || `VLP${i + 1}`, overrides: o };
   });
   const presList = (f.presList ?? []).map(num).filter((p) => p != null && p > 0);
@@ -408,7 +419,65 @@ export function oilSensitivity(f) {
         presList: presList.length ? presList : undefined,
         wcPct: cfg.wcPct,
       }).map((m) => ({ label: m.label, presPsi: m.presPsi, j: m.j, curve: m.curve }));
-  return { vlpFamily: vlpSensitivityOil(cfg, sets, { rates }), iprFamily };
+  // ESP wells: a frequency override must re-solve the coupled pump dP.
+  // With a pump model that is the real ESP-coupled VLP; on manual dP (and
+  // the water tab, whose ESP takes dP directly) the affinity law scales the
+  // quoted dP by (f/f0)^2 — documented in sensitivity.js.
+  let vlpFamily;
+  if (cfg.esp) {
+    const bp = buildEspPump(f);
+    const baseFreq = num(f.espFreqHz) ?? 50;
+    if (!bp.error && bp.pump) {
+      // a pump model is available: every set gets the real coupled solve
+      // (at its own frequency when one is given)
+      vlpFamily = vlpSensitivityEsp(cfg, bp.pump, espOpts(f), sets, { rates });
+    } else {
+      const scaled = sets.map((s) => {
+        const { freqHz, ...rest } = s.overrides;
+        if (freqHz == null) return { ...s, overrides: rest };
+        return {
+          ...s,
+          overrides: { ...rest, esp: { pumpDpPsi: espDpAtFreq(cfg.esp.pumpDpPsi, freqHz, baseFreq) } },
+        };
+      });
+      vlpFamily = vlpSensitivityOil(cfg, scaled, { rates });
+    }
+  } else {
+    vlpFamily = vlpSensitivityOil(cfg, sets, { rates });
+  }
+  return { vlpFamily, iprFamily };
+}
+
+/** Water-injector VLP sensitivities: available BHIP families per parameter
+ *  set (injection THP, injection-water temperature, tubing ID) against the
+ *  injectivity line, plus the same line at future reservoir pressures
+ *  (water J is pressure-independent, so J stays constant). */
+export function waterInjSensitivity(f) {
+  const cfg = buildOilCfg(f);
+  const ipr = buildOilIpr(f, cfg, 0);
+  const model = { j: ipr.j, prPsi: ipr.prPsi };
+  const op = injectorOperatingPoint(cfg, model);
+  const qTop = op.status === 'ok' ? op.qOp * 1.6 : 5000;
+  const rates = [];
+  for (let i = 1; i <= 14; i++) rates.push((qTop * i) / 14);
+  const sets = (f.vlpSets ?? []).map((s, i) => {
+    const o = {};
+    for (const k of ['thpPsi', 'injTempF', 'tubingIdIn']) if (num(s[k]) != null) o[k] = num(s[k]);
+    return { label: s.label || `VLP${i + 1}`, overrides: o };
+  });
+  const presList = (f.presList ?? []).map(num).filter((p) => p != null && p > 0);
+  const list = presList.length ? presList : [1.25, 1.5, 1.75].map((x) => model.prPsi * x);
+  return {
+    vlpFamily: vlpSensitivityInjector(cfg, sets, { rates }),
+    iprFamily: list.map((p, i) => ({
+      label: `Pres${i + 1}=${Math.round(p)} psi`,
+      presPsi: p,
+      j: model.j,
+      curve: rates.map((q) => ({ qGrossStbD: q, pwfPsi: pwfAtQInj(q, { j: model.j, prPsi: p }) })),
+    })),
+    jInj: model.j,
+    prPsi: model.prPsi,
+  };
 }
 
 export function oilGasLift(f) {
@@ -1274,6 +1343,7 @@ export const handlers = {
   'oil/forecast': oilForecastApi,
   'water/injector': waterInjector,
   'water/injcalibrate': waterInjCalibrate,
+  'water/injsensitivity': waterInjSensitivity,
   'esp/pumps': espPumps,
   'oil/esp': oilEsp,
   'oil/espstages': oilEspStages,

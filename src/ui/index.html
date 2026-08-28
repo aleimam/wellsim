@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-08-28j" />
+  <link rel="stylesheet" href="/style.css?v=2026-08-28k" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -232,8 +232,7 @@
           <fieldset>
             <legend>ESP</legend>
             <div id="water-esp-fields"></div>
-            <div class="note">Pump &Delta;P and tubing gas are direct inputs for now — the pump-catalog,
-            intake/separator and matching solver arrive with the ESP stack.</div>
+            <div class="note">Water is gas-free, so the intake/separator block and the pump catalog do not apply: the pump is its depth, its frequency and the &Delta;P it delivers there. A frequency sensitivity scales that &Delta;P by the affinity law (f/f&#8320;)&sup2;.</div>
           </fieldset>
         </div>
         <fieldset>
@@ -244,9 +243,9 @@
         </fieldset>
         <fieldset id="water-sens-fieldset">
           <legend>Sensitivities</legend>
-          <div class="senshead">VLP parameter sets (blank = base value)</div>
+          <div class="senshead" id="water-sens-head">VLP parameter sets (blank = base value)</div>
           <table class="sens" id="water-sens-table"></table>
-          <div class="senshead">Future reservoir pressures, psi (J constant &mdash; water &mu;&middot;B do not change)</div>
+          <div class="senshead" id="water-pres-head">Future reservoir pressures, psi (J constant &mdash; water &mu;&middot;B do not change)</div>
           <div id="water-pres-list" class="presrow"></div>
           <button id="water-btn-sens" class="action secondary">Run sensitivities</button>
         </fieldset>
@@ -361,6 +360,6 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/app.js?v=2026-08-28j"></script>
+  <script src="/app.js?v=2026-08-28k"></script>
 </body>
 </html>

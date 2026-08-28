@@ -107,11 +107,25 @@ const WATER_TEST_FIELDS = [
   ['testThpPsi', 'Test FTHP', 'psi', 200],
   ['testPwfPsi', 'Test Pwf (blank = get Pwf)', 'psi', ''],
 ];
-const WATER_SENS_COLS = ['thpPsi', 'tubingIdIn', 'injRateMMscfd'];
+// VLP sensitivity parameters per fluid and lift type (blank cell = base).
+// Water marches at its limiting case (no GOR / water cut), so only the
+// hydraulic and lift parameters vary; the injector varies the injection
+// THP, the injected-water temperature and the tubing.
+const WATER_SENS_SETS = {
+  natural: ['thpPsi', 'tubingIdIn'],
+  gaslift: ['thpPsi', 'injRateMMscfd', 'tubingIdIn'],
+  esp: ['thpPsi', 'freqHz', 'tubingIdIn'],
+  injector: ['thpPsi', 'injTempF', 'tubingIdIn'],
+};
 const WATER_SENS_ROWS = [
   { label: 'VLP1', thpPsi: 400 },
   { label: 'VLP2', thpPsi: 300 },
   { label: 'VLP3', thpPsi: 100 },
+];
+const WATER_INJ_SENS_ROWS = [
+  { label: 'VLP1', thpPsi: 1500 },
+  { label: 'VLP2', thpPsi: 2000 },
+  { label: 'VLP3', thpPsi: 2500 },
 ];
 
 // ---- oil Reserve estimate (workbook: oil reserve estimate) ----
@@ -160,6 +174,14 @@ const OIL_ESP_CUSTOM_FIELDS = [['espRefFreqHz', 'Reference frequency', 'Hz', 60]
 const OIL_ESP_MANUAL_FIELDS = [
   ['pumpDpPsi', 'Pump ΔP (manual)', 'psi', 1325.16],
   ['tubingGasScfD', 'Tubing gas (blank = formation)', 'scf/d', ''],
+];
+// water ESP: no gas, so no catalog/separator/intake block — the pump is a
+// depth, a frequency and the dP it delivers there. A frequency sensitivity
+// scales that dP by the affinity law (f/f0)^2.
+const WATER_ESP_FIELDS = [
+  ['pumpTvdM', 'Pump depth', 'mTVD', 2985],
+  ['espFreqHz', 'Operating frequency', 'Hz', 50],
+  ['pumpDpPsi', 'Pump ΔP at that frequency', 'psi', 1325.16],
 ];
 const ESP_CURVE_COLS = [
   { key: 'headFt', label: 'head ft/stage' },
@@ -269,7 +291,12 @@ const OIL_GL_FIELDS = [
   ['injSteps', 'Steps', '-', 10],
 ];
 
-const OIL_SENS_COLS = ['thpPsi', 'wcPct', 'gorScfStb', 'tubingIdIn', 'injRateMMscfd'];
+// oil VLP sensitivity parameters per lift type (blank cell = base value)
+const OIL_SENS_SETS = {
+  natural: ['thpPsi', 'gorScfStb', 'wcPct', 'tubingIdIn'],
+  gaslift: ['thpPsi', 'gorScfStb', 'wcPct', 'tubingIdIn', 'injRateMMscfd'],
+  esp: ['thpPsi', 'gorScfStb', 'wcPct', 'tubingIdIn', 'freqHz'],
+};
 const OIL_SENS_ROWS = [
   { label: 'VLP1', wcPct: 0 },
   { label: 'VLP2', wcPct: 40 },
@@ -390,19 +417,40 @@ function renderTables(containerId, tables) {
   });
 }
 
+// short, unit-bearing headers for the VLP sensitivity columns
+const SENS_LABELS = {
+  thpPsi: 'FTHP psi',
+  gorScfStb: 'GOR scf/stb',
+  wcPct: 'W.C %',
+  tubingIdIn: 'Tbg ID in',
+  injRateMMscfd: 'Inj gas MMscf/d',
+  freqHz: 'Freq Hz',
+  injTempF: 'Inj water T °F',
+};
+
 function renderSensTable(id, prefix, cols, rows) {
   const t = document.getElementById(id);
+  // keep whatever the user already typed when the column set changes
+  const prev = {};
+  for (let i = 0; i < rows.length; i++)
+    for (const el of t.querySelectorAll(`input[id^="${prefix}-sens-${i}-"]`))
+      prev[el.id] = el.value;
   t.innerHTML =
-    `<tr><th>set</th>${cols.map((c) => `<th>${c}</th>`).join('')}</tr>` +
+    `<tr><th>set</th>${cols.map((c) => `<th>${SENS_LABELS[c] ?? c}</th>`).join('')}</tr>` +
     rows
-      .map(
-        (r, i) =>
-          `<tr><td><input id="${prefix}-sens-${i}-label" value="${r.label}" style="width:52px"/></td>` +
-          cols
-            .map((c) => `<td><input id="${prefix}-sens-${i}-${c}" value="${r[c] ?? ''}"/></td>`)
-            .join('') +
+      .map((r, i) => {
+        const cell = (c) => {
+          const key = `${prefix}-sens-${i}-${c}`;
+          const v = prev[key] ?? r[c] ?? '';
+          return `<td><input id="${key}" value="${v}"/></td>`;
+        };
+        const lk = `${prefix}-sens-${i}-label`;
+        return (
+          `<tr><td><input id="${lk}" value="${prev[lk] ?? r.label}" style="width:52px"/></td>` +
+          cols.map(cell).join('') +
           `</tr>`
-      )
+        );
+      })
       .join('');
 }
 
@@ -769,15 +817,29 @@ function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
 const FAM_BLUES = ['#9ecae1', '#4292c6', '#084594'];
 const FAM_REDS = ['#fcae91', '#fb6a4a', '#a50f15'];
 
-function plotSens(div, xTitle, iprFam, vlpFam, iprX) {
+function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
   const traces = [];
   iprFam.forEach((m, i) =>
-    traces.push({ x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi), name: `IPR ${m.label}`, mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 2.5 } })
+    traces.push({ x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi), name: `${opts.iprName ?? 'IPR'} ${m.label}`, mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 2.5 } })
   );
   vlpFam.forEach((m, i) =>
-    traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: `VLP ${m.label}`, mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
+    traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: `${opts.vlpName ?? 'VLP'} ${m.label}`, mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
   );
-  Plotly.newPlot(div, traces, { ...LAYOUT(), title: 'IPR & VLP sensitivities', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } }, PLOT_CFG());
+  const layout = { ...LAYOUT(), title: opts.title ?? 'IPR & VLP sensitivities', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } };
+  // injector: the injection-water temperature moves the BOTTOMHOLE
+  // temperature rather than the pressure (incompressible water), so its
+  // families are only visible on a second axis
+  if (opts.showBht && vlpFam.some((m) => m.curve.some((p) => p.bhtF != null))) {
+    vlpFam.forEach((m, i) =>
+      traces.push({
+        x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.bhtF), name: `BHT ${m.label}`,
+        yaxis: 'y2', mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 1.5, dash: 'dash' },
+      })
+    );
+    layout.yaxis2 = { title: 'BHT, °F', overlaying: 'y', side: 'right', showgrid: false };
+    layout.margin = { ...layout.margin, r: window.innerWidth < 640 ? 40 : 55 };
+  }
+  Plotly.newPlot(div, traces, layout, PLOT_CFG());
 }
 
 function plotWhp(div, xTitle, whp, thp) {
@@ -828,10 +890,27 @@ function switchMl(prefix) {
     mlMode(prefix) === 'multi' ? '' : 'none';
 }
 
+/** Active VLP sensitivity columns for each tab (lift/well-type aware). */
+const oilSensCols = () => OIL_SENS_SETS[oilLiftType()] ?? OIL_SENS_SETS.natural;
+const waterSensCols = () =>
+  waterWellType() === 'injector'
+    ? WATER_SENS_SETS.injector
+    : WATER_SENS_SETS[waterLiftType()] ?? WATER_SENS_SETS.natural;
+const waterSensRows = () =>
+  waterWellType() === 'injector' ? WATER_INJ_SENS_ROWS : WATER_SENS_ROWS;
+
+function refreshOilSens() {
+  renderSensTable('oil-sens-table', 'oil', oilSensCols(), OIL_SENS_ROWS);
+}
+function refreshWaterSens() {
+  renderSensTable('water-sens-table', 'water', waterSensCols(), waterSensRows());
+}
+
 function switchLift() {
   const t = oilLiftType();
   document.getElementById('oil-lift-gl').style.display = t === 'gaslift' ? '' : 'none';
   document.getElementById('oil-lift-esp').style.display = t === 'esp' ? '' : 'none';
+  refreshOilSens();
   // per-lift GOR default: ESP wells 300, natural/gas-lift 5000 — swap only
   // while the field still holds the other type's default (user values kept)
   const gor = document.getElementById('oil-gorScfStb');
@@ -895,6 +974,7 @@ function switchWaterLift() {
   const t = waterLiftType();
   document.getElementById('water-lift-gl').style.display = t === 'gaslift' ? '' : 'none';
   document.getElementById('water-lift-esp').style.display = t === 'esp' ? '' : 'none';
+  refreshWaterSens();
 }
 
 const waterWellType = () => document.querySelector('input[name="water-welltype"]:checked')?.value ?? 'producer';
@@ -904,7 +984,7 @@ function waterForm() {
     ...WATER_TEST_FIELDS,
     ...OIL_GL_FIELDS,
     ...OIL_GL_WELL_FIELDS,
-    ...OIL_ESP_FIELDS,
+    ...WATER_ESP_FIELDS,
   ]);
   f.liftType = waterWellType() === 'injector' ? 'natural' : waterLiftType();
   f.fluid = 'water';
@@ -920,8 +1000,18 @@ function switchWaterType() {
   document.getElementById('water-lift-fieldset').style.display = inj ? 'none' : '';
   document.getElementById('water-lift-gl').style.display = inj ? 'none' : '';
   document.getElementById('water-lift-esp').style.display = inj ? 'none' : '';
-  document.getElementById('water-sens-fieldset').style.display = inj ? 'none' : '';
+  // the injector has its own VLP sensitivities (THP / inj water temp / tubing)
+  document.getElementById('water-sens-fieldset').style.display = '';
+  const sh = document.getElementById('water-sens-head');
+  if (sh) sh.textContent = inj
+    ? 'VLP parameter sets — available BHIP families (blank = base value)'
+    : 'VLP parameter sets (blank = base value)';
+  const ph = document.getElementById('water-pres-head');
+  if (ph) ph.textContent = inj
+    ? 'Future reservoir pressures, psi (injectivity line; J constant)'
+    : 'Future reservoir pressures, psi (J constant — water μ·B do not change)';
   if (!inj) switchWaterLift();
+  refreshWaterSens();
   const row = document.getElementById('water-injTempF')?.closest('.frow');
   if (row) row.style.display = inj ? '' : 'none';
   const relabel = (id, txt) => {
@@ -1550,19 +1640,30 @@ const waterCalibrate = () =>
 
 async function oilSens() {
   const body = oilForm();
-  body.vlpSets = collectSens('oil', OIL_SENS_COLS, OIL_SENS_ROWS.length);
+  body.vlpSets = collectSens('oil', oilSensCols(), OIL_SENS_ROWS.length);
   body.presList = collectPres('oil', 3);
   const r = await api('oil/sensitivity', body);
   plotSens('oil-chart-sens', 'Oil rate, stb/d', r.iprFamily, r.vlpFamily, (p) => p.qOilStbD);
 }
 
 async function waterSens() {
+  const inj = waterWellType() === 'injector';
   const body = waterForm();
-  body.vlpSets = collectSens('water', WATER_SENS_COLS, WATER_SENS_ROWS.length);
+  body.vlpSets = collectSens('water', waterSensCols(), waterSensRows().length);
   body.presList = collectPres('water', 3);
-  const r = await api('oil/sensitivity', body);
-  // water IPR curves carry the rate in qGrossStbD (gross water basis)
-  plotSens('water-chart-sens', 'Water rate, bbl/d', r.iprFamily, r.vlpFamily, (p) => p.qGrossStbD ?? p.qOilStbD);
+  const r = await api(inj ? 'water/injsensitivity' : 'oil/sensitivity', body);
+  // water IPR curves carry the rate in qGrossStbD (gross water basis);
+  // for the injector the "IPR" family is the injectivity line at future Pres
+  plotSens(
+    'water-chart-sens',
+    inj ? 'Injection rate, bbl/d' : 'Water rate, bbl/d',
+    r.iprFamily,
+    r.vlpFamily,
+    (p) => p.qGrossStbD ?? p.qOilStbD,
+    inj
+      ? { title: 'Injectivity & available-BHIP sensitivities', iprName: 'Required', vlpName: 'Available', showBht: true }
+      : {}
+  );
 }
 
 function gasIprMode() {
@@ -2116,7 +2217,7 @@ loadEspPumps();
 renderPresList('oil-esppres-list', 'oil-esp', [2400, 2100, 1800]);
 document.querySelectorAll('input[name="oil-esptab"]').forEach((r) => (r.onchange = switchEspTab));
 document.getElementById('oil-btn-espsens').onclick = guard(espSensRun);
-renderSensTable('oil-sens-table', 'oil', OIL_SENS_COLS, OIL_SENS_ROWS);
+refreshOilSens();
 renderPresList('oil-pres-list', 'oil', [2662.5, 1775, 887.5]);
 document.querySelectorAll('input[name="oil-lift"]').forEach((r) => (r.onchange = switchLift));
 switchLift();
@@ -2125,8 +2226,8 @@ renderForm('water-form', 'water', WATER_SCHEMA);
 renderFieldRow('water-test', 'water', WATER_TEST_FIELDS);
 renderFieldRow('water-gl-fields', 'water', OIL_GL_WELL_FIELDS);
 renderFieldRow('water-gl-inputs', 'water', OIL_GL_FIELDS);
-renderFieldRow('water-esp-fields', 'water', OIL_ESP_FIELDS);
-renderSensTable('water-sens-table', 'water', WATER_SENS_COLS, WATER_SENS_ROWS);
+renderFieldRow('water-esp-fields', 'water', WATER_ESP_FIELDS);
+refreshWaterSens();
 renderPresList('water-pres-list', 'water', [4400, 4000, 3600]);
 document.querySelectorAll('input[name="water-lift"]').forEach((r) => (r.onchange = switchWaterLift));
 switchWaterLift();

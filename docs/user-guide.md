@@ -81,8 +81,10 @@ crossing of the available BHIP (falls with rate through friction) and the
 required Pr + q/J (rises). Charts: the injectivity nodal plot, and the
 **injection THP required vs rate** with BHT on the second axis. Calibration
 works from an injection test (BHIP input-or-marched → J injectivity →
-matched K). Lift types and sensitivities hide for the injector (no artificial
-lift on injection). If THP + head cannot reach Pr the solver reports the
+matched K). Lift types hide for the injector (no artificial lift on
+injection), and the **sensitivities become the injector's own** — injection
+THP, injected-water temperature and tubing ID (see §3 above). If THP + head
+cannot reach Pr the solver reports the
 **THP deficit** — the extra surface pressure (or pump) needed to start
 injection. Friction uses laminar Fanning (16/Re) below the transition,
 Chen above.
@@ -127,7 +129,35 @@ inputs are required; there is no input THT.
    method is served at `/api/skin-guidance`) and the program back-solves the
    **matched permeability** so the Darcy J equals the test J. Darcy remains the
    dominant J program-wide.
-3. **Sensitivities** — VLP parameter sets (blank cell = base value) and future
+3. **Sensitivities** — the VLP parameter columns follow the fluid and the
+   **active lift type** (a blank cell always means "base value", and values
+   you typed survive a lift switch):
+
+   | Well | VLP sensitivity parameters |
+   |---|---|
+   | Oil — natural | FTHP · GOR · W.C · tubing ID |
+   | Oil — gas lift | FTHP · GOR · W.C · tubing ID · injection gas rate |
+   | Oil — ESP | FTHP · GOR · W.C · tubing ID · frequency (Hz) |
+   | Water — natural | FTHP · tubing ID |
+   | Water — gas lift | FTHP · injection gas rate · tubing ID |
+   | Water — ESP | FTHP · frequency (Hz) · tubing ID |
+   | Water — injector | injection THP · injected-water temperature · tubing ID |
+
+   **ESP frequency**: with a pump model selected, each set's coupled pump ΔP
+   is re-solved per rate at that frequency (affinity-scaled pump curve,
+   intake state included); on Manual ΔP — and on the water tab, which has no
+   gas and therefore no catalog/intake block — the quoted ΔP is scaled by the
+   affinity law (f/f₀)². Above the pump's flow range the head is zero, so the
+   frequency curves merge; that is the model being honest, not an error.
+
+   **Injector**: the injector runs its own sensitivity family — available
+   BHIP vs rate for each set, against the injectivity line at future
+   reservoir pressures. Injection water is incompressible with a fixed
+   viscosity here, so the injected-water temperature moves the **bottomhole
+   temperature**, not the pressure; those BHT families are plotted on the
+   chart's second axis.
+
+   Alongside the VLP sets, both producers and injectors sweep future
    reservoir pressures (defaults 2662.5 / 1775 / 887.5 psi = 0.75·0.5·0.25 × Pr).
    Future IPRs use the workbook's future-J chain (J_2x with μ·Bo at the future
    pressure).
