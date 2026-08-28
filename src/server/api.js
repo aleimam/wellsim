@@ -252,6 +252,24 @@ function gasMultiLayer(f, cfg) {
   return { inflow: createGasInflow({ multiLayer: { layers } }) };
 }
 
+/** Pump-curve family (30-60 Hz) + the down-thrust/BEP/up-thrust envelope,
+ *  the data behind the PumpCurve chart. Shared by the oil ESP view and the
+ *  water tab's single-solve response. */
+const CURVE_FREQS = [30, 35, 40, 45, 50, 55, 60];
+function pumpCurveFamily(pump, opts) {
+  return {
+    family: CURVE_FREQS.map((hz) => ({ freqHz: hz, points: pumpCurveAt(pump, { ...opts, freqHz: hz }) })),
+    thrustLines: ['down', 'bep', 'up'].map((k) => ({
+      key: k,
+      points: CURVE_FREQS.map((hz) => {
+        const fr = hz / pump.refFreqHz;
+        const p = pump.points[THRUST[k]];
+        return { rateBpd: p.rateBpd * fr, headFt: p.headFt * opts.stages * fr * fr * (1 - opts.wearFactor) };
+      }),
+    })),
+  };
+}
+
 export function oilNodal(f) {
   const cfg0 = buildOilCfg(f);
   const pb = oilPb(f, cfg0);
@@ -326,6 +344,14 @@ export function oilNodal(f) {
             headFt: opSolve?.headFt ?? null,
             qGrossPumpBpd: opSolve?.state.qGrossPumpBpd ?? null,
             thrust: opSolve ? thrustStatus(espPump.pump, espCoupled.freqHz, opSolve.state.qGrossPumpBpd).status : null,
+            // pump-curve family + thrust envelope so the caller can draw the
+            // curve from this one solve (the water tab has no separate ESP view)
+            ...(opSolve ? pumpCurveFamily(espPump.pump, espCoupled) : {}),
+            opts: espCoupled ?? null,
+            opPoint: opSolve ? { rateBpd: opSolve.state.qGrossPumpBpd, headFt: opSolve.headFt } : null,
+            gradPsiFt: opSolve?.state.gradPsiFt ?? null,
+            freeGasPct: opSolve?.state.freeGasPct ?? null,
+            dpConverged: opSolve?.converged ?? null,
           }
         : null,
     // the dP (input on manual, solved with a pump) sits at the pump depth in
@@ -1230,7 +1256,7 @@ export function oilEsp(f) {
     }),
   }));
   // FINAL model-match charts: IPR vs the coupled ESP-VLP + wellhead curve
-  const oilFrac = 1 - cfg.wcPct / 100;
+  const oilFrac = cfg.fluid === 'water' ? 1 : 1 - cfg.wcPct / 100;
   const cap = Math.min(qMaxGross(ipr) * oilFrac * 0.98, 10000);
   const rates = oilRateGrid(Math.max(cap * 0.05, 50), cap);
   const vlpCurve = rates.map((q) => {

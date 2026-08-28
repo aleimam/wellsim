@@ -1001,6 +1001,11 @@ function switchWaterLift() {
   const t = waterLiftType();
   document.getElementById('water-lift-gl').style.display = t === 'gaslift' ? '' : 'none';
   document.getElementById('water-lift-esp').style.display = t === 'esp' ? '' : 'none';
+  // the ESP chart rows belong to the ESP lift only — stale ones would
+  // otherwise linger after switching back to natural flow
+  if (t !== 'esp')
+    for (const id of ['water-cr-esppump', 'water-cr-esptrav'])
+      document.getElementById(id).style.display = 'none';
   refreshWaterSens();
 }
 
@@ -1394,6 +1399,8 @@ async function liquidSolve(c) {
       rows: r.whpCurve.map((p) => [fmt(p.q, 0), fmt(p.whpPsi, 1), fmt(p.whtF, 1), fmt(p.pwfIprPsi, 1), fmt(p.pwfVlpPsi, 1)]),
     },
   ]);
+  // water ESP: the pump curve and the traverse come from this same solve
+  if (c.prefix === 'water') waterEspCharts(r);
   // ESP-only chart rows: manual-dP ESP shows the traverse (the input dP is
   // merged into the march at the pump depth); natural/gas-lift hide it
   if (c.prefix === 'oil') {
@@ -1580,6 +1587,77 @@ async function espStagesRun() {
       : `stages = ${r.stages} (exact ${fmt(r.stagesExact, 2)}) — design proof OK: ` +
         `intake ${fmt(r.intakePsi, 0)} psi ≥ ${fmt(r.minIntakePsi, 0)} psi floor. Applied to the stages input.`);
   document.getElementById('oil-espStages').value = String(r.stages);
+}
+
+/** Water ESP charts drawn from the single nodal solve: the pump curve with
+ *  its thrust envelope, and the traverse (top-down vs the IPR back-calc)
+ *  with the pump step at pump depth. Hidden unless a pump is driving. */
+function waterEspCharts(r) {
+  const pumpRow = document.getElementById('water-cr-esppump');
+  const travRow = document.getElementById('water-cr-esptrav');
+  const e = r.esp;
+  const show = !!(e && e.pumpName && e.family);
+  pumpRow.style.display = show ? '' : 'none';
+  travRow.style.display = e && r.espTraverse ? '' : 'none';
+  if (show) {
+    const traces = e.family.map((c) => ({
+      x: c.points.map((p) => p.rateBpd), y: c.points.map((p) => p.headFt),
+      name: `${c.freqHz} Hz`, mode: 'lines', line: { width: c.freqHz === e.opts.freqHz ? 3 : 1.4 },
+    }));
+    for (const t of e.thrustLines) {
+      traces.push({
+        x: t.points.map((p) => p.rateBpd), y: t.points.map((p) => p.headFt),
+        name: t.key === 'bep' ? 'BEP' : `${t.key}-thrust`, mode: 'lines',
+        line: { color: t.key === 'bep' ? '#2C7048' : '#C2540B', width: 1.5, dash: 'dash' },
+      });
+    }
+    if (e.opPoint)
+      traces.push({
+        x: [e.opPoint.rateBpd], y: [e.opPoint.headFt], name: 'Operating point', mode: 'markers',
+        marker: { symbol: 'star', size: 16, color: '#A93A2C', line: { width: 1, color: '#7a1f14' } },
+      });
+    Plotly.newPlot('water-chart-esppump', traces, {
+      ...LAYOUT(),
+      title: `Pump curve — ${e.pumpName}, ${e.opts.stages} stages, wear ${fmt(e.opts.wearFactor, 2)}`,
+      xaxis: { title: 'Rate @ pump, bbl/d' },
+      yaxis: { title: 'Head, ft', rangemode: 'tozero' },
+    }, PLOT_CFG());
+    renderTables('water-table-esppump', [{
+      title: 'ESP results (water)', headers: ['item', 'value'],
+      rows: [
+        ['Pump', e.pumpName],
+        ['Frequency, Hz', fmt(e.opts.freqHz, 0)],
+        ['Stages', fmt(e.opts.stages, 0)],
+        ['Wear factor', fmt(e.opts.wearFactor, 2)],
+        ['Rate @ pump, bbl/d', fmt(e.qGrossPumpBpd, 0)],
+        ['Theoretical head, ft', fmt(e.headFt, 1)],
+        ['Pump ΔP, psi', fmt(e.pumpDpPsi, 1)],
+        ['Pump intake, psi', fmt(e.intakePsi, 1)],
+        ['Pump discharge, psi', fmt(e.dischargePsi, 1)],
+        ['Water gradient, psi/ft', fmt(e.gradPsiFt, 4)],
+        ['Free gas @ intake, %', fmt(e.freeGasPct, 2)],
+        ['Thrust', e.thrust ?? '—'],
+        ['ΔP fixed point', e.dpConverged ? 'converged' : 'NOT converged'],
+      ],
+    }]);
+  }
+  const tr = r.espTraverse;
+  if (e && tr) {
+    Plotly.newPlot('water-chart-esptrav', [
+      { x: tr.stations.map((s) => s.pPsi), y: tr.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#0B1418', width: 2 } },
+      { x: tr.backStations.map((s) => s.pPsi), y: tr.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#2C7048', width: 2, dash: 'dash' } },
+      { x: [tr.intakePsi, tr.dischargePsi], y: [tr.pumpTvdFt, tr.pumpTvdFt], name: `Pump ΔP ${fmt(tr.dpPsi, 0)} psi`, mode: 'lines+markers', line: { color: '#C2540B', width: 3 }, marker: { size: 9 } },
+    ], {
+      ...LAYOUT(),
+      title: 'Traverse gradient — top-down vs IPR back-calc',
+      xaxis: { title: 'Pressure, psi' },
+      yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
+    }, PLOT_CFG());
+    renderTables('water-table-esptrav', [{
+      title: 'Traverse', headers: ['TVD ft', 'P psi'],
+      rows: tr.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
+    }]);
+  }
 }
 
 /** Water tab: the same stage match against the shared pump database. */

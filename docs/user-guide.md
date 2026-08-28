@@ -74,6 +74,13 @@ there is no free-gas intake block and no separator — the curve works on the
 water volume at the intake. **Manual ΔP** remains in the dropdown for a
 pump you only know by its ΔP.
 
+Solving a water ESP well also draws two charts, the same pair the oil tab
+shows: the **PumpCurve** — the 30–60 Hz family with the
+down-thrust/BEP/up-thrust envelope and your operating point starred, with
+an ESP results block beside it — and the **Traverse**, the top-down march
+against the IPR back-calculated branch with the pump ΔP step drawn at pump
+depth. Both rows appear only while ESP is the active lift.
+
 A water well is head-dominated: it flows naturally only when Pr beats
 THP + the static water column (≈ 0.446 psi/ft at SG 1.05); otherwise the
 solver reports no-intersection — that is the physics, not an error.
