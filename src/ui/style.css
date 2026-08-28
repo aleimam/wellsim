@@ -210,8 +210,11 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); }
   /* the three well tabs get a full row with real touch targets;
      utility links wrap onto a second row below them */
   .tab { flex: 1 1 30%; padding: 13px 0 11px; min-height: 44px; text-align: center; }
+  /* utility links size to their own text (no clipped labels) and wrap into
+     rows; the cap + ellipsis only guards long signed-in account names */
   .hdr-link {
-    flex: 1 1 17%; margin-left: 0; min-height: 40px; padding: 8px 4px;
+    flex: 1 1 auto; margin-left: 0; min-width: 0; max-width: 48%;
+    min-height: 40px; padding: 8px 9px; letter-spacing: 0.5px;
     display: inline-flex; align-items: center; justify-content: center;
     text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
