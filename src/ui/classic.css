@@ -155,3 +155,6 @@ input.outcell { background: #f5ecef !important; color: #5a4a52 !important; borde
 /* elements that belong to the mobile (PWF) skin stay hidden here */
 #mobilebar, #hdr-result { display: none !important; }
 header h1 em { font-style: normal; }
+
+/* charts that have not been drawn yet render nothing, not an empty box */
+.results .chart:empty { display: none; }

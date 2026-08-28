@@ -272,3 +272,6 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); }
   .action.secondary { position: static; box-shadow: none; }
   #error-bar { bottom: calc(50px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* charts that have not been drawn yet render nothing, not an empty box */
+.results .chart:empty { display: none; }

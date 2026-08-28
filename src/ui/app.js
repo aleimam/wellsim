@@ -765,17 +765,21 @@ function summary(id, cards) {
 
 // On phones the chart size is FIXED, computed once from the viewport (screen
 // width minus page padding and borders): charts fit the view exactly and never
-// re-fit as panels toggle. Desktop keeps fluid autosizing.
+// re-fit as panels toggle. Desktop keeps fluid autosizing. The phone bottom
+// margin leaves room for the axis title AND the legend below it (no overlap).
 const LAYOUT = () => ({
-  margin: window.innerWidth < 640 ? { l: 46, r: 10, t: 34, b: 40 } : { l: 60, r: 20, t: 40, b: 45 },
+  margin: window.innerWidth < 640 ? { l: 46, r: 12, t: 34, b: 88 } : { l: 60, r: 20, t: 40, b: 45 },
   ...(window.innerWidth < 640
-    ? { autosize: false, width: window.innerWidth - 18, height: 260 }
+    ? { autosize: false, width: window.innerWidth - 18, height: 300 }
     : { height: 380 }),
   font: { family: '"IBM Plex Sans", "Segoe UI", sans-serif', size: window.innerWidth < 640 ? 11 : 12, color: '#0B1418' },
-  legend: { orientation: 'h', y: -0.22 },
+  legend: window.innerWidth < 640 ? { orientation: 'h', y: -0.42 } : { orientation: 'h', y: -0.22 },
   plot_bgcolor: '#FBFCFC',
   paper_bgcolor: '#FFFFFF',
 });
+
+// phones: no Plotly modebar (its icons sat on the chart titles); desktop keeps it
+const PLOT_CFG = () => ({ displaylogo: false, responsive: true, displayModeBar: window.innerWidth < 640 ? false : undefined });
 
 function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
   const traces = [
@@ -788,7 +792,7 @@ function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
       marker: { symbol: 'diamond', size: 14, color: '#0B1418', line: { width: 2, color: '#fff' } },
     });
   }
-  Plotly.newPlot(div, traces, { ...LAYOUT(), title: 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } }, { displaylogo: false, responsive: true });
+  Plotly.newPlot(div, traces, { ...LAYOUT(), title: 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } }, PLOT_CFG());
 }
 
 const FAM_BLUES = ['#9ecae1', '#4292c6', '#084594'];
@@ -802,7 +806,7 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX) {
   vlpFam.forEach((m, i) =>
     traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: `VLP ${m.label}`, mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
   );
-  Plotly.newPlot(div, traces, { ...LAYOUT(), title: 'IPR & VLP sensitivities', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } }, { displaylogo: false, responsive: true });
+  Plotly.newPlot(div, traces, { ...LAYOUT(), title: 'IPR & VLP sensitivities', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } }, PLOT_CFG());
 }
 
 function plotWhp(div, xTitle, whp, thp) {
@@ -834,7 +838,7 @@ function plotWhp(div, xTitle, whp, thp) {
       },
       yaxis2: { title: 'WHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#C2540B' }, tickfont: { color: '#C2540B' } },
     },
-    { displaylogo: false, responsive: true }
+    PLOT_CFG()
   );
 }
 
@@ -1054,7 +1058,7 @@ async function oilForecastRun() {
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate stb/d · GOR scf/stb', rangemode: 'tozero' },
     yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   mobileShowResults();
   renderTables('oil-table-fc', [
     {
@@ -1142,7 +1146,7 @@ async function oilReserveRun() {
     Plotly.newPlot('oil-chart-rsv1', [
       { x: r.rows.map((p) => p.dtDays), y: r.rows.map((p) => p.pwfPsi), name: 'Pwf', mode: 'markers', marker: { color: '#0B1418', size: 8 } },
       { x: [0, tMax], y: [pwf0, pwf0 - r.rlt.slopePsiDay * tMax], name: `slope m = ${fmt(r.rlt.slopePsiDay, 3)} psi/d`, mode: 'lines', line: { color: '#A93A2C', width: 2, dash: 'dash' } },
-    ], { ...LAYOUT(), title: 'Reservoir limit — Pwf decline', xaxis: { title: 'dt, days' }, yaxis: { title: 'Pwf, psi' } }, { displaylogo: false, responsive: true });
+    ], { ...LAYOUT(), title: 'Reservoir limit — Pwf decline', xaxis: { title: 'dt, days' }, yaxis: { title: 'Pwf, psi' } }, PLOT_CFG());
     renderTables('oil-table-rsv1', [{
       title: 'Solved rows', headers: ['dt d', 'q stb/d', 'Pwf', 'pr', 'z'],
       rows: r.rows.map((p) => [fmt(p.dtDays, 1), fmt(p.qOilStbD, 0), fmt(p.pwfPsi, 0), fmt(p.presPsi, 0), fmt(p.z, 3)]),
@@ -1173,7 +1177,7 @@ async function oilReserveRun() {
     ...(fit.nSlopeMMstb != null
       ? [{ x: [0, eoMax], y: [0, fit.nSlopeMMstb * eoMax], name: `slope N = ${fmt(fit.nSlopeMMstb, 1)} MMstb`, mode: 'lines', line: { color: '#A93A2C', width: 2, dash: 'dash' } }]
       : []),
-  ], { ...LAYOUT(), title: 'Havlena–Odeh — F vs Eo', xaxis: { title: 'Eo, bbl/stb' }, yaxis: { title: 'F, MMbbl' } }, { displaylogo: false, responsive: true });
+  ], { ...LAYOUT(), title: 'Havlena–Odeh — F vs Eo', xaxis: { title: 'Eo, bbl/stb' }, yaxis: { title: 'F, MMbbl' } }, PLOT_CFG());
 
   const nPts = mb.filter((p) => p.nMMstb != null);
   Plotly.newPlot('oil-chart-rsv2', [
@@ -1181,7 +1185,7 @@ async function oilReserveRun() {
     ...(fit.nAvgMMstb != null
       ? [{ x: [0, Math.max(...nPts.map((p) => p.npMMstb), 0.001)], y: [fit.nAvgMMstb, fit.nAvgMMstb], name: `average N = ${fmt(fit.nAvgMMstb, 1)}`, mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }]
       : []),
-  ], { ...LAYOUT(), title: 'N vs Np — does the estimate stabilize?', xaxis: { title: 'Np, MMstb' }, yaxis: { title: 'N, MMstb' } }, { displaylogo: false, responsive: true });
+  ], { ...LAYOUT(), title: 'N vs Np — does the estimate stabilize?', xaxis: { title: 'Np, MMstb' }, yaxis: { title: 'N, MMstb' } }, PLOT_CFG());
 
   renderTables('oil-table-rsv1', [{
     title: 'Material balance', headers: ['dt d', 'pr psi', 'Np MMstb', 'F MMbbl', 'Eo', 'N MMstb'],
@@ -1211,7 +1215,7 @@ async function liquidGl(c) {
     title: `Gas-lift performance — ${c.fluidName} rate vs injection`,
     xaxis: { title: 'Injection rate, MMscf/d' },
     yaxis: { title: `${c.fluidName[0].toUpperCase() + c.fluidName.slice(1)} rate, bbl/d` },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   const inc = r.incremental[r.incremental.length - 1];
   document.getElementById(`${c.prefix}-gl-result`).textContent =
     (r.optimum
@@ -1305,7 +1309,7 @@ async function liquidSolve(c) {
         title: 'Traverse gradient — manual pump ΔP merged at pump depth',
         xaxis: { title: 'Pressure, psi' },
         yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
-      }, { displaylogo: false, responsive: true });
+      }, PLOT_CFG());
       renderTables('oil-table-esptrav', [{
         title: 'Traverse', headers: ['TVD ft', 'P psi'],
         rows: t.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
@@ -1362,7 +1366,7 @@ async function espRun() {
     title: `Pump curve — ${r.pump.name}, ${r.opts.stages} stages, wear ${fmt(r.opts.wearFactor, 2)}`,
     xaxis: { title: 'Rate @ pump, bbl/d' },
     yaxis: { title: 'Head, ft', rangemode: 'tozero' },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   // results block shown beside the pump curve
   renderTables('oil-table-gl', [{
     title: 'ESP results', headers: ['item', 'value'],
@@ -1417,7 +1421,7 @@ async function espRun() {
     title: 'Traverse gradient — top-down vs IPR back-calc',
     xaxis: { title: 'Pressure, psi' },
     yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   renderTables('oil-table-esptrav', [{
     title: 'Traverse', headers: ['TVD ft', 'P psi'],
     rows: op.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
@@ -1450,7 +1454,7 @@ async function espSensRun() {
     title: `ESP Pres sensitivity — ${r.pump.name}, ${r.opts.stages} stages @ ${r.opts.freqHz} Hz (solved nodes)`,
     xaxis: { title: 'Oil rate, stb/d', rangemode: 'tozero' },
     yaxis: { title: 'Pwf, psi', rangemode: 'tozero' },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   mobileShowResults();
   renderTables('oil-table-espsens', [{
     title: 'ESP data at the solved node',
@@ -1514,7 +1518,7 @@ async function waterInjSolve() {
     xaxis: { title: 'Injection rate, bbl/d' },
     yaxis: { title: 'THP, psi', rangemode: 'tozero' },
     yaxis2: { title: 'BHT, °F', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   renderTables('water-table-nodal', [
     {
       title: 'Injectivity (required)', headers: ['q bbl/d', 'Pwf psi'],
@@ -1736,7 +1740,7 @@ async function gasReserveRun() {
       title: 'Reservoir limit — Pwf vs time (all rows)',
       xaxis: { title: 'dt, days' },
       yaxis: { title: 'Pwf, psi' },
-    }, { displaylogo: false, responsive: true });
+    }, PLOT_CFG());
     renderTables('gas-table-pz', [
       {
         title: 'Reservoir limit', headers: ['dt d', 'q', 'Pwf', 'pr', 'z'],
@@ -1761,7 +1765,7 @@ async function gasReserveRun() {
     title: `p/Z vs Gp — minimum connected GIIP (${r.mode === 'sithp' ? 'SITHP' : 'prod data'} selection)`,
     xaxis: { title: 'Gp, Bscf', rangemode: 'tozero' },
     yaxis: { title: 'p/Z, psi', rangemode: 'tozero' },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   renderTables('gas-table-pz', [
     r.mode === 'sithp'
       ? {
@@ -1826,7 +1830,7 @@ async function gasForecastRun() {
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate MMscf/d · Gp Bscf', rangemode: 'tozero' },
     yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
-  }, { displaylogo: false, responsive: true });
+  }, PLOT_CFG());
   mobileShowResults();
   renderTables('gas-table-fc', [
     {
