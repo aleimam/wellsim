@@ -288,3 +288,28 @@ test('water ESP reports the same pump state (match + sensitivity)', () => {
   const p = nodal.esp.point;
   assert.ok(Math.abs(p.qGrossPumpBpd - p.qGrossPumpNoSepBpd) < 1e-6);
 });
+
+test('sensitivity responses carry Pri so the chart can cap its pressure axis', () => {
+  const oil = handlers['oil/sensitivity']({ ...OIL_BASE, gorScfStb: 5000, liftType: 'natural', vlpSets: [{ label: 'A' }] });
+  assert.equal(oil.priPsi, OIL_BASE.priPsi, 'oil Pri');
+  const water = handlers['oil/sensitivity']({ ...WATER_BASE, vlpSets: [{ label: 'A' }] });
+  assert.equal(water.priPsi, WATER_BASE.priPsi, 'water Pri');
+  const gas = handlers['gas/sensitivity']({
+    thpPsi: 1625, qMMscfd: 14.137, cgrStbMMscf: 57.436, wgrStbMMscf: 3.846, tubingIdIn: 2.992, roughness: 0.0021,
+    topPerfAhM: 3013, devStartM: 690, devAngleDeg: 23.65, condApi: 48.7, gasSg: 0.763, n2Pct: 1.2, co2Pct: 3, h2sPpm: 2,
+    tresF: 232, condViscCp: 2, oilViscCp: 2, sigmaDyn: 30, soilTempF: 90, htcBtu: 3, tubingOdIn: 3.5, cpBtu: 0.51,
+    priPsi: 3800, permMd: 5, thicknessFt: 80, reFt: 1640.5, rwFt: 0.5104, skin: 0, iprMode: 'j',
+    vlpSets: [{ label: 'A' }],
+  });
+  assert.equal(gas.priPsi, 3800, 'gas Pri');
+  // the IPR family can never exceed Pri — the inflow side is bounded by it
+  for (const m of oil.iprFamily)
+    for (const q of m.curve) assert.ok(q.pwfPsi <= oil.priPsi + 1e-6, `IPR ${q.pwfPsi} > Pri`);
+  // the VLP CAN run above Pri at high rates — an unattainable region (the
+  // well would need more pressure than the reservoir has). Capping the axis
+  // at Pri hides exactly that tail so the crossing stays legible.
+  const maxVlp = Math.max(...oil.vlpFamily.flatMap((m) => m.curve.map((q) => q.pwfPsi)));
+  assert.ok(maxVlp > oil.priPsi, 'the VLP tail exceeds Pri, so the cap does real work');
+  // the solved operating point always lies at or below Pri
+  for (const m of oil.vlpFamily) if (m.op) assert.ok(m.op.pwfPsi <= oil.priPsi + 1e-6);
+});

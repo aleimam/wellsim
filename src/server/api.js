@@ -589,6 +589,9 @@ export function oilSensitivity(f) {
     pumpName: espPumpS.pump?.name ?? null,
     espOpts: espOptsS,
     fluid: cfg.fluid ?? 'oil',
+    // the sensitivity chart tops its pressure axis at the initial reservoir
+    // pressure: nothing in a producing system can sit above it
+    priPsi: ipr.priPsi ?? ipr.prPsi,
   };
 }
 
@@ -869,6 +872,9 @@ export function gasSensitivity(f) {
   return {
     vlpFamily: vlpSensitivityGas(cfg, sets, { rates }),
     iprFamily: gasIprSensitivity(ipr, { presList: presList.length ? presList : undefined }),
+    // the sensitivity chart tops its pressure axis at the initial reservoir
+    // pressure: nothing in a producing system can sit above it
+    priPsi: ipr.priPsi ?? ipr.prPsi,
   };
 }
 

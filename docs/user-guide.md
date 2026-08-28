@@ -173,6 +173,15 @@ inputs are required; there is no input THT.
    temperature**, not the pressure; those BHT families are plotted on the
    chart's second axis.
 
+   **Pressure axis.** The sensitivity chart tops its pressure axis at
+   **Pri** on oil, water and gas wells. The inflow side can never exceed
+   the initial reservoir pressure, and the VLP tail that does — the
+   high-rate region where the well would need more pressure than the
+   reservoir has — otherwise stretched the scale and squashed the
+   families. The **injector is the exception** and keeps an auto axis:
+   injection deliberately pushes above Pri, so capping it there would clip
+   the very curves the chart exists to show.
+
    **Pump @ solution point.** Wherever an ESP node is solved — the model
    match *and* every sensitivity case — the pump's complete state is
    reported in one identical parameter set: pump, stages, frequency (with

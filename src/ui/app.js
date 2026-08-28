@@ -828,7 +828,15 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
   vlpFam.forEach((m, i) =>
     traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: `${opts.vlpName ?? 'VLP'} ${m.label}`, mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
   );
-  const layout = { ...LAYOUT(), title: opts.title ?? 'IPR & VLP sensitivities', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } };
+  // the pressure axis tops out at Pri: in a producing system neither the
+  // IPR nor the VLP can sit above the initial reservoir pressure, so a
+  // fixed [0, Pri] scale makes the families comparable run to run
+  const layout = {
+    ...LAYOUT(),
+    title: opts.title ?? 'IPR & VLP sensitivities',
+    xaxis: { title: xTitle },
+    yaxis: { title: 'Pressure, psi', ...(opts.priPsi > 0 ? { range: [0, opts.priPsi] } : { rangemode: 'tozero' }) },
+  };
   // injector: the injection-water temperature moves the BOTTOMHOLE
   // temperature rather than the pressure (incompressible water), so its
   // families are only visible on a second axis
@@ -1877,7 +1885,7 @@ async function oilSens() {
   body.vlpSets = collectSens('oil', oilSensCols(), OIL_SENS_ROWS.length);
   body.presList = collectPres('oil', 3);
   const r = await api('oil/sensitivity', body);
-  plotSens('oil-chart-sens', 'Oil rate, stb/d', r.iprFamily, r.vlpFamily, (p) => p.qOilStbD);
+  plotSens('oil-chart-sens', 'Oil rate, stb/d', r.iprFamily, r.vlpFamily, (p) => p.qOilStbD, { priPsi: r.priPsi });
   renderSensResults('oil', r, 'q oil stb/d');
 }
 
@@ -1896,8 +1904,11 @@ async function waterSens() {
     r.vlpFamily,
     (p) => p.qGrossStbD ?? p.qOilStbD,
     inj
+      // the injector deliberately pushes ABOVE the reservoir pressure, so
+      // its axis stays auto-scaled — capping it at Pri would clip the very
+      // curves it exists to show
       ? { title: 'Injectivity & available-BHIP sensitivities', iprName: 'Required', vlpName: 'Available', showBht: true }
-      : {}
+      : { priPsi: r.priPsi }
   );
   if (inj) {
     // the injector has no producing node/pump: only the families are drawn
@@ -2250,7 +2261,7 @@ async function gasSens() {
   body.vlpSets = collectSens('gas', GAS_SENS_COLS, GAS_SENS_ROWS.length);
   body.presList = collectPres('gas', 3);
   const r = await api('gas/sensitivity', body);
-  plotSens('gas-chart-sens', 'Gas rate, MMscf/d', r.iprFamily, r.vlpFamily, (p) => p.qMMscfd);
+  plotSens('gas-chart-sens', 'Gas rate, MMscf/d', r.iprFamily, r.vlpFamily, (p) => p.qMMscfd, { priPsi: r.priPsi });
 }
 
 // ---------- init ----------
