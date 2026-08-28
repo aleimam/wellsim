@@ -867,17 +867,30 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
     layout.margin = { ...layout.margin, r: window.innerWidth < 640 ? 40 : 55 };
   }
   if (phone) {
-    // give the legend its own room instead of letting it eat the plot:
-    // estimate how many rows it needs at this width, then grow the canvas
-    // and the bottom margin by exactly that much (the plot keeps its height)
+    // Give the legend its own room BELOW the axis title instead of letting
+    // it eat the plot or sit on the title. Everything is measured from the
+    // plot floor: the tick labels + x-axis title occupy ~55 px, so the
+    // legend starts past that, and the canvas grows by exactly the legend's
+    // height — the plot area itself stays a constant PLOT_H.
+    const PLOT_H = 176;      // drawing area kept for the curves
+    const AXIS_BLOCK = 55;   // x tick labels + axis title below the plot
+    const LEGEND_GAP = 8;
     const usable = Math.max(160, (layout.width ?? window.innerWidth - 18) - layout.margin.l - layout.margin.r);
     const longest = Math.max(...traces.map((t) => t.name.length), 6);
     const perRow = Math.max(1, Math.floor(usable / (longest * 5.6 + 30)));
     const rows = Math.ceil(traces.length / perRow);
-    const legendPx = rows * 15 + 10;
-    layout.legend = { orientation: 'h', y: -0.16, yanchor: 'top', x: 0, font: { size: 9 }, tracegroupgap: 2 };
-    layout.margin = { ...layout.margin, b: 46 + legendPx };
-    layout.height = 260 + legendPx;
+    const legendH = rows * 16 + 6;
+    const legendTop = AXIS_BLOCK + LEGEND_GAP; // px below the plot floor
+    layout.legend = {
+      orientation: 'h',
+      y: -(legendTop / PLOT_H), // Plotly measures y in plot-height fractions
+      yanchor: 'top',
+      x: 0,
+      font: { size: 9 },
+      tracegroupgap: 2,
+    };
+    layout.margin = { ...layout.margin, b: legendTop + legendH + 8 };
+    layout.height = layout.margin.t + PLOT_H + layout.margin.b;
   }
   Plotly.newPlot(div, traces, layout, PLOT_CFG());
 }
