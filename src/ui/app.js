@@ -849,21 +849,55 @@ function plot(div, traces, layout) {
   return p.then((gd) => {
     const el = gd ?? (typeof div === 'string' ? document.getElementById(div) : div);
     if (!el || !el.layout || el.offsetParent === null) return el;
-    const title = el.querySelector('.g-xtitle');
-    const legend = el.querySelector('g.legend');
-    if (!title || !legend) return el;
-    const t = title.getBoundingClientRect();
-    const l = legend.getBoundingClientRect();
-    const encroach = t.bottom + 6 - l.top; // >0 means the legend sits too high
-    if (encroach <= 0) return el;
-    const plotH = (el.layout.height ?? 300) - (el.layout.margin?.t ?? 34) - (el.layout.margin?.b ?? 60);
-    if (plotH <= 0) return el;
-    return Plotly.relayout(el, {
-      'legend.y': (el.layout.legend?.y ?? -0.36) - encroach / plotH,
-      'margin.b': (el.layout.margin?.b ?? 60) + encroach,
-      height: (el.layout.height ?? 300) + encroach,
-    }).then(() => el);
+    return fitPhoneTitle(el).then(() => fitPhoneLegend(el));
   });
+}
+
+/** Keep the chart title inside the canvas: shrink it to fit, and if that
+ *  would take it below readable size, wrap it onto a second line instead.
+ *  (The ESP pump-curve title carries the pump name, stage count and wear,
+ *  which overran a phone canvas by 12 px at the default size.) */
+function fitPhoneTitle(el) {
+  const node = el.querySelector('.gtitle');
+  const svg = el.querySelector('svg.main-svg');
+  if (!node || !svg) return Promise.resolve(el);
+  const avail = svg.getBoundingClientRect().width - 14;
+  const width = node.getBoundingClientRect().width;
+  if (width <= avail || width <= 0) return Promise.resolve(el);
+  const current = parseFloat(getComputedStyle(node).fontSize) || 15;
+  const needed = Math.floor(current * (avail / width));
+  const MIN = 11;
+  if (needed >= MIN) return Plotly.relayout(el, { 'title.font.size': needed }).then(() => el);
+  // too long to shrink: break it at the em dash (or the first comma)
+  const text = el.layout.title?.text ?? '';
+  const at = text.indexOf(' — ') >= 0 ? text.indexOf(' — ') : text.indexOf(', ');
+  if (at < 0) return Plotly.relayout(el, { 'title.font.size': MIN }).then(() => el);
+  const wrapped = `${text.slice(0, at)}<br>${text.slice(at).replace(/^(\s*—\s*|,\s*)/, '')}`;
+  return Plotly.relayout(el, {
+    'title.text': wrapped,
+    'title.font.size': MIN + 1,
+    'margin.t': (el.layout.margin?.t ?? 34) + 14,
+    height: (el.layout.height ?? 300) + 14,
+  }).then(() => el);
+}
+
+/** The legend must clear the x-axis title; the estimate in
+ *  applyPhoneLegend is text-width based, so correct it from the drawing. */
+function fitPhoneLegend(el) {
+  const title = el.querySelector('.g-xtitle');
+  const legend = el.querySelector('g.legend');
+  if (!title || !legend) return Promise.resolve(el);
+  const t = title.getBoundingClientRect();
+  const l = legend.getBoundingClientRect();
+  const encroach = t.bottom + 6 - l.top; // >0 means the legend sits too high
+  if (encroach <= 0) return Promise.resolve(el);
+  const plotH = (el.layout.height ?? 300) - (el.layout.margin?.t ?? 34) - (el.layout.margin?.b ?? 60);
+  if (plotH <= 0) return Promise.resolve(el);
+  return Plotly.relayout(el, {
+    'legend.y': (el.layout.legend?.y ?? -0.36) - encroach / plotH,
+    'margin.b': (el.layout.margin?.b ?? 60) + encroach,
+    height: (el.layout.height ?? 300) + encroach,
+  }).then(() => el);
 }
 
 function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX) {
@@ -2530,8 +2564,20 @@ function refitCharts() {
     const boxW = el.getBoundingClientRect().width;
     if (boxW <= 0) return;
     const svg = el.querySelector('svg.main-svg');
-    if (!svg || Math.abs(svg.getBoundingClientRect().width - boxW) > 2) Plotly.Plots.resize(el);
+    if (!svg || Math.abs(svg.getBoundingClientRect().width - boxW) > 2) {
+      Promise.resolve(Plotly.Plots.resize(el)).then(() => tunePhoneChart(el));
+    } else {
+      tunePhoneChart(el);
+    }
   });
+}
+
+/** Phone title/legend fitting, applied to a chart that is on screen NOW.
+ *  Charts drawn while their half of the mobile view was hidden could not
+ *  be measured at draw time, so this runs again whenever they surface. */
+function tunePhoneChart(el) {
+  if (window.innerWidth >= 640 || !el.data || el.offsetParent === null) return Promise.resolve(el);
+  return fitPhoneTitle(el).then(() => fitPhoneLegend(el));
 }
 
 function resizeVisibleCharts() {
