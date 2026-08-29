@@ -84,9 +84,36 @@ test('oil sensitivity endpoint: families with default sets', () => {
   });
   assert.equal(r.error, undefined);
   assert.equal(r.vlpFamily.length, 3);
-  assert.equal(r.iprFamily.length, 3);
-  close(r.iprFamily[0].j, 5.27146844059, 1e-9); // J_21 through the API
-  close(r.iprFamily[2].j, 6.78094220552862, 1e-9); // J_23
+  // the current-Pr reference curve leads, then the three future pressures.
+  // It is the curve the per-set solutions are solved against, so the chart
+  // cannot omit it.
+  assert.equal(r.iprFamily.length, 4);
+  assert.equal(r.iprFamily[0].isCurrent, true);
+  close(r.iprFamily[0].presPsi, 3550, 1e-9); // prPsi blank -> Pri
+  assert.ok(!r.iprFamily.slice(1).some((m) => m.isCurrent || m.isPri));
+  close(r.iprFamily[1].j, 5.27146844059, 1e-9); // J_21 through the API
+  close(r.iprFamily[3].j, 6.78094220552862, 1e-9); // J_23
+  // every set carries the solution the table lists and the chart marks
+  for (const m of r.vlpFamily) assert.ok(m.op ? m.op.qOilStbD > 0 : m.opStatus);
+});
+
+test('a depleted well shows BOTH current Pr and Pri as reference curves', () => {
+  const r = handlers['oil/sensitivity']({
+    ...OIL_FORM,
+    prPsi: '2800', // below Pri 3550
+    vlpSets: [{ label: 'VLP1', thpPsi: '400' }],
+    presList: [],
+  });
+  assert.equal(r.error, undefined);
+  const refs = r.iprFamily.filter((m) => m.isCurrent || m.isPri);
+  assert.equal(refs.length, 2);
+  close(refs[0].presPsi, 2800, 1e-9);
+  close(refs[1].presPsi, 3550, 1e-9);
+  // and only one when they coincide
+  const same = handlers['oil/sensitivity']({
+    ...OIL_FORM, vlpSets: [{ label: 'VLP1', thpPsi: '400' }], presList: [],
+  });
+  assert.equal(same.iprFamily.filter((m) => m.isCurrent || m.isPri).length, 1);
 });
 
 test('gas nodal endpoint (Darcy J mode) and calibrate (C&n from table)', () => {
@@ -126,7 +153,15 @@ test('gas sensitivity endpoint', () => {
   });
   assert.equal(r.error, undefined);
   assert.equal(r.vlpFamily.length, 2);
-  assert.equal(r.iprFamily.length, 2);
+  assert.equal(r.iprFamily.length, 3); // current Pr + the two future pressures
+  assert.equal(r.iprFamily[0].isCurrent, true);
+  // gas gained the per-set nodal solution the oil and water tabs already had
+  for (const m of r.vlpFamily) {
+    assert.ok(m.op, `${m.label} should solve: ${m.opStatus}`);
+    assert.ok(m.op.qMMscfd > 0 && m.op.pwfPsi > 0 && m.op.whtF > 0);
+  }
+  // a lower THP must produce a higher rate
+  assert.ok(r.vlpFamily[1].op.qMMscfd > r.vlpFamily[0].op.qMMscfd);
 });
 
 test('endpoints surface clean errors instead of NaN results', () => {

@@ -182,6 +182,37 @@ function oilDarcyAtPr(f, pvt, prPsi) {
   };
 }
 
+/**
+ * Reference IPR curves for a sensitivity chart: the CURRENT Pr — the one the
+ * per-set nodal solutions in the table are actually solved against — and Pri
+ * when the well is already depleted below it. Without these the chart showed
+ * only the reduced FUTURE pressures, so the solutions listed in the table had
+ * no curve to sit on and the reader could not see where they came from.
+ * curveAt(presPsi) returns the IPR curve at that pressure.
+ */
+function referenceIprs(ipr, curveAt) {
+  const prNow = ipr.prPsi;
+  const pri = ipr.priPsi ?? prNow;
+  const out = [
+    {
+      label: 'Pr=' + Math.round(prNow) + ' psi (current)',
+      presPsi: prNow,
+      j: ipr.j,
+      curve: curveAt(prNow),
+      isCurrent: true,
+    },
+  ];
+  if (Math.abs(pri - prNow) > 1)
+    out.push({
+      label: 'Pri=' + Math.round(pri) + ' psi',
+      presPsi: pri,
+      j: ipr.j,
+      curve: curveAt(pri),
+      isPri: true,
+    });
+  return out;
+}
+
 function buildOilIpr(f, cfg, pb) {
   const priPsi = num(f.priPsi);
   const prPsi = num(f.prPsi) ?? priPsi;
@@ -483,7 +514,7 @@ export function oilSensitivity(f) {
   const presList = (f.presList ?? []).map(num).filter((p) => p != null && p > 0);
   // water well: mu_w and Bw do not change with pressure, so the future J IS
   // the current J — no futureOilJ chain (that chain is oil PVT)
-  const iprFamily = water
+  const futureIprs = water
     ? (presList.length ? presList : [0.75, 0.5, 0.25].map((x) => ipr.prPsi * x)).map((p, i) => ({
         label: `Pres${i + 1}=${Math.round(p)} psi`,
         presPsi: p,
@@ -494,6 +525,16 @@ export function oilSensitivity(f) {
         presList: presList.length ? presList : undefined,
         wcPct: cfg.wcPct,
       }).map((m) => ({ label: m.label, presPsi: m.presPsi, j: m.j, curve: m.curve }));
+  // the current-Pr curve leads the family: every per-set solution below is
+  // solved against it, so it has to be on the chart
+  const iprFamily = [
+    ...referenceIprs(ipr, (p) =>
+      water
+        ? iprCurve(withCurrentPr(ipr, p), { wcPct: 0 })
+        : oilIprSensitivity(ipr, pvt, { presList: [p], wcPct: cfg.wcPct })[0].curve
+    ),
+    ...futureIprs,
+  ];
   // ESP wells: a frequency override must re-solve the coupled pump dP.
   // With a pump model that is the real ESP-coupled VLP; on manual dP (and
   // the water tab, whose ESP takes dP directly) the affinity law scales the
@@ -549,6 +590,17 @@ export function oilSensitivity(f) {
         whtF: march.whtF,
         whpPsi: pwfAtQGross(op.qOp / oilFracSet, ipr) - march.pwfPsi + setCfg.thpPsi,
       };
+      // A set that changes the WATER CUT has its own IPR *in oil-rate terms*
+      // (q_oil = q_gross * (1 - wc)), so its node does not lie on the base
+      // curve. Ship that set's own current-Pr IPR so the chart can show the
+      // node as the intersection of two drawn curves rather than a floating
+      // marker.
+      if (!water && marchOv.wcPct != null && Math.abs(marchOv.wcPct - cfg.wcPct) > 1e-9) {
+        m.iprCurve = oilIprSensitivity(ipr, pvt, {
+          presList: [ipr.prPsi],
+          wcPct: setCfg.wcPct,
+        })[0].curve;
+      }
       if (solve) {
         const cfgAt = { ...setCfg, esp: { ...setCfg.esp, pumpDpPsi: solve.dpPsi, tubingGasScfD: solve.tubingGasScfD } };
         m.esp = {
@@ -909,9 +961,39 @@ export function gasSensitivity(f) {
     return { label: s.label || `VLP${i + 1}`, overrides: o };
   });
   const presList = (f.presList ?? []).map(num).filter((p) => p != null && p > 0);
+  const gasVlpFamily = vlpSensitivityGas(cfg, sets, { rates });
+  // every VLP set gets its own nodal solution against the CURRENT IPR, the
+  // same contract the oil and water tabs already honoured
+  for (let i = 0; i < gasVlpFamily.length; i++) {
+    const m = gasVlpFamily[i];
+    const setCfg = mergeCfg(cfg, sets[i]?.overrides ?? {});
+    try {
+      const op = gasOperatingPoint(setCfg, ipr);
+      if (op.status !== 'ok') {
+        m.opStatus = op.status;
+        m.op = null;
+        continue;
+      }
+      const march = gasMarch({ ...setCfg, qGasMMscfd: op.qOp });
+      const pwfIpr = ipr.c != null ? pwfAtQGasCn(op.qOp, ipr) : pwfAtQGasJ(op.qOp, ipr);
+      m.opStatus = 'ok';
+      m.op = {
+        qMMscfd: op.qOp,
+        pwfPsi: op.pwfPsi,
+        whtF: march.whtF,
+        whpPsi: pwfIpr - march.pwfPsi + setCfg.thpPsi,
+      };
+    } catch (e) {
+      m.opStatus = e.message;
+      m.op = null;
+    }
+  }
   return {
-    vlpFamily: vlpSensitivityGas(cfg, sets, { rates }),
-    iprFamily: gasIprSensitivity(ipr, { presList: presList.length ? presList : undefined }),
+    vlpFamily: gasVlpFamily,
+    iprFamily: [
+      ...referenceIprs(ipr, (p) => gasIprSensitivity(ipr, { presList: [p] })[0].curve),
+      ...gasIprSensitivity(ipr, { presList: presList.length ? presList : undefined }),
+    ],
     // the sensitivity chart tops its pressure axis at the initial reservoir
     // pressure: nothing in a producing system can sit above it
     priPsi: ipr.priPsi ?? ipr.prPsi,

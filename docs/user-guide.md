@@ -286,6 +286,18 @@ preserved. Sensitivities remain single-layer.
 
 ---
 
+#### Sensitivity charts — what is drawn
+
+Every module (oil, water, gas) draws, in this order: the **current-Pr IPR**
+(heavy teal) — the curve the per-set solutions are actually solved against —
+then **Pri** when the well is depleted below it, then the future-pressure
+family, the VLP curve per set, and each set’s **solved node** as a diamond.
+A set that overrides the **water cut** also gets its own thin IPR: oil rate =
+gross × (1 − W.C), so it meets a different curve in rate terms and its node
+would otherwise appear to float. Beneath the chart, the **nodal solution per
+VLP set (at current Pr)** table lists rate, Pwf, WHP and WHT — the same
+numbers the diamonds mark.
+
 ## 3. Oil — Reserve estimate (Module 2)
 
 Select **Oil Well → Reserve estimate**. Well data, marches and the matched IPR come

@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-08-29s" />
+  <link rel="stylesheet" href="/style.css?v=2026-08-29w" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -390,7 +390,7 @@
       <div class="results">
         <div id="gas-summary" class="summary"></div>
         <div class="chartrow" id="gas-cr-nodal"><div id="gas-chart-nodal" class="chart"></div><div id="gas-table-nodal" class="datatable"></div></div>
-        <div id="gas-chart-sens" class="chart"></div>
+        <div class="chartrow stack" id="gas-cr-sens"><div id="gas-chart-sens" class="chart"></div><div id="gas-table-sens" class="datatable"></div></div>
         <div class="chartrow" id="gas-cr-whp"><div id="gas-chart-whp" class="chart"></div><div id="gas-table-whp" class="datatable"></div></div>
         <div class="chartrow" id="gas-cr-pz" style="display:none"><div id="gas-chart-pz" class="chart"></div><div id="gas-table-pz" class="datatable"></div></div>
         <div class="chartrow stack" id="gas-cr-fc" style="display:none"><div id="gas-chart-fc" class="chart"></div><div id="gas-table-fc" class="datatable"></div></div>
@@ -403,6 +403,6 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/app.js?v=2026-08-29s"></script>
+  <script src="/app.js?v=2026-08-29w"></script>
 </body>
 </html>

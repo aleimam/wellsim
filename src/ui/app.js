@@ -942,10 +942,10 @@ function plot(div, traces, layout) {
   return p.then((gd) => {
     const el = gd ?? (typeof div === 'string' ? document.getElementById(div) : div);
     if (!el || !el.layout || el.offsetParent === null) return el;
-    // the title must fit at ANY width — a narrow results column clips it on
-    // the desktop too; the legend repositioning is phone-only
-    if (window.innerWidth >= 640) return fitChartTitle(el);
-    return fitChartTitle(el).then(() => fitPhoneLegend(el));
+    // both must fit at ANY width: a narrow results column clips a long
+    // title, and a many-trace legend overruns the bottom margin. Both are
+    // no-ops when nothing overlaps.
+    return fitChartTitle(el).then(() => fitChartLegend(el));
   });
 }
 
@@ -979,9 +979,12 @@ function fitChartTitle(el) {
   }).then(() => el);
 }
 
-/** The legend must clear the x-axis title; the estimate in
- *  applyPhoneLegend is text-width based, so correct it from the drawing. */
-function fitPhoneLegend(el) {
+/** The legend must clear the x-axis title; the phone estimate in
+ *  applyPhoneLegend is text-width based, so correct it from the drawing.
+ *  Runs at EVERY width: the sensitivity charts now carry up to 13 traces,
+ *  whose legend wraps to three rows and overruns the desktop bottom margin
+ *  (a fixed 45px sized for one row). A no-op when nothing overlaps. */
+function fitChartLegend(el) {
   const title = el.querySelector('.g-xtitle');
   const legend = el.querySelector('g.legend');
   if (!title || !legend) return Promise.resolve(el);
@@ -1029,12 +1032,49 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
     return base ? `${base} ${lab}` : lab;
   };
   const traces = [];
-  iprFam.forEach((m, i) =>
+  // the reference curves (current Pr, and Pri when the well is depleted below
+  // it) are what the per-set solutions are solved against, so they lead the
+  // legend and are drawn solid and heavier than the future-pressure family
+  const refs = iprFam.filter((m) => m.isCurrent || m.isPri);
+  const future = iprFam.filter((m) => !m.isCurrent && !m.isPri);
+  refs.forEach((m) =>
+    traces.push({
+      x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi),
+      name: nameOf(iprName, m.label), mode: 'lines',
+      line: { color: m.isCurrent ? '#00636D' : '#7038b0', width: 3.5 },
+    })
+  );
+  future.forEach((m, i) =>
     traces.push({ x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi), name: nameOf(iprName, m.label), mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 2.5 } })
   );
   vlpFam.forEach((m, i) =>
     traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: nameOf(vlpName, m.label), mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
   );
+  // each set's NODAL SOLUTION against the current IPR — the same numbers the
+  // table lists. Without these the reader had to infer the intersection.
+  const opQ = opts.opQ;
+  // a set with its own water cut solves against its own IPR in rate terms —
+  // draw it thin, in the set's colour, so its node is a visible intersection
+  vlpFam.forEach((m, i) => {
+    if (!m.iprCurve) return;
+    traces.push({
+      x: m.iprCurve.map(iprX), y: m.iprCurve.map((p) => p.pwfPsi),
+      name: nameOf(iprName, `${m.label} @ Pr`), mode: 'lines',
+      line: { color: FAM_REDS[i % 3], width: 1.25 },
+    });
+  });
+  if (opQ) {
+    const solved = vlpFam.map((m, i) => ({ m, i })).filter(({ m }) => m.op && opQ(m.op) != null);
+    solved.forEach(({ m, i }) =>
+      traces.push({
+        x: [opQ(m.op)], y: [m.op.pwfPsi],
+        name: phone ? 'node' : `${m.label} node`,
+        showlegend: !phone || i === 0,
+        mode: 'markers',
+        marker: { symbol: 'diamond', size: 12, color: FAM_REDS[i % 3], line: { width: 1.5, color: '#0B1418' } },
+      })
+    );
+  }
   // the pressure axis tops out at Pri: in a producing system neither the
   // IPR nor the VLP can sit above the initial reservoir pressure, so a
   // fixed [0, Pri] scale makes the families comparable run to run
@@ -2075,7 +2115,7 @@ function renderSensResults(prefix, r, rateLabel) {
   const anyEsp = fam.some((m) => m.esp);
   const anyTrav = fam.some((m) => m.traverse);
   renderTables(`${prefix}-table-sens`, [{
-    title: 'Nodal solution per VLP set',
+    title: 'Nodal solution per VLP set (at current Pr)',
     headers: anyEsp
       ? ['set', rateLabel, 'Pwf psi', 'WHP psi', 'WHT °F', 'Hz', 'ΔP psi', 'head ft', 'Pint psi', 'Pdis psi', 'thrust']
       : ['set', rateLabel, 'Pwf psi', 'WHP psi', 'WHT °F'],
@@ -2161,7 +2201,7 @@ async function oilSens() {
   body.vlpSets = collectSens('oil', oilSensCols(), OIL_SENS_ROWS.length);
   body.presList = collectPres('oil', 3);
   const r = await api('oil/sensitivity', body);
-  plotSens('oil-chart-sens', 'Oil rate, stb/d', r.iprFamily, r.vlpFamily, (p) => p.qOilStbD, { priPsi: r.priPsi });
+  plotSens('oil-chart-sens', 'Oil rate, stb/d', r.iprFamily, r.vlpFamily, (p) => p.qOilStbD, { priPsi: r.priPsi, opQ: (o) => o.qOilStbD });
   renderSensResults('oil', r, 'q oil stb/d');
 }
 
@@ -2230,7 +2270,7 @@ async function waterSens() {
           vlpName: 'Available', vlpNameShort: 'Av',
           showBht: true,
         }
-      : { priPsi: r.priPsi }
+      : { priPsi: r.priPsi, opQ: (o) => o.qOilStbD }
   );
   if (inj) {
     // the injector has no producing node/pump: families + the injectivity grid
@@ -2614,12 +2654,31 @@ async function gasCalibrate() {
   }
 }
 
+/** Gas sensitivities: the nodal solution per VLP set, against the CURRENT
+ *  IPR — the same table the oil and water tabs show, and the same solutions
+ *  the diamond nodes mark on the chart. */
+function renderGasSensTable(r) {
+  const fam = r.vlpFamily ?? [];
+  const row = document.getElementById('gas-cr-sens');
+  if (row) row.style.display = '';
+  renderTables('gas-table-sens', [{
+    title: 'Nodal solution per VLP set (at current Pr)',
+    headers: ['set', 'q MMscf/d', 'Pwf psi', 'WHP psi', 'WHT °F'],
+    rows: fam.map((m) =>
+      m.op
+        ? [m.label, fmt(m.op.qMMscfd, 2), fmt(m.op.pwfPsi, 1), fmt(m.op.whpPsi, 1), fmt(m.op.whtF, 1)]
+        : [m.label, m.opStatus ?? '—', '—', '—', '—']
+    ),
+  }]);
+}
+
 async function gasSens() {
   const body = gasForm();
   body.vlpSets = collectSens('gas', GAS_SENS_COLS, GAS_SENS_ROWS.length);
   body.presList = collectPres('gas', 3);
   const r = await api('gas/sensitivity', body);
-  plotSens('gas-chart-sens', 'Gas rate, MMscf/d', r.iprFamily, r.vlpFamily, (p) => p.qMMscfd, { priPsi: r.priPsi });
+  plotSens('gas-chart-sens', 'Gas rate, MMscf/d', r.iprFamily, r.vlpFamily, (p) => p.qMMscfd, { priPsi: r.priPsi, opQ: (o) => o.qMMscfd });
+  renderGasSensTable(r);
 }
 
 // ---------- init ----------
@@ -2823,8 +2882,7 @@ function refitCharts() {
  *  be measured at draw time, so this runs again whenever they surface. */
 function tunePhoneChart(el) {
   if (!el.data || el.offsetParent === null) return Promise.resolve(el);
-  if (window.innerWidth >= 640) return fitChartTitle(el);
-  return fitChartTitle(el).then(() => fitPhoneLegend(el));
+  return fitChartTitle(el).then(() => fitChartLegend(el));
 }
 
 function resizeVisibleCharts() {
