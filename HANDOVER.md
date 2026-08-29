@@ -2,7 +2,7 @@
 
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
-**As of:** 30 August 2026 — commit `6cea1f2`, asset stamp `2026-08-30k`,
+**As of:** 30 August 2026 — commit `c6f1caa`, asset stamp `2026-08-30k`,
 210 tests passing, 43/43 validation sweep.
 
 ---
