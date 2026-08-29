@@ -941,19 +941,23 @@ function applyPhoneLegend(layout, traces) {
  */
 function plot(div, traces, layout) {
   const p = Plotly.newPlot(div, traces, applyPhoneLegend(layout, traces), PLOT_CFG());
-  if (window.innerWidth >= 640) return p;
   return p.then((gd) => {
     const el = gd ?? (typeof div === 'string' ? document.getElementById(div) : div);
     if (!el || !el.layout || el.offsetParent === null) return el;
-    return fitPhoneTitle(el).then(() => fitPhoneLegend(el));
+    // the title must fit at ANY width — a narrow results column clips it on
+    // the desktop too; the legend repositioning is phone-only
+    if (window.innerWidth >= 640) return fitChartTitle(el);
+    return fitChartTitle(el).then(() => fitPhoneLegend(el));
   });
 }
 
 /** Keep the chart title inside the canvas: shrink it to fit, and if that
  *  would take it below readable size, wrap it onto a second line instead.
+ *  Runs at every width — a narrow results column clips a long title on the
+ *  desktop just as a phone does; it is a no-op when the title already fits.
  *  (The ESP pump-curve title carries the pump name, stage count and wear,
  *  which overran a phone canvas by 12 px at the default size.) */
-function fitPhoneTitle(el) {
+function fitChartTitle(el) {
   const node = el.querySelector('.gtitle');
   const svg = el.querySelector('svg.main-svg');
   if (!node || !svg) return Promise.resolve(el);
@@ -2439,7 +2443,9 @@ async function gasReserveRun() {
   }
   plot('gas-chart-pz', traces, {
     ...LAYOUT(),
-    title: `p/Z vs Gp — minimum connected GIIP (${r.mode === 'sithp' ? 'SITHP' : r.mode === 'gauge' ? 'gauge Pr' : 'prod data'} selection)`,
+    // the selection is already named by the legend trace, so the title does
+    // not repeat it — it overran the chart canvas on a narrow results column
+    title: 'p/Z vs Gp — minimum connected GIIP',
     xaxis: { title: 'Gp, Bscf', rangemode: 'tozero' },
     yaxis: { title: 'p/Z, psi', rangemode: 'tozero' },
   });
@@ -2811,12 +2817,14 @@ function refitCharts() {
   });
 }
 
-/** Phone title/legend fitting, applied to a chart that is on screen NOW.
+/** Title (any width) and legend (phone) fitting, applied to a chart that
+ *  is on screen NOW.
  *  Charts drawn while their half of the mobile view was hidden could not
  *  be measured at draw time, so this runs again whenever they surface. */
 function tunePhoneChart(el) {
-  if (window.innerWidth >= 640 || !el.data || el.offsetParent === null) return Promise.resolve(el);
-  return fitPhoneTitle(el).then(() => fitPhoneLegend(el));
+  if (!el.data || el.offsetParent === null) return Promise.resolve(el);
+  if (window.innerWidth >= 640) return fitChartTitle(el);
+  return fitChartTitle(el).then(() => fitPhoneLegend(el));
 }
 
 function resizeVisibleCharts() {
