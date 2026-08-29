@@ -1564,50 +1564,6 @@ export function oilEsp(f) {
   };
 }
 
-/** ESP Pres sensitivity: each future Pres gets the Darcy future J, then a
- *  FULL coupled ESP solve — the solved node and the ESP data at that node. */
-export function oilEspSens(f) {
-  const cfg = buildOilCfg(f);
-  const pb = oilPb(f, cfg);
-  const ipr = buildOilIpr(f, cfg, pb);
-  const bp = buildEspPump(f);
-  if (bp.error) return bp;
-  if (!bp.pump) return { error: 'select a pump first' };
-  const opts = espOpts(f);
-  const pvt = oilPvtBundle(cfg, pb);
-  const rsCur = solutionGorScfStb(ipr.prPsi, pvt);
-  const presList = (f.presList ?? []).map(num).filter((p) => p != null && p > 0);
-  const list = presList.length ? presList : [0.9, 0.8, 0.7].map((x) => ipr.prPsi * x);
-  const cases = list.map((presPsi, i) => {
-    const fj = futureOilJ(presPsi, { darcy: ipr.darcy, pvt, rsCurScfStb: rsCur });
-    const rec = { ...withCurrentPr(ipr, presPsi), j: fj.j, jDarcy: fj.j, jSource: 'darcy' };
-    const op = espOperatingPoint(cfg, rec, bp.pump, opts);
-    return {
-      label: `Pres${i + 1}=${Math.round(presPsi)} psi`,
-      presPsi,
-      j: fj.j,
-      iprCurve: iprCurve(rec, { wcPct: cfg.wcPct }),
-      opStatus: op.status,
-      op:
-        op.status === 'ok'
-          ? {
-              qOilStbD: op.qOilStbD,
-              pwfPsi: op.pwfTraversePsi,
-              pintPsi: op.pintTraversePsi,
-              pdisPsi: op.pdisPsi,
-              dpPsi: op.dpPsi,
-              headFt: op.headFt,
-              whtF: op.whtF,
-              freeGasPct: op.state.freeGasPct,
-              qGrossPumpBpd: op.state.qGrossPumpBpd,
-              gradPsiFt: op.state.gradPsiFt,
-              thrust: op.thrust.status,
-            }
-          : null,
-    };
-  });
-  return { cases, pump: { name: bp.pump.name }, opts, basePrPsi: ipr.prPsi };
-}
 
 /** First run: match the stage count of the selected pump (new pump, wear 0). */
 export function oilEspStages(f) {
@@ -1682,7 +1638,6 @@ export const handlers = {
   'oil/esp': oilEsp,
   'oil/espstages': oilEspStages,
   'oil/espwear': oilEspWear,
-  'oil/espsens': oilEspSens,
   'gas/nodal': gasNodal,
   'gas/calibrate': gasCalibrate,
   'gas/sensitivity': gasSensitivity,

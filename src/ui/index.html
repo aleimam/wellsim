@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-08-29y" />
+  <link rel="stylesheet" href="/style.css?v=2026-08-30b" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -114,14 +114,6 @@
             <div id="oil-esp-matchrow" style="display:none">
               <button id="oil-btn-espstages" class="action secondary">Match stages (new pump, wear 0)</button>
               <button id="oil-btn-espwear" class="action secondary">Match wear + PI (measured Pint/Pdis)</button>
-              <div class="senshead">ESP view (one active)</div>
-              <label class="radio"><input type="radio" name="oil-esptab" value="match" checked /> Model match</label>
-              <label class="radio"><input type="radio" name="oil-esptab" value="sens" /> Sensitivity</label>
-              <div id="oil-espsens-inputs" style="display:none">
-                <div class="senshead">Future reservoir pressures, psi (future J via Darcy; each case fully solved)</div>
-                <div id="oil-esppres-list" class="presrow"></div>
-                <button id="oil-btn-espsens" class="action secondary">Run Pres sensitivity (ESP)</button>
-              </div>
             </div>
             <div id="oil-esp-result" class="note"></div>
           </fieldset>
@@ -209,7 +201,6 @@
         <div class="chartrow" id="oil-cr-rsv2" style="display:none"><div id="oil-chart-rsv2" class="chart"></div><div id="oil-table-rsv2" class="datatable"></div></div>
         <div class="chartrow stack" id="oil-cr-fc" style="display:none"><div id="oil-chart-fc" class="chart"></div><div id="oil-table-fc" class="datatable"></div></div>
         <div class="chartrow" id="oil-cr-esptrav" style="display:none"><div id="oil-chart-esptrav" class="chart"></div><div id="oil-table-esptrav" class="datatable"></div></div>
-        <div class="chartrow stack" id="oil-cr-espsens" style="display:none"><div id="oil-chart-espsens" class="chart"></div><div id="oil-table-espsens" class="datatable"></div></div>
       </div>
     </section>
 
@@ -403,6 +394,6 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/app.js?v=2026-08-29y"></script>
+  <script src="/app.js?v=2026-08-30b"></script>
 </body>
 </html>

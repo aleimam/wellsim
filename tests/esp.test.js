@@ -130,8 +130,8 @@ test('design floor caps the stage count when the match would starve the intake',
   assert.ok(m.intakePsi >= 1500 - 2, `intake=${m.intakePsi}`);
 });
 
-test('ESP API: final charts and the Pres-sensitivity cases with solved nodes', async () => {
-  const { oilEsp, oilEspSens } = await import('../src/server/api.js');
+test('ESP API: final charts, and ESP sets solved through the MAIN sensitivity', async () => {
+  const { oilEsp, oilSensitivity } = await import('../src/server/api.js');
   const F = {
     thpPsi: 160, qOilStbD: 2565, wcPct: 5, gorScfStb: 384, api: 32,
     gasSg: 0.812, rsiScfStb: 384, tresF: 230, oilViscCp: 6, waterSg: 1.05,
@@ -146,19 +146,32 @@ test('ESP API: final charts and the Pres-sensitivity cases with solved nodes', a
   assert.ok(!r.error, r.error);
   assert.ok(r.iprCurve.length > 5 && r.vlpCurve.length > 5 && r.whpCurve.length > 5);
   assert.ok(r.op.designFloor.ok, 'demo intake clears the 300 psi floor');
-  const s = oilEspSens({ ...F, presList: [2400, 2100] });
+  // The ESP-only Pres sensitivity was removed; the main VLP/IPR sensitivity
+  // is the single place ESP cases are run. It solves each VLP set against the
+  // CURRENT Pr with the coupled pump, and draws the future-pressure IPRs.
+  const s = oilSensitivity({
+    ...F,
+    presList: [2400, 2100],
+    vlpSets: [
+      { label: 'VLP1', freqHz: '50' },
+      { label: 'VLP2', freqHz: '55' },
+    ],
+  });
   assert.ok(!s.error, s.error);
-  assert.equal(s.cases.length, 2);
-  for (const c of s.cases) {
-    assert.ok(c.j > 0);
-    if (c.op) {
-      assert.ok(c.op.qOilStbD > 0 && c.op.pintPsi > 0 && c.op.dpPsi > 0);
-      assert.ok(c.op.pdisPsi > c.op.pintPsi);
-    }
+  // current-Pr reference curve leads, then the two future pressures
+  assert.equal(s.iprFamily[0].isCurrent, true);
+  assert.equal(s.iprFamily.length, 3);
+  for (const m of s.iprFamily) assert.ok(m.j > 0 && m.curve.length > 5);
+  // every ESP set solves, with real pump state at its node
+  assert.equal(s.vlpFamily.length, 2);
+  for (const m of s.vlpFamily) {
+    assert.ok(m.op, `${m.label}: ${m.opStatus}`);
+    assert.ok(m.op.qOilStbD > 0 && m.op.pwfPsi > 0);
+    assert.ok(m.esp.dpPsi > 0 && m.esp.dischargePsi > m.esp.intakePsi);
+    assert.ok(m.esp.point && m.esp.point.stages > 0);
   }
-  // lower Pres -> lower solved rate
-  const ok = s.cases.filter((c) => c.op);
-  if (ok.length === 2) assert.ok(ok[1].op.qOilStbD < ok[0].op.qOilStbD);
+  // a higher frequency lifts more: affinity head goes as (f/f0)^2
+  assert.ok(s.vlpFamily[1].op.qOilStbD > s.vlpFamily[0].op.qOilStbD);
 });
 
 test('manual-dP ESP nodal returns the traverse with the dP step at pump depth', async () => {

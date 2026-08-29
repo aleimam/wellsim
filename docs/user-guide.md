@@ -248,16 +248,16 @@ inputs are required; there is no input THT.
    matched K carries it into the Darcy record). Validation: from the demo
    well's measured gauges the solver recovers the workbook's PI input
    (2.698 vs 2.7).
-   **Two ESP views** (radio under the ESP inputs): *Model match* shows the
-   final charts — IPR vs the coupled ESP-VLP nodal plot, wellhead PQ & WHT,
-   the PumpCurve with the results block beside it, and the Traverse on its
-   own row with the measured Pint/Pdis markers. The Traverse also draws in
-   **Manual ΔP** mode, where your input ΔP appears as the highlighted
-   pressure step at pump depth merged into the march. *Sensitivity* runs
-   future-Pres cases (Darcy future-J chain), each fully solved: the chart
-   overlays every case's IPR with its solved node starred, and the table
-   lists the ESP data at each node (rate, Pwf, Pint, Pdis, ΔP, head,
-   Qg@pump, gradient, free gas %, WHT, thrust window).
+   Solving an ESP well draws the final charts — IPR vs the coupled ESP-VLP
+   nodal plot, wellhead PQ & WHT, the PumpCurve with the results block beside
+   it, and the Traverse on its own row with the measured Pint/Pdis markers.
+   The Traverse also draws in **Manual ΔP** mode, where your input ΔP appears
+   as the highlighted pressure step at pump depth merged into the march.
+   ESP cases are run from the **main VLP/IPR sensitivity block** (§ the
+   sensitivity charts above) — one place for every fluid and lift type. Its
+   VLP sets take an ESP **frequency** column, each set gets the real coupled
+   pump solve at its own frequency, and the results carry the pump curve per
+   set, the traverse per set and the full pump state at each solved node.
 
 ### Multi-layer IPR (optional, oil & gas well models)
 

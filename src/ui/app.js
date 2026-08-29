@@ -1203,6 +1203,11 @@ function switchLift() {
   if (t !== 'esp')
     for (const id of ['oil-cr-senspump', 'oil-cr-senstrav'])
       document.getElementById(id).style.display = 'none';
+  if (t !== 'esp') document.getElementById('oil-cr-esptrav').style.display = 'none';
+  // shared gas-lift / ESP-pump-curve row (see switchOilModule)
+  const gl = document.getElementById('oil-cr-gl');
+  const wellModule = document.querySelector('input[name="oil-module"]:checked')?.value === 'well';
+  if (gl && wellModule) gl.style.display = t === 'natural' ? 'none' : '';
   refreshOilSens();
   // per-lift GOR default: ESP wells 300, natural/gas-lift 5000 — swap only
   // while the field still holds the other type's default (user values kept)
@@ -1241,17 +1246,6 @@ function switchWaterEspPump() {
 }
 
 // ---- ESP view: Model match (final charts) | Sensitivity (Pres cases) ----
-const espTab = () => document.querySelector('input[name="oil-esptab"]:checked')?.value ?? 'match';
-
-function switchEspTab() {
-  const sens = espTab() === 'sens';
-  document.getElementById('oil-espsens-inputs').style.display = sens ? '' : 'none';
-  if (oilLiftType() !== 'esp' || espPumpMode() === 'manual') return;
-  for (const id of ['oil-cr-nodal', 'oil-cr-gl', 'oil-cr-whp', 'oil-cr-esptrav'])
-    document.getElementById(id).style.display = sens ? 'none' : '';
-  document.getElementById('oil-cr-espsens').style.display = sens ? '' : 'none';
-  resizeVisibleCharts();
-}
 
 /** Fill the oil and water pump selectors from the shared 68-pump database
  *  (the water tab has no custom-curve builder, so no "add new" option). */
@@ -1452,13 +1446,18 @@ function switchOilModule() {
   document.getElementById('oil-mod-reserve').style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('oil-mod-forecast').style.display = m === 'forecast' ? '' : 'none';
   document.getElementById('panel-oil').classList.toggle('mode-reserve', m === 'reserve');
-  for (const id of ['oil-summary', 'oil-cr-nodal', 'oil-cr-gl', 'oil-cr-sens', 'oil-cr-whp'])
+  for (const id of ['oil-summary', 'oil-cr-nodal', 'oil-cr-sens', 'oil-cr-whp'])
     document.getElementById(id).style.display = m === 'well' ? '' : 'none';
+  // the gas-lift row is SHARED with the ESP pump curve, so it belongs to those
+  // two lifts only — left always-on it showed a natural-flow well the pump
+  // curve of the ESP run before it
+  document.getElementById('oil-cr-gl').style.display =
+    m === 'well' && oilLiftType() !== 'natural' ? '' : 'none';
   for (const id of ['oil-cr-rsv1', 'oil-cr-rsv2'])
     document.getElementById(id).style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('oil-cr-fc').style.display = m === 'forecast' ? '' : 'none';
   if (m !== 'well') {
-    for (const id of ['oil-cr-esptrav', 'oil-cr-espsens', 'oil-cr-senspump', 'oil-cr-senstrav'])
+    for (const id of ['oil-cr-esptrav', 'oil-cr-senspump', 'oil-cr-senstrav'])
       document.getElementById(id).style.display = 'none';
   }
   resizeVisibleCharts();
@@ -1746,7 +1745,6 @@ async function liquidSolve(c) {
   // ESP-only chart rows: manual-dP ESP shows the traverse (the input dP is
   // merged into the march at the pump depth); natural/gas-lift hide it
   if (c.prefix === 'oil') {
-    document.getElementById('oil-cr-espsens').style.display = 'none';
     if (r.espTraverse) {
       const t = r.espTraverse;
       plot('oil-chart-esptrav', [
@@ -1872,48 +1870,11 @@ async function espRun() {
     title: 'Traverse', headers: ['TVD ft', 'P psi'],
     rows: op.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
   }]);
-  // show the model-match rows
-  const mr = document.querySelector('input[name="oil-esptab"][value="match"]');
-  if (mr) mr.checked = true;
-  switchEspTab();
+  // the row starts hidden (it belongs to ESP only), so the function that
+  // draws into it reveals it — it used to rely on the ESP view switcher
+  document.getElementById('oil-cr-esptrav').style.display = '';
 }
 
-async function espSensRun() {
-  const body = oilForm();
-  body.presList = collectPres('oil-esp', 3);
-  const r = await api('oil/espsens', body);
-  const traces = [];
-  r.cases.forEach((c, i) => {
-    traces.push({
-      x: c.iprCurve.map((p) => p.qOilStbD), y: c.iprCurve.map((p) => p.pwfPsi),
-      name: `IPR ${c.label}`, mode: 'lines', line: { width: 2 },
-    });
-    if (c.op) {
-      traces.push({
-        x: [c.op.qOilStbD], y: [c.op.pwfPsi], name: `node ${c.label}`, mode: 'markers',
-        marker: { symbol: 'star', size: 14 },
-      });
-    }
-  });
-  plot('oil-chart-espsens', traces, {
-    ...LAYOUT(),
-    title: `ESP Pres sensitivity — ${r.pump.name}, ${r.opts.stages} stages @ ${r.opts.freqHz} Hz (solved nodes)`,
-    xaxis: { title: 'Oil rate, stb/d', rangemode: 'tozero' },
-    yaxis: { title: 'Pwf, psi', rangemode: 'tozero' },
-  });
-  mobileShowResults();
-  renderTables('oil-table-espsens', [{
-    title: 'ESP data at the solved node',
-    headers: ['case', 'J', 'q stb/d', 'Pwf', 'Pint', 'Pdis', 'ΔP', 'head ft', 'Qg@pump', 'grad', 'free gas %', 'WHT °F', 'thrust'],
-    rows: r.cases.map((c) =>
-      c.op
-        ? [c.label, fmt(c.j, 3), fmt(c.op.qOilStbD, 0), fmt(c.op.pwfPsi, 0), fmt(c.op.pintPsi, 0), fmt(c.op.pdisPsi, 0), fmt(c.op.dpPsi, 0), fmt(c.op.headFt, 0), fmt(c.op.qGrossPumpBpd, 0), fmt(c.op.gradPsiFt, 4), fmt(c.op.freeGasPct, 1), fmt(c.op.whtF, 1), c.op.thrust]
-        : [c.label, fmt(c.j, 3), c.opStatus, '—', '—', '—', '—', '—', '—', '—', '—', '—', '—']),
-  }]);
-  const sr = document.querySelector('input[name="oil-esptab"][value="sens"]');
-  if (sr) sr.checked = true;
-  switchEspTab();
-}
 
 async function espStagesRun() {
   const r = await api('oil/espstages', oilForm());
@@ -2760,7 +2721,6 @@ function applyCase(c) {
   switchMl('oil');
   switchMl('gas');
   switchEspPump();
-  switchEspTab();
   switchWaterType();
   switchWaterLift();
   switchGasModule();
@@ -2954,9 +2914,6 @@ renderFieldRow('oil-esp-manual-fields', 'oil', OIL_ESP_MANUAL_FIELDS);
 renderGridTable('oil-espcurve-table', 'oil-espcurve', ESP_CURVE_COLS, ESP_CURVE_ROWS);
 document.getElementById('oil-espPumpSel').onchange = switchEspPump;
 loadEspPumps();
-renderPresList('oil-esppres-list', 'oil-esp', [2400, 2100, 1800]);
-document.querySelectorAll('input[name="oil-esptab"]').forEach((r) => (r.onchange = switchEspTab));
-document.getElementById('oil-btn-espsens').onclick = guard(espSensRun);
 refreshOilSens();
 renderPresList('oil-pres-list', 'oil', [2662.5, 1775, 887.5]);
 document.querySelectorAll('input[name="oil-lift"]').forEach((r) => (r.onchange = switchLift));
