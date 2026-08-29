@@ -4,7 +4,6 @@
 const OIL_SCHEMA = [
   { title: 'Well & flow', fields: [
     ['thpPsi', 'FTHP', 'psi', 700],
-    ['qOilStbD', 'Current oil rate', 'stb/d', 2100],
     ['wcPct', 'Water cut', '%', 50],
     ['gorScfStb', 'GOR', 'scf/stb', 5000],
     ['tubingIdIn', 'Tubing ID', 'in', 2.992],
@@ -68,7 +67,6 @@ const OIL_FC_FIELDS = [
 const WATER_SCHEMA = [
   { title: 'Well & flow', fields: [
     ['thpPsi', 'FTHP', 'psi', 200],
-    ['qOilStbD', 'Water rate', 'bbl/d', 2000],
     ['tubingIdIn', 'Tubing ID', 'in', 2.992],
     ['roughness', 'Roughness', '-', 0.00006],
   ]},
@@ -202,7 +200,6 @@ const OIL_TEST_FIELDS = [
 const GAS_SCHEMA = [
   { title: 'Well & flow', fields: [
     ['thpPsi', 'FTHP', 'psi', 1625],
-    ['qGasMMscfd', 'Current gas rate', 'MMscf/d', 14.137],
     ['cgrStbMMscf', 'CGR', 'stb/MMscf', 57.4358974],
     ['wgrStbMMscf', 'WGR', 'stb/MMscf', 3.8461538],
     ['tubingIdIn', 'Tubing ID', 'in', 2.992],
@@ -1343,7 +1340,6 @@ function switchWaterType() {
     if (l) l.textContent = txt;
   };
   relabel('water-thpPsi', inj ? 'Injection THP' : 'FTHP');
-  relabel('water-qOilStbD', inj ? 'Injection rate' : 'Water rate');
   // per-type THP default: producer 200 psi, injector 2000 psi — swap only
   // while the field still holds the other type's default (user values kept)
   for (const id of ['water-thpPsi', 'water-testThpPsi']) {

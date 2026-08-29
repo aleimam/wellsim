@@ -286,3 +286,45 @@ test('skin guidance endpoint', () => {
   const r = handlers['skin-guidance']();
   assert.ok(r.guidance.length >= 10);
 });
+
+// The 'current rate' input was removed from all three fluids: the well model
+// SOLVES for the rate, so nothing may depend on a typed one. This pins that —
+// the ESP back-traverse used to march at cfg's rate, which meant the traverse
+// below the pump was drawn at whatever the user had typed instead of at the
+// operating rate.
+test('current rate is not an input: results are identical whatever is passed', async () => {
+  const strip = (f) => { const c = { ...f }; delete c.qOilStbD; delete c.qGasMMscfd; return c; };
+  const cases = [
+    ['oil natural', 'oil/nodal', { ...OIL_FORM, liftType: 'natural' }, 'qOilStbD'],
+    ['oil ESP', 'oil/nodal', {
+      ...OIL_FORM, liftType: 'esp', espPumpMode: 'db', espPumpName: 'ESP B 538-3600',
+      espStages: '145', espFreqHz: '50', espSepEffPct: '95', pumpAhM: '2993.08',
+      espRefFreqHz: '60', espMinIntakePsi: '300',
+    }, 'qOilStbD'],
+  ];
+  for (const [label, route, form, key] of cases) {
+    const bare = strip(form);
+    const base = JSON.stringify(handlers[route](bare));
+    for (const v of ['2100', '50000', '1']) {
+      const got = JSON.stringify(handlers[route]({ ...bare, [key]: v }));
+      assert.equal(got, base, `${label}: passing ${key}=${v} changed the result`);
+    }
+  }
+});
+
+test('ESP back-traverse is marched at the SOLVED rate', async () => {
+  const form = {
+    ...OIL_FORM, liftType: 'esp', espPumpMode: 'db', espPumpName: 'ESP B 538-3600',
+    espStages: '145', espFreqHz: '50', espSepEffPct: '95', pumpAhM: '2993.08',
+    espRefFreqHz: '60', espMinIntakePsi: '300',
+  };
+  delete form.qOilStbD;
+  const r = handlers['oil/nodal'](form);
+  assert.ok(r.op && r.op.qOilStbD > 0, 'needs an operating point');
+  const back = r.espTraverse.backStations;
+  assert.ok(back.length >= 2, 'back-march should have stations');
+  // marched from the perfs upward: pressure falls as TVD decreases
+  const deep = back[back.length - 1], shallow = back[0];
+  assert.ok(deep.tvdFt >= shallow.tvdFt, 'stations run shallow -> deep');
+  assert.ok(deep.pPsi > shallow.pPsi, 'pressure must rise with depth');
+});

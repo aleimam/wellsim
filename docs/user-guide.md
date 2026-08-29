@@ -110,7 +110,6 @@ Chen above.
 | Group | Field | Default |
 |---|---|---|
 | Well & flow | FTHP | 700 psi |
-| | Current oil rate | 2100 stb/d |
 | | Water cut | 50 % |
 | | GOR | 5000 scf/stb |
 | | Tubing ID | 2.992 in |

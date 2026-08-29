@@ -104,6 +104,8 @@ function buildOilCfg(f) {
     perfTvdM({ topPerfAhM: num(f.topPerfAhM), devStartM: num(f.devStartM) ?? 0, devAngleDeg: num(f.devAngleDeg) ?? 0 });
   const cfg = {
     thpPsi: num(f.thpPsi),
+    // placeholder only: the marches validate rate > 0, and every caller
+    // passes its own rate ({ ...cfg, qOilStbD: q }). Not a user input.
     qOilStbD: num(f.qOilStbD) ?? 1000,
     gorScfStb: num(f.gorScfStb),
     wcPct: num(f.wcPct),
@@ -332,7 +334,12 @@ export function oilNodal(f) {
     : null;
   const opMarch = op.status === 'ok' ? (opSolve ? opSolve.march : oilMarch({ ...cfg, qOilStbD: op.qOp })) : null;
   const espDpPsi = opSolve ? opSolve.dpPsi : cfg.esp?.pumpDpPsi;
-  const espCfgAtOp = opSolve ? { ...cfg, esp: { ...cfg.esp, pumpDpPsi: opSolve.dpPsi, tubingGasScfD: opSolve.tubingGasScfD } } : cfg;
+  const espCfgAtOp =
+    op.status === 'ok'
+      ? opSolve
+        ? { ...cfg, qOilStbD: op.qOp, esp: { ...cfg.esp, pumpDpPsi: opSolve.dpPsi, tubingGasScfD: opSolve.tubingGasScfD } }
+        : { ...cfg, qOilStbD: op.qOp }
+      : cfg;
   return {
     pbPsi: pb,
     computed: { pbPsi: pb, prPsi: ipr.prPsi, perfTvdM: cfg.perfTvdM },
@@ -559,7 +566,7 @@ export function oilSensitivity(f) {
         m.pumpCurve = { freqHz: setOpts.freqHz, points: pumpCurveAt(espPumpS.pump, setOpts) };
         m.traverse = {
           stations: march.stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
-          backStations: espBackMarch(cfgAt, op.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
+          backStations: espBackMarch({ ...cfgAt, qOilStbD: op.qOp }, op.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
           pumpTvdFt: espPumpTvdM(setCfg) * 3.281,
           dpPsi: solve.dpPsi,
           intakePsi: march.intakePsi,
@@ -569,7 +576,7 @@ export function oilSensitivity(f) {
         // manual-dP ESP: the traverse still shows the input dP at pump depth
         m.traverse = {
           stations: march.stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
-          backStations: espBackMarch(setCfg, op.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
+          backStations: espBackMarch({ ...setCfg, qOilStbD: op.qOp }, op.pwfPsi).stations.map((s) => ({ tvdFt: s.tvdFt, pPsi: s.pPsi })),
           pumpTvdFt: espPumpTvdM(setCfg) * 3.281,
           dpPsi: setCfg.esp.pumpDpPsi,
           intakePsi: march.intakePsi,
@@ -685,6 +692,7 @@ function buildGasCfg(f) {
     perfTvdM({ topPerfAhM: num(f.topPerfAhM), devStartM: num(f.devStartM) ?? 0, devAngleDeg: num(f.devAngleDeg) ?? 0 });
   return {
     thpPsi: num(f.thpPsi),
+    // placeholder only — see the note in buildOilCfg
     qGasMMscfd: num(f.qGasMMscfd) ?? 10,
     cgrStbMMscf: num(f.cgrStbMMscf),
     wgrStbMMscf: num(f.wgrStbMMscf),
@@ -1536,7 +1544,7 @@ export function oilEspStages(f) {
   const bp = buildEspPump(f);
   if (bp.error) return bp;
   if (!bp.pump) return { error: 'select a pump first' };
-  const q = num(f.testQOilStbD) ?? num(f.qOilStbD);
+  const q = num(f.testQOilStbD);
   if (!(q > 0)) return { error: 'enter a test oil rate' };
   try {
     const m = matchStages(cfg, ipr, bp.pump, {
@@ -1572,7 +1580,7 @@ export function oilEspWear(f) {
       sepEffPct: opts.sepEffPct,
       measPintPsi: pint,
       measPdisPsi: pdis,
-      qOilStbD: num(f.testQOilStbD) ?? num(f.qOilStbD),
+      qOilStbD: num(f.testQOilStbD),
     });
     const pvt = oilPvtBundle(cfg, pb);
     const darcy = oilDarcyAtPr(f, pvt, ipr.prPsi);

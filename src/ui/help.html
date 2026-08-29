@@ -219,6 +219,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 <ul>
   <li><b>Selection modules</b>: where the workbook had parallel sheets, one radio selection is active and the rest hide (lift type, IPR basis, module, reserve pressure-source).</li>
   <li><b>Side tables</b> beside each chart hold the plotted numbers with a Copy button (tab-separated, pastes into Excel).</li>
+  <li><b>There is no current-rate input.</b> The well model SOLVES for the rate &mdash; the operating point is the IPR/VLP intersection &mdash; so a typed rate would either be ignored or quietly contradict the answer. Rates are entered only where they are genuine data: the calibration <b>test rate</b>, the prod-data table, and the ESP/gas-lift matches.</li>
   <li><b>Production tables</b> accept clipboard paste (button or Ctrl+V in a cell); column order <code>Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf</code>; header lines auto-skip; up to 200 rows.</li>
   <li><b>Dates</b>: <code>17-Nov-14</code>, <code>17-Nov-2014 13:00:00</code>, <code>05/03/2014 06:30</code>, ISO, or a day serial. Impossible dates are rejected with the row number &mdash; nothing silently rolls over. dt = days from the first row; time-of-day honoured.</li>
   <li><b>Header bar</b> (final layout): the Oil Well | Water Well | Gas Well tabs, then <b>Save as</b> &middot; <b>Open</b> &middot; <b>Print report</b> &middot; <b>Sign in</b> &middot; <b>Help</b>.</li>
@@ -238,7 +239,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 <h4>Defaults</h4>
 <div class="tblwrap"><table>
 <tr><th>Group</th><th>Fields (default)</th></tr>
-<tr><td>Well &amp; flow</td><td class="num">FTHP 700 psi &middot; rate 2100 stb/d &middot; WC 50% &middot; GOR 5000 scf/stb &middot; ID 2.992 in &middot; roughness 0.00006</td></tr>
+<tr><td>Well &amp; flow</td><td class="num">FTHP 700 psi &middot; WC 50% &middot; GOR 5000 scf/stb &middot; ID 2.992 in &middot; roughness 0.00006</td></tr>
 <tr><td>Trajectory</td><td class="num">top perf 2810 mAH &middot; kick-off 1910 m &middot; deviation 7&deg;</td></tr>
 <tr><td>Fluids &amp; PVT</td><td class="num">46 API &middot; &gamma;g 0.842 &middot; Rsi 700 scf/stb &middot; Tres 201&deg;F &middot; &mu; tubing 6 cp &middot; water SG 1.05 &middot; Pb blank = calc</td></tr>
 <tr><td>Heat transfer</td><td class="num">soil 90&deg;F &middot; U 3 BTU/hr&middot;ft&sup2;&middot;&deg;F &middot; OD 3.5 in &middot; Cp 0.51</td></tr>
@@ -279,7 +280,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 <h4>Defaults</h4>
 <div class="tblwrap"><table>
 <tr><th>Group</th><th>Fields (default)</th></tr>
-<tr><td>Well &amp; flow</td><td class="num">FTHP 1625 psi &middot; 14.137 MMscf/d &middot; CGR 57.436 &middot; WGR 3.846 stb/MMscf &middot; ID 2.992 in &middot; base roughness 0.0021 in</td></tr>
+<tr><td>Well &amp; flow</td><td class="num">FTHP 1625 psi &middot; CGR 57.436 &middot; WGR 3.846 stb/MMscf &middot; ID 2.992 in &middot; base roughness 0.0021 in</td></tr>
 <tr><td>Trajectory</td><td class="num">top perf 3013 mAH &middot; kick-off 690 m &middot; deviation 23.65&deg;</td></tr>
 <tr><td>Fluids &amp; PVT</td><td class="num">cond. 48.7 API &middot; &gamma;g 0.763 &middot; N&#8322; 1.2% &middot; CO&#8322; 3% &middot; H&#8322;S 2 ppm &middot; Tres 232&deg;F &middot; &mu;cond 2 cp &middot; &sigma; 30 dyn/cm</td></tr>
 <tr><td>Reservoir</td><td class="num">Pri 3800 psi &middot; Pr blank = Pri</td></tr>
