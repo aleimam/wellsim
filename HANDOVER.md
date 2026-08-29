@@ -96,8 +96,16 @@ private; neither belongs in a repository. They **are** in the F: backup.
 
 - **`data/` is the only stateful thing in the entire application.** It holds
   `users.json` and the company case store, lives at `/opt/wellsim/app/data`,
-  and is not in git. Back it up on its own schedule — the deploy does not
-  touch it, and nothing else will recreate it.
+  and is not in git. The deploy does not touch it and nothing else will
+  recreate it.
+
+  **There is no scheduled backup of it** — checked 30 Aug 2026: no root
+  crontab, no systemd timer. The only thing running is the app's own rolling
+  copy into `data-backups/`, which is written *when a case is saved* and sits
+  on the same disk as the thing it protects, so it survives a bad write and
+  not a lost server. That is survivable today only because the case store is
+  empty. **Before real client cases go in, add an off-box copy** — a nightly
+  `tar` of `data/` pulled somewhere else is enough.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
 - **Charts are drawn by Plotly at their container's width**, and that width is
