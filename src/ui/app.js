@@ -123,9 +123,9 @@ const WATER_SENS_ROWS = [
   { label: 'VLP3', thpPsi: 100 },
 ];
 const WATER_INJ_SENS_ROWS = [
-  { label: 'VLP1', thpPsi: 1500 },
-  { label: 'VLP2', thpPsi: 2000 },
-  { label: 'VLP3', thpPsi: 2500 },
+  { label: 'VLP1', thpPsi: 100 },
+  { label: 'VLP2', thpPsi: 1000 },
+  { label: 'VLP3', thpPsi: 2000 },
 ];
 
 // ---- oil Reserve estimate (workbook: oil reserve estimate) ----
@@ -422,7 +422,7 @@ function renderTables(containerId, tables) {
 
 // short, unit-bearing headers for the VLP sensitivity columns
 const SENS_LABELS = {
-  thpPsi: 'FTHP psi',
+  thpPsi: 'THP psi',
   __injThpPsi: 'Inj THP psi', // injector override (no flowing THP exists)
   gorScfStb: 'GOR scf/stb',
   wcPct: 'W.C %',
@@ -432,13 +432,14 @@ const SENS_LABELS = {
   injTempF: 'Inj water T °F',
 };
 
-function renderSensTable(id, prefix, cols, rows, labelOverrides = {}) {
+function renderSensTable(id, prefix, cols, rows, labelOverrides = {}, resetValues = false) {
   const t = document.getElementById(id);
   // keep whatever the user already typed when the column set changes
   const prev = {};
-  for (let i = 0; i < rows.length; i++)
-    for (const el of t.querySelectorAll(`input[id^="${prefix}-sens-${i}-"]`))
-      prev[el.id] = el.value;
+  if (!resetValues)
+    for (let i = 0; i < rows.length; i++)
+      for (const el of t.querySelectorAll(`input[id^="${prefix}-sens-${i}-"]`))
+        prev[el.id] = el.value;
   t.innerHTML =
     `<tr><th>set</th>${cols.map((c) => `<th>${labelOverrides[c] ?? SENS_LABELS[c] ?? c}</th>`).join('')}</tr>` +
     rows
@@ -1022,10 +1023,14 @@ const waterSensRows = () =>
 function refreshOilSens() {
   renderSensTable('oil-sens-table', 'oil', oilSensCols(), OIL_SENS_ROWS);
 }
+let waterSensType = null; // 'producer' | 'injector' — row MEANING, not just columns
 function refreshWaterSens() {
-  const inj = waterWellType() === 'injector';
+  const type = waterWellType();
+  const inj = type === 'injector';
+  const typeChanged = waterSensType !== null && waterSensType !== type;
+  waterSensType = type;
   renderSensTable('water-sens-table', 'water', waterSensCols(), waterSensRows(),
-    inj ? { thpPsi: SENS_LABELS.__injThpPsi } : {});
+    inj ? { thpPsi: SENS_LABELS.__injThpPsi } : {}, typeChanged);
 }
 
 function switchLift() {
@@ -1163,9 +1168,15 @@ const WATER_PRODUCER_ONLY_ROWS = [
   'water-cr-gl', 'water-cr-esppump', 'water-cr-esptrav',
   'water-cr-senspump', 'water-cr-senstrav',
 ];
+// injector-only rows, cleared when a producer is selected
+const WATER_INJECTOR_ONLY_ROWS = ['water-cr-injgrid'];
 /** Wipe every water result — used when the well TYPE changes, because
  *  the shared rows (nodal, wellhead) then mean something different. */
 function clearWaterResults() {
+  for (const id of WATER_INJECTOR_ONLY_ROWS) {
+    const row = document.getElementById(id);
+    if (row) row.style.display = 'none';
+  }
   document.getElementById('water-summary').innerHTML = '';
   document.querySelectorAll('#panel-water .results .chart').forEach((c) => {
     if (c.data) Plotly.purge(c);
@@ -1190,6 +1201,23 @@ function clearWaterProducerResults() {
   }
 }
 
+/** Water sensitivity pressures default to 0.75 / 0.5 / 0.25 x Pri (the
+ *  same fractions the oil and gas tabs use). Refilled from the current Pri
+ *  unless the user has typed something of their own. */
+let waterPresAuto = [];
+function refreshWaterPresDefaults() {
+  const pri = Number(val('water-priPsi'));
+  if (!(pri > 0)) return;
+  const next = [0.75, 0.5, 0.25].map((x) => Math.round(pri * x));
+  for (let i = 0; i < 3; i++) {
+    const el = document.getElementById(`water-pres-${i}`);
+    if (!el) continue;
+    const cur = el.value.trim();
+    if (cur === '' || cur === String(waterPresAuto[i] ?? '')) el.value = String(next[i]);
+  }
+  waterPresAuto = next;
+}
+
 function switchWaterType() {
   const inj = waterWellType() === 'injector';
   document.getElementById('water-lift-fieldset').style.display = inj ? 'none' : '';
@@ -1206,6 +1234,7 @@ function switchWaterType() {
     ? 'Future reservoir pressures, psi (injectivity line; J constant)'
     : 'Future reservoir pressures, psi (J constant — water μ·B do not change)';
   clearWaterResults();
+  refreshWaterPresDefaults();
   if (!inj) switchWaterLift();
   refreshWaterSens();
   const row = document.getElementById('water-injTempF')?.closest('.frow');
@@ -2038,6 +2067,47 @@ async function oilSens() {
   renderSensResults('oil', r, 'q oil stb/d');
 }
 
+/** Injectivity sensitivities: every THP set solved against Pri and each
+ *  future Pres. x = the nodal solution rate, y = the injection THP that
+ *  places it — one line per reservoir pressure. */
+function renderInjGrid(r) {
+  const row = document.getElementById('water-cr-injgrid');
+  const grid = r.grid ?? [];
+  const usable = grid.filter((g) => g.points.some((p) => p.status === 'ok' || p.status === 'grid-cap'));
+  row.style.display = usable.length ? '' : 'none';
+  if (!usable.length) return;
+  const traces = grid.map((g, i) => {
+    const pts = g.points.filter((p) => p.qBpd > 0);
+    return {
+      x: pts.map((p) => p.qBpd),
+      y: pts.map((p) => p.thpPsi),
+      name: g.isPri ? `Pri ${Math.round(g.presPsi)}` : `Pr ${Math.round(g.presPsi)}`,
+      mode: 'lines+markers',
+      line: { color: g.isPri ? '#0B1418' : FAM_BLUES[(i - 1) % 3], width: g.isPri ? 3 : 2.2, dash: g.isPri ? 'solid' : 'dot' },
+      marker: { size: 9, symbol: g.isPri ? 'diamond' : 'circle' },
+    };
+  });
+  plot('water-chart-injgrid', traces, {
+    ...LAYOUT(),
+    title: 'Injectivity sensitivities',
+    xaxis: { title: 'Injection rate at the solved node, bbl/d', rangemode: 'tozero' },
+    yaxis: { title: 'Injection THP, psi', rangemode: 'tozero' },
+  });
+  renderTables('water-table-injgrid', [{
+    title: 'Nodal solutions — THP x reservoir pressure',
+    headers: ['set', 'THP psi', 'Pres psi', 'q inj bbl/d', 'BHIP psi', 'BHT °F', 'status'],
+    rows: grid.flatMap((g) => g.points.map((p) => [
+      p.label,
+      fmt(p.thpPsi, 0),
+      fmt(p.presPsi, 0),
+      p.status === 'ok' || p.status === 'grid-cap' ? fmt(p.qBpd, 0) : '—',
+      p.pwfPsi != null ? fmt(p.pwfPsi, 1) : '—',
+      p.bhtF != null ? fmt(p.bhtF, 1) : '—',
+      p.status === 'ok' ? 'ok' : p.deficitPsi != null ? `no injection (deficit ${fmt(p.deficitPsi, 0)} psi)` : p.status,
+    ])),
+  }]);
+}
+
 async function waterSens() {
   const inj = waterWellType() === 'injector';
   const body = waterForm();
@@ -2065,11 +2135,13 @@ async function waterSens() {
       : { priPsi: r.priPsi }
   );
   if (inj) {
-    // the injector has no producing node/pump: only the families are drawn
+    // the injector has no producing node/pump: families + the injectivity grid
     for (const id of ['water-cr-senspump', 'water-cr-senstrav'])
       document.getElementById(id).style.display = 'none';
     document.getElementById('water-table-sens').innerHTML = '';
+    renderInjGrid(r);
   } else {
+    document.getElementById('water-cr-injgrid').style.display = 'none';
     renderSensResults('water', r, 'q water bbl/d');
   }
 }
@@ -2690,7 +2762,8 @@ renderFieldRow('water-esp-manual-fields', 'water', WATER_ESP_MANUAL_FIELDS);
 document.getElementById('water-espPumpSel').onchange = switchWaterEspPump;
 document.getElementById('water-btn-espstages').onclick = guard(waterEspStagesRun);
 refreshWaterSens();
-renderPresList('water-pres-list', 'water', [4400, 4000, 3600]);
+renderPresList('water-pres-list', 'water', [3600, 2400, 1200]); // 0.75/0.5/0.25 x Pri 4800
+waterPresAuto = [3600, 2400, 1200];
 document.querySelectorAll('input[name="water-lift"]').forEach((r) => (r.onchange = switchWaterLift));
 switchWaterLift();
 document.querySelectorAll('input[name="water-welltype"]').forEach((r) => (r.onchange = switchWaterType));

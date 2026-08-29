@@ -612,8 +612,37 @@ export function waterInjSensitivity(f) {
     for (const k of ['thpPsi', 'injTempF', 'tubingIdIn']) if (num(s[k]) != null) o[k] = num(s[k]);
     return { label: s.label || `VLP${i + 1}`, overrides: o };
   });
+  // future reservoir pressures: the same fractions of Pri the producers use
+  const priPsi = ipr.priPsi ?? model.prPsi;
   const presList = (f.presList ?? []).map(num).filter((p) => p != null && p > 0);
-  const list = presList.length ? presList : [1.25, 1.5, 1.75].map((x) => model.prPsi * x);
+  const list = presList.length ? presList : [0.75, 0.5, 0.25].map((x) => priPsi * x);
+
+  // INJECTIVITY GRID: every THP set solved against Pri and each future Pres.
+  // Each cell is a real nodal solution — available BHIP (march at that THP)
+  // crossing the required Pr + q/J — so the chart reads "what injection THP
+  // places what rate, as the reservoir depletes".
+  const presGrid = [priPsi, ...list];
+  const grid = presGrid.map((presPsi, pi) => ({
+    label: pi === 0 ? `Pri=${Math.round(presPsi)} psi` : `Pr${pi}=${Math.round(presPsi)} psi`,
+    presPsi,
+    isPri: pi === 0,
+    points: sets.map((set) => {
+      const thpPsi = set.overrides.thpPsi ?? cfg.thpPsi;
+      const setCfg = mergeCfg(cfg, set.overrides);
+      const o = injectorOperatingPoint(setCfg, { j: model.j, prPsi: presPsi });
+      return {
+        label: set.label,
+        thpPsi,
+        presPsi,
+        status: o.status,
+        qBpd: o.status === 'ok' ? o.qOp : o.status === 'grid-cap' ? o.qOp : 0,
+        pwfPsi: o.pwfPsi ?? null,
+        bhtF: o.bhtF ?? null,
+        deficitPsi: o.deficitPsi ?? null,
+      };
+    }),
+  }));
+
   return {
     vlpFamily: vlpSensitivityInjector(cfg, sets, { rates }),
     iprFamily: list.map((p, i) => ({
@@ -622,8 +651,10 @@ export function waterInjSensitivity(f) {
       j: model.j,
       curve: rates.map((q) => ({ qGrossStbD: q, pwfPsi: pwfAtQInj(q, { j: model.j, prPsi: p }) })),
     })),
+    grid,
     jInj: model.j,
     prPsi: model.prPsi,
+    priPsi,
   };
 }
 
