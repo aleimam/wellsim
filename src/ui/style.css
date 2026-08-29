@@ -120,6 +120,15 @@ input.outcell { background: #F5ECEF !important; color: #5A4A52 !important; borde
 
 /* reserve module: table takes half the page, chart beside it */
 .panel.mode-reserve { grid-template-columns: 1fr 1fr; }
+/* ...but only while a half page is still wide enough to draw in. The base
+   .panel collapses at 1100px; this rule is more specific, so without its own
+   query it kept the 50/50 split all the way down to the phone breakpoint and
+   squeezed the chart to ~90px beside the fixed 250px results table. A chart
+   needs ~350px and the table is a fixed 250px + 10px gap, so a half page
+   must be ~610px. Measured: main padding + gap eats 71px, so a half page is
+   (vw-71)/2 and the chart is that minus 260 — 610px of half page wants a
+   ~1300px viewport. Below that, one column. */
+@media (max-width: 1300px) { .panel.mode-reserve { grid-template-columns: 1fr; } }
 /* production tables size to the half-page column like the oil one: no hard
    per-column minimums (they forced the 9-column gas table past its card on
    a 1366-wide screen). Only the date cell gets a floor, and reads left. */
