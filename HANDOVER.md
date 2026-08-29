@@ -2,8 +2,8 @@
 
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
-**As of:** 29 August 2026 (evening) — commit `a39872a`, asset stamp
-`2026-08-30b`, 201 tests passing, 43/43 validation sweep.
+**As of:** 30 August 2026 — commit `65c86aa`, asset stamp `2026-08-30h`,
+201 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -23,7 +23,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 23 test files, 55 commits.
+`nodal`, `reserve`, `solvers`), 23 test files, 61 commits.
 
 ## 2. Running it
 
