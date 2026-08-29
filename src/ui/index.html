@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-08-29g" />
+  <link rel="stylesheet" href="/style.css?v=2026-08-29i" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -325,6 +325,7 @@
             <label class="radio"><input type="radio" name="gas-pressource" value="prod" checked /> 1. Prod data &amp; macro (Pres solver)</label>
             <label class="radio"><input type="radio" name="gas-pressource" value="sithp" /> 2. Pres from SITHP</label>
             <label class="radio"><input type="radio" name="gas-pressource" value="rlt" /> 3. Reservoir limit (constant rate)</label>
+            <label class="radio"><input type="radio" name="gas-pressource" value="gauge" /> 4. Pres from memory gauges</label>
             <div id="gas-rsv-guidance" class="guidance"></div>
             <div id="gas-rsv-prod">
               <div class="senshead">prod_data — inputs green (CGR/WGR blank = base), outputs dt / pr / z filled by the solver</div>
@@ -340,6 +341,10 @@
             <div id="gas-rsv-sithp" style="display:none">
               <div class="senshead">Static surveys — q = 0 rows, Pres by the static gas march (well-model data + geothermal temp). Gp is taken from the cumulative of the prod data table (selection 1).</div>
               <table class="sens" id="gas-sithp-table"></table>
+            </div>
+            <div id="gas-rsv-gauge" style="display:none">
+              <div class="senshead">Memory-gauge surveys — inputs Date and Pr (the static, built-up reservoir pressure at datum); z, Gp and p/Z are calculated. Gp is taken from the cumulative of the prod data table (selection 1).</div>
+              <table class="sens" id="gas-gauge-table"></table>
             </div>
             <div id="gas-rsv-rlt" style="display:none">
               <div class="senshead">Reservoir limit (workbook sheet): m = −slope(Pwf, t) over all rows, Ct = Cg·Sg + Co·So + Cw·Sw + Cf, GIIP = q̄/(Ct·m)</div>
@@ -376,6 +381,6 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/app.js?v=2026-08-29g"></script>
+  <script src="/app.js?v=2026-08-29i"></script>
 </body>
 </html>

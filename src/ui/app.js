@@ -519,6 +519,23 @@ const PROD_COLS = [
   { key: 'presPsi', label: 'pr', out: true },
   { key: 'z', label: 'z', out: true },
 ];
+// memory-gauge surveys: Date | Pr. The demo values ARE the pressures the
+// SITHP route computes from its own defaults (2500/2000/1300 psi STHP), so
+// routes 2 and 4 agree out of the box and can be cross-checked.
+const GAS_GAUGE_ROWS = [
+  { date: '17-Nov-14', presPsi: 3266.3 },
+  { date: '17-Nov-19', presPsi: 2607.1 },
+  { date: '26-Nov-24', presPsi: 1671.0 },
+  {},
+];
+const GAS_GAUGE_COLS = [
+  { key: 'date', label: 'Date dd-MMM-yy' },
+  { key: 'presPsi', label: 'Pr psi (gauge)' },
+  { key: 'dtDays', label: 'dt d', out: true },
+  { key: 'z', label: 'z', out: true },
+  { key: 'gpBscf', label: 'Gp Bscf', out: true },
+  { key: 'pOverZ', label: 'p/Z psi', out: true },
+];
 const SITHP_COLS = [
   { key: 'date', label: 'Date dd-MMM-yy' },
   { key: 'sithpPsi', label: 'STHP psi' },
@@ -2184,6 +2201,7 @@ function gasForm() {
   f.testPoints = collectGasTests();
   f.prodRows = collectGrid('gas-prod', PROD_COLS, gasProdCount);
   f.sithpRows = collectGrid('gas-sithp', SITHP_COLS, GAS_SITHP_ROWS.length);
+  f.gaugeRows = collectGrid('gas-gauge', GAS_GAUGE_COLS, GAS_GAUGE_ROWS.length);
   return f;
 }
 
@@ -2195,6 +2213,8 @@ const RESERVE_GUIDANCE = {
     'Limitations: Pres inherits any VLP-match or J error (drawdown maps into pr); result is a MINIMUM connected GIIP that grows as depletion data accumulates.',
   sithp: 'Best practice: stabilized shut-in surveys — the strongest data, independent of IPR/VLP matching; Gp comes from the prod-data cumulative. ' +
     'Limitations: needs true stabilized SITHP (long enough shut-in) and a liquid-free static column; rate records still set Gp accuracy.',
+  gauge: 'Best practice: measured static reservoir pressures from memory or permanent gauges — the most direct p/Z route, with no march and no IPR between the data and the answer. ' +
+    'Limitations: each reading must be a STABILIZED (built-up / extrapolated) pressure at datum, not a flowing one, and corrected to the datum depth before entry; Gp still comes from the rate records.',
   rlt: 'Best practice: a clean EARLY constant-rate drawdown in pseudo-steady state; quick minimum-volume screen. ' +
     'Limitations: assumes pss and constant Ct over the window; sensitive to Ct and to rate variations; differs from the p/Z methods by design.',
 };
@@ -2203,8 +2223,9 @@ function switchGasPresSource() {
   const s = document.querySelector('input[name="gas-pressource"]:checked').value;
   // shut-in selection shows only the survey table; Gp still comes from the
   // (hidden) prod data table's cumulative
-  document.getElementById('gas-rsv-prod').style.display = s === 'sithp' ? 'none' : '';
+  document.getElementById('gas-rsv-prod').style.display = s === 'sithp' || s === 'gauge' ? 'none' : '';
   document.getElementById('gas-rsv-sithp').style.display = s === 'sithp' ? '' : 'none';
+  document.getElementById('gas-rsv-gauge').style.display = s === 'gauge' ? '' : 'none';
   document.getElementById('gas-rsv-rlt').style.display = s === 'rlt' ? '' : 'none';
   // reservoir-limit view slims the prod table to the essential columns
   document.getElementById('gas-rsv-prod').classList.toggle('rlt-slim', s === 'rlt');
@@ -2249,9 +2270,25 @@ async function gasReserveRun() {
       setOut(`gas-prod-${i}-z`, row.z, 4);
     });
   }
+  if (r.mode === 'gauge') {
+    // fill the survey table's output columns (dt, z, Gp, p/Z)
+    const gIdx = [];
+    for (let i = 0; i < GAS_GAUGE_ROWS.length; i++) {
+      if (val(`gas-gauge-${i}-date`) !== '' && val(`gas-gauge-${i}-presPsi`) !== '') gIdx.push(i);
+    }
+    r.rows.forEach((row, k) => {
+      const i = gIdx[k];
+      if (i == null) return;
+      setOut(`gas-gauge-${i}-dtDays`, row.dtDays, 2);
+      setOut(`gas-gauge-${i}-z`, row.z, 4);
+      setOut(`gas-gauge-${i}-gpBscf`, row.gpBscf, 3);
+      setOut(`gas-gauge-${i}-pOverZ`, row.pOverZ, 1);
+    });
+  }
   const giipTxt = r.fit.giipBscf != null ? `${fmt(r.fit.giipBscf, 2)} Bscf` : 'no depletion signal';
   const routeTxt =
     r.mode === 'sithp' ? '2: SITHP statics (zero-rate correlation)'
+    : r.mode === 'gauge' ? '4: measured Pr (memory gauges)'
     : r.mode === 'rlt' ? `3: reservoir limit (all ${r.rows.length} rows, workbook method)`
     : '1: prod data & macro (Pres solver)';
   document.getElementById('gas-reserve-result').textContent =
@@ -2268,7 +2305,10 @@ async function gasReserveRun() {
   // big-font GIP result for the selected method
   const banner = document.getElementById('gas-giip-banner');
   const methodName =
-    r.mode === 'sithp' ? 'SITHP statics' : r.mode === 'rlt' ? 'Reservoir limit' : 'Prod data / Pres solver';
+    r.mode === 'sithp' ? 'SITHP statics'
+    : r.mode === 'gauge' ? 'Measured Pr (gauges)'
+    : r.mode === 'rlt' ? 'Reservoir limit'
+    : 'Prod data / Pres solver';
   banner.innerHTML =
     r.fit.giipBscf != null
       ? `<span class="method">GIP — minimum connected (${methodName})</span><span class="val">${fmt(r.fit.giipBscf, 1)} Bscf</span>`
@@ -2308,22 +2348,31 @@ async function gasReserveRun() {
 
   // p/Z chart: fitted points + line to GIIP (the prod-data chart shows only
   // its own points — no SITHP overlay, per user request)
-  const mainName = r.mode === 'sithp' ? 'SITHP statics (zero-rate corr.)' : 'Production (back-calc Pr)';
-  const mainColor = r.mode === 'sithp' ? '#C2540B' : '#00636D';
+  const mainName =
+    r.mode === 'sithp' ? 'SITHP statics (zero-rate corr.)'
+    : r.mode === 'gauge' ? 'Measured Pr (memory gauges)'
+    : 'Production (back-calc Pr)';
+  const mainColor = r.mode === 'sithp' ? '#C2540B' : r.mode === 'gauge' ? '#7038b0' : '#00636D';
+  const mainSymbol = r.mode === 'sithp' ? 'square' : r.mode === 'gauge' ? 'diamond' : 'circle';
   const traces = [
-    { x: r.rows.map((p) => p.gpBscf), y: r.rows.map((p) => p.pOverZ), name: mainName, mode: 'markers', marker: { size: 9, color: mainColor, symbol: r.mode === 'sithp' ? 'square' : 'circle' } },
+    { x: r.rows.map((p) => p.gpBscf), y: r.rows.map((p) => p.pOverZ), name: mainName, mode: 'markers', marker: { size: 9, color: mainColor, symbol: mainSymbol } },
   ];
   if (r.fit.giipBscf != null) {
     traces.push({ x: [0, r.fit.giipBscf], y: [r.fit.pziPsi, 0], name: 'p/Z line → GIIP', mode: 'lines', line: { color: '#2C7048', dash: 'dash', width: 2 } });
   }
   plot('gas-chart-pz', traces, {
     ...LAYOUT(),
-    title: `p/Z vs Gp — minimum connected GIIP (${r.mode === 'sithp' ? 'SITHP' : 'prod data'} selection)`,
+    title: `p/Z vs Gp — minimum connected GIIP (${r.mode === 'sithp' ? 'SITHP' : r.mode === 'gauge' ? 'gauge Pr' : 'prod data'} selection)`,
     xaxis: { title: 'Gp, Bscf', rangemode: 'tozero' },
     yaxis: { title: 'p/Z, psi', rangemode: 'tozero' },
   });
   renderTables('gas-table-pz', [
-    r.mode === 'sithp'
+    r.mode === 'gauge'
+      ? {
+          title: 'Memory gauges → p/Z', headers: ['dt d', 'Pr psi', 'z', 'Gp Bscf', 'p/Z psi'],
+          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.gpBscf, 3), fmt(p.pOverZ, 1)]),
+        }
+      : r.mode === 'sithp'
       ? {
           title: 'SITHP → Pres → p/Z', headers: ['dt d', 'SITHP', 'Pres', 'z', 'p/Z', 'Gp Bscf'],
           rows: r.rows.map((p) => [fmt(p.dtDays ?? p.tDays, 2), fmt(p.sithpPsi, 0), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3)]),
@@ -2811,6 +2860,7 @@ renderSensTable('gas-sens-table', 'gas', GAS_SENS_COLS, GAS_SENS_ROWS);
 renderPresList('gas-pres-list', 'gas', [2850, 1900, 950]);
 renderProdTable(GAS_PROD_DEFAULTS);
 renderGridTable('gas-sithp-table', 'gas-sithp', SITHP_COLS, GAS_SITHP_ROWS);
+renderGridTable('gas-gauge-table', 'gas-gauge', GAS_GAUGE_COLS, GAS_GAUGE_ROWS);
 // clipboard paste into the prod table (Ctrl+V in any cell, or the button)
 document.getElementById('gas-prod-table').addEventListener('paste', (e) => {
   const text = e.clipboardData?.getData('text') ?? '';

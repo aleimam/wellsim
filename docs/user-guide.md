@@ -407,7 +407,7 @@ well-head PQ + WHT chart. VLP sensitivities: THP 2440/2000/1200 rows by default.
 
 ## 5. Gas — Reserve estimate (Module 2)
 
-Three selections (one active). Well data and the matched J come from the Well model.
+Four selections (one active). Well data and the matched J come from the Well model.
 
 ### 5.1 Prod data & macro (Pres solver)
 
@@ -427,6 +427,22 @@ per-station explicit z, from the well-model data — validated to 1.2 % against 
 workbook's 7661.9 psi case). Gp comes from the prod-data cumulative — no IPR/VLP
 matching involved. Defaults: 2500 / 2000 / 1300 psi on the same dates.
 
+### 5.4 Pres from memory gauges
+
+Measured static reservoir pressures — the shortest route to a p/Z line: **no march
+and no IPR**, because the gauge reading *is* the datum. Table
+`Date | Pr psi (gauge) | dt | z | Gp | p/Z` — two inputs, four calculated. z is the
+same explicit Brill & Beggs at reservoir temperature the other routes use, Gp is the
+prod-data cumulative at the survey date, and the fitted p/Z line gives the same
+minimum connected GIIP.
+Each entry must be a **stabilized** (built-up or extrapolated) pressure **corrected to
+the datum depth** — a flowing gauge reading is not Pr and will read as a smaller tank.
+A survey dated outside the production record is flagged: its Gp is held at the
+nearest end, which biases the fit.
+Defaults: 3266.3 / 2607.1 / 1671.0 psi on the same three dates — *these are exactly
+what selection 2 computes from its own 2500 / 2000 / 1300 psi SITHP defaults*, so the
+two routes return the same 120.19 Bscf out of the box and can be cross-checked.
+
 ### 5.3 Reservoir limit
 
 Same method as the oil version, gas units: **GIIP = q̄/(Ct·m)** with defaults
@@ -434,7 +450,7 @@ Sg 0.85 · So 0 · Sw 0.15 · Co/Cw 1e-6 · Cf 3e-6, Cg grey = calculated from t
 Bg points. Slim table + Pwf-decline chart with the slope line.
 
 Each selection carries a best-practice/limitation note; demo answers differ
-(≈150 / 120 / 91 Bscf) — that spread is the tool exposing input uncertainty.
+(≈150 / 120 / 91 / 120 Bscf — selections 2 and 4 agree by construction) — that spread is the tool exposing input uncertainty.
 
 ---
 

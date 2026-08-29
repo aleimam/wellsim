@@ -230,3 +230,40 @@ test('coupled p/Z + nodal forecast: plateau, decline, sane termination', () => {
     `    forecast: ${f.rows.length} steps, plateau ${f.rows.filter((r) => r.onPlateau).length} steps, EUR ${f.eurBscf.toFixed(1)} Bscf (${f.recoveryPct.toFixed(1)}%), status ${f.status}`
   );
 });
+
+test('gauge route recovers a known tank from measured Pr (no march, no IPR)', async () => {
+  const { gaugeReserve, sithpReserve, staticGasMarch } = await import('../src/core/reserve/gas-reserve.js');
+  const { brent } = await import('../src/core/solvers/brent.js');
+  const G = 90;
+  const pzi = 3800 / zAtRes(GASCFG, 3800);
+  const q = 10;
+  const days = [0, 150, 300];
+  const truth = days.map((d) => presFromPz(GASCFG, pzi * (1 - (q * d) / 1000 / G)));
+  const prodRows = days.map((d) => ({ date: d, qMMscfd: q }));
+  const r = gaugeReserve(GASCFG, days.map((d, i) => ({ date: d, presPsi: truth[i] })), prodRows);
+  close(r.fit.giipBscf, G, 1e-9); // exact: the tank is the input
+  close(r.fit.pziPsi, pzi, 1e-9);
+  assert.equal(r.points.length, 3);
+  close(r.points[1].gpBscf, 1.5, 1e-9); // Gp from the rate records alone
+  close(r.points[1].pOverZ, r.points[1].presPsi / r.points[1].z, 1e-12);
+  close(r.points[1].dtDays, 150, 1e-12);
+
+  // route 2 and route 4 must agree when the gauge reads what the static
+  // march computes from the SITHP — the cross-check the demo defaults show
+  const sithpRows = truth.map((presTrue, i) => ({
+    date: days[i],
+    sithpPsi: brent((x) => staticGasMarch(GASCFG, { sithpPsi: x, surfTempF: 90 }).presPsi - presTrue,
+      presTrue * 0.5, presTrue, { tol: 1e-8 }).root,
+    qMMscfd: 0,
+  }));
+  const r2 = sithpReserve(GASCFG, sithpRows, prodRows);
+  close(r2.fit.giipBscf, r.fit.giipBscf, 1e-3);
+});
+
+test('gauge route needs two surveys to see depletion', async () => {
+  const { gaugeReserve } = await import('../src/core/reserve/gas-reserve.js');
+  assert.throws(
+    () => gaugeReserve(GASCFG, [{ date: 0, presPsi: 3800 }], [{ date: 0, qMMscfd: 10 }]),
+    /at least 2 surveys/
+  );
+});

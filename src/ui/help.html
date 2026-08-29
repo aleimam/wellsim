@@ -194,7 +194,7 @@ pre.eq code { background: none; padding: 0; }
     <td class="ok">Natural &check;</td></tr>
 <tr><td><b>2 &mdash; Reserve estimate</b></td>
     <td class="ok">&check; Havlena&ndash;Odeh MB &middot; static-gauge MB &middot; reservoir limit</td>
-    <td class="ok">&check; p/Z prod data &middot; p/Z from SITHP &middot; reservoir limit</td></tr>
+    <td class="ok">&check; p/Z prod data &middot; p/Z from SITHP &middot; reservoir limit &middot; p/Z from memory gauges</td></tr>
 <tr><td><b>3 &mdash; Forecast</b></td>
     <td class="ok">&check; Tarner &middot; Walsh generalized-MB (Rv) &mdash; saturation-tracking MB + nodal</td>
     <td class="ok">&check; p/Z tank + nodal, history overlay</td></tr>
@@ -294,6 +294,8 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
     <p>Static shut-in surveys; Pres by the static gas march (gas-head-only stations, geothermal T, per-station Z &mdash; 1.2% vs the workbook case). Gp from prod cumulative; no IPR/VLP.</p></div>
   <div class="selcard"><span class="n">3</span><h5>Reservoir limit</h5>
     <p>GIIP = q&#772;/(Ct&middot;m)/1000. Defaults Sg 0.85 / So 0 / Sw 0.15; Cg grey = from two Bg points; slim table + Pwf-decline chart.</p></div>
+  <div class="selcard"><span class="n">4</span><h5>Pres from memory gauges</h5>
+    <p>Measured static Pr &mdash; no march, no IPR: the gauge reading IS the datum. Inputs <b>Date | Pr</b>; calculated <b>z | Gp | p/Z</b>. Each reading must be a stabilized build-up corrected to datum. Defaults are the pressures selection 2 computes, so the two routes cross-check (both 120.19 Bscf).</p></div>
 </div>
 
 <h2 id="oil-forecast"><span class="sect">Oil</span> &mdash; Forecast (Tarner | Walsh)</h2>

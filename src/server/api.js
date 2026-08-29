@@ -59,6 +59,7 @@ import {
   giipFromPz,
   staticPresFromSithp,
   sithpReserve,
+  gaugeReserve,
   reservoirLimitWorkbook,
   cumGp,
   gasForecast,
@@ -922,8 +923,10 @@ function interpGp(solved, tDays) {
   return solved[solved.length - 1].gpBscf;
 }
 
-/** Module 2 (gas): p/Z fit -> minimum connected GIIP, from one of two
+/** Module 2 (gas): p/Z fit -> minimum connected GIIP, from one of the
  *  selectable pressure sources:
+ *   'gauge'   — route 4: measured static Pr from memory/permanent gauges,
+ *               no march and no IPR — the pressure IS the datum;
  *   'sithp'   — route 1: SITHP statics (zero-rate correlation), no IPR
  *               needed; production rows supply only the Gp integration;
  *   'flowing' — route 2 (default): Pres solver back-calculation from
@@ -976,6 +979,52 @@ export function gasReserve(f) {
       lastDay: solved[solved.length - 1].tDays,
       currentPresPsi: Math.min(...solved.map((s) => s.presPsi)),
     };
+  }
+
+  if (src === 'gauge') {
+    // memory-gauge surveys: Date | Pr (inputs) -> z | Gp | p/Z (calculated).
+    // No march and no IPR — the gauge reading is the reservoir pressure; the
+    // prod table supplies only the Gp integration.
+    const rawG = (f.gaugeRows ?? []).filter(
+      (r) => num(r.presPsi) != null && dateVal(r.date) != null
+    );
+    for (let i = 0; i < rawG.length; i++) {
+      if (Number.isNaN(toDays(dateVal(rawG[i].date))))
+        return { error: `gauge row ${i + 1}: unparseable date "${rawG[i].date}"` };
+      if (num(rawG[i].presPsi) <= 0)
+        return { error: `gauge row ${i + 1}: Pr must be positive` };
+    }
+    const gaugeRows = rawG.map((r) => ({ date: dateVal(r.date), presPsi: num(r.presPsi) }));
+    if (gaugeRows.length < 2)
+      return { error: 'route 4 needs at least 2 gauge surveys with dates' };
+    if (rows.length < 2)
+      return { error: 'route 4 needs production rows (date + rate) in the prod table to integrate Gp' };
+    try {
+      const r = gaugeReserve(cfg, gaugeRows, rows);
+      // a survey outside the production record gets a CLAMPED Gp (cumGp holds
+      // the first/last value) — that flattens the p/Z line, so say so
+      const prodDays = rows.map((x) => toDays(x.date));
+      const tMin = Math.min(...prodDays);
+      const tMax = Math.max(...prodDays);
+      const warnings = [];
+      r.points.forEach((pt, i) => {
+        if (pt.tDays < tMin || pt.tDays > tMax)
+          warnings.push(
+            `gauge row ${i + 1}: survey date is outside the production record — Gp held at the nearest end, so this point biases the fit`
+          );
+      });
+      return {
+        mode: 'gauge',
+        rows: r.points,
+        fit: r.fit,
+        warnings,
+        lastGpBscf: r.lastGpBscf,
+        lastDay: r.lastDay,
+        currentPresPsi: Math.min(...r.points.map((pt) => pt.presPsi)),
+      };
+    } catch (e) {
+      return { error: e.message };
+    }
   }
 
   if (src === 'sithp') {

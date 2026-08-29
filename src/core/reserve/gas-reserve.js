@@ -256,6 +256,35 @@ export function sithpReserve(cfg, sithpRows, prodRows) {
   return { points, fit: giipFromPz(points), lastGpBscf: gp.lastGpBscf, lastDay: gp.lastDay };
 }
 
+/**
+ * GIIP from MEASURED reservoir pressures (memory / permanent gauges) — the
+ * shortest route to a p/Z line: no march and no IPR, because the pressure is
+ * already the datum. Each row is a gauge survey [{ date, presPsi }] carrying
+ * the static (built-up / extrapolated) reservoir pressure; Z comes from the
+ * well-model composition at reservoir temperature, and Gp at the survey date
+ * from the flowing production rows (the same trapezoid the other routes use).
+ * prodRows: [{ date, qMMscfd }].
+ */
+export function gaugeReserve(cfg, gaugeRows, prodRows) {
+  if (gaugeRows.length < 2)
+    throw new Error('gauge route needs at least 2 surveys (date + Pr) to see depletion');
+  const gp = cumGp(prodRows);
+  const t0 = toDays(gaugeRows[0].date);
+  const points = gaugeRows.map((r) => {
+    const tDays = toDays(r.date);
+    const z = zAtRes(cfg, r.presPsi);
+    return {
+      tDays,
+      dtDays: tDays - t0,
+      presPsi: r.presPsi,
+      z,
+      pOverZ: r.presPsi / z,
+      gpBscf: gp.at(tDays),
+    };
+  });
+  return { points, fit: giipFromPz(points), lastGpBscf: gp.lastGpBscf, lastDay: gp.lastDay };
+}
+
 /** Invert the p/Z line for pressure: find P with P/Z(P) = pzTarget. */
 export function presFromPz(cfg, pzTargetPsi) {
   const f = (p) => p / zAtRes(cfg, p) - pzTargetPsi;
