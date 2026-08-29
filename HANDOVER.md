@@ -97,12 +97,30 @@ private; neither belongs in a repository. They **are** in the F: backup.
   touch it, and nothing else will recreate it.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
-- **Charts are drawn by Plotly at their container's width.** Drawing one
-  while its container is hidden yields a stale 700 px canvas, and a
-  `ResizeObserver` does not fire for a `display:none` ancestor. This caused a
-  long tail of "overlapping chart" reports; the fix is the mismatch-driven
-  `refitCharts()` pass in `app.js`. If charts ever look wrong after a solve,
-  start there rather than in the physics.
+- **Charts are drawn by Plotly at their container's width**, and that width is
+  often wrong at draw time — the container is hidden, or its flex layout has
+  not settled, or the web font has not loaded. This caused a long tail of
+  "overlapping chart" reports. Every chart therefore goes through `plot()` in
+  `app.js`, which applies three **measure-after-draw** corrections in order,
+  each a no-op when nothing is wrong:
+
+  1. `fitChartWidth` — canvas vs its container (a chart drawn wider than its
+     box laps the results table beside it),
+  2. `fitChartTitle` — title vs canvas (shrink, then wrap at the em dash),
+  3. `fitChartLegend` — legend vs the x-axis title (grow the bottom margin).
+
+  `refitCharts()` re-runs all three over every visible chart and is wired to
+  fonts-ready, window load, resize and orientationchange. **It was dead code
+  until 30 Aug 2026** — defined but never called — which is why reloads used
+  to show a size jump a second or two in. If charts ever look wrong, start
+  with these four functions rather than the physics.
+- **Chart ROWS are a pure function of state, not a side effect.**
+  `applyOilRows()` derives every oil chart row from (module, lift, pump mode,
+  ESP view); the module/lift/ESP-view switches all call it. It replaced
+  visibility being set independently in four places, which repeatedly left
+  rows stranded — most visibly, leaving the ESP Sensitivity view hid the
+  nodal and wellhead charts for every other lift. Add new rows there, not in
+  a switch.
 - **Secrets** are in `d:\github_token.txt`, `d:\hetzner_token.txt`,
   `d:\wellsim_token.txt` (Cloudflare). They are never committed and never
   printed. The server accepts SSH keys only; the private key is

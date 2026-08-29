@@ -44,6 +44,17 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   restart signs everyone out); add TLS for internet deployment.
 - **Mobile**: below 640 px the layout stacks, inputs grow to finger size, and the main
   action button stays pinned while you scroll.
+- **Charts size themselves to the space they are in.** Each one is measured
+  after it draws and corrected if needed: the canvas to its container (so it
+  never laps the table beside it), the title to the canvas (shrunk, then
+  wrapped if that would make it unreadable), and the legend clear of the
+  x-axis title. They re-fit when the web font finishes loading, when the page
+  finishes loading, and whenever you resize or rotate — so a reload settles
+  straight into its final layout rather than jumping.
+- **Result rows follow the active selection.** Choosing the ESP *Sensitivity*
+  view replaces the model-match charts with the sensitivity; leaving it — or
+  switching lift type or module — brings them back. Rows that belong to
+  another lift are cleared rather than left showing the previous run.
 
 ### Sensitivity charts — what every module draws
 
