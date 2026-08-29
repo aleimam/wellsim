@@ -2,8 +2,8 @@
 
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
-**As of:** 29 August 2026 — commit `ef83ed4`, asset stamp `2026-08-29r`,
-198 tests passing, 43/43 validation sweep.
+**As of:** 29 August 2026 (evening) — commit `a39872a`, asset stamp
+`2026-08-30b`, 201 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -22,8 +22,8 @@ deviations are an explicit Brill & Beggs Z-factor and Brent root-finding in
 place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
-~8,800 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 23 test files, 46 commits.
+~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
+`nodal`, `reserve`, `solvers`), 23 test files, 55 commits.
 
 ## 2. Running it
 
@@ -35,7 +35,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 198 unit + regression tests
+node --test                       # 201 unit + regression tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -71,7 +71,9 @@ src/core/reserve/    oil-reserve (Havlena-Odeh, static MB, reservoir limit)
                      gas-reserve (p/Z solver, SITHP march, gauge p/Z, reservoir limit, forecast)
                      tarner.js, walsh.js (the two oil forecast methods)
 src/core/solvers/    Brent, bracketing
-src/server/api.js    every endpoint; the UI's only contract
+src/server/api.js    every endpoint; the UI's only contract. ONE sensitivity
+                     path (oilSensitivity / gasSensitivity) serves every fluid
+                     and lift type, ESP included
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
@@ -132,7 +134,10 @@ private; neither belongs in a repository. They **are** in the F: backup.
 
   **The consequence to respect: this host is now reachable only with the
   private key `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
-  Hetzner console, not SSH. Keep a copy somewhere safe and offline.
+  Hetzner console, not SSH. A passphrase-protected copy is kept on the F:
+  backup drive under `ssh-key` with its own README; the passphrase is in the
+  password manager and deliberately NOT on that drive. The working copy on
+  the workstation stays passphrase-free so deploys run unattended.
 - **The code-signing PFX** and its password are for the desktop distributable.
   The PFX must not ship inside any distributed zip, and the password belongs
   in a password manager, not a file.
@@ -158,6 +163,13 @@ already exists in the SITHP static march if it is ever wanted.
 **Oil forecast:** the material balance has no water-production term, so the
 Forecast W.C affects lift only, never the balance. On a high-water-cut well
 that is a real modelling limit, not a rounding issue.
+
+**ESP nodes at future pressures.** An ESP-only Pres sensitivity used to
+solve the pump operating point AT each future reservoir pressure. It was
+removed so that the VLP/IPR block is the single sensitivity path. That block
+solves each set at the CURRENT Pr and draws the future pressures as IPR
+curves without solving nodes on them, so the capability is genuinely gone
+rather than relocated — it would need adding to the main block.
 
 **Demo data self-consistency:** the demo oil well carries a measured GOR of
 5000 scf/stb against an Rsi of 700 at a pressure above the bubble point. The
