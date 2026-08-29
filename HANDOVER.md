@@ -1,0 +1,150 @@
+# WellSim — handover
+
+**Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
+**Manual:** https://wellsim.app/help.html
+**As of:** 29 August 2026 — commit `ef83ed4`, asset stamp `2026-08-29r`,
+198 tests passing, 43/43 validation sweep.
+
+---
+
+## 1. What this is
+
+A zero-dependency Node.js web app for oil, gas and water well engineering:
+nodal analysis, minimum connected reserves from early production, and
+production forecasting. It is a **faithful port of the M. El-Ashry Excel
+toolset** — the author's tuned correlations and workflows are preserved
+exactly; the spreadsheet macros are replaced by deterministic solvers.
+
+The governing rule of the project: **the tested Excel workbooks are the
+specification.** Where the port departs from a workbook it is a deliberate,
+documented decision, not an improvement of the engineering. The two standing
+deviations are an explicit Brill & Beggs Z-factor and Brent root-finding in
+place of GoalSeek loops. Both are recorded in the manual under *Workbook
+deviations*.
+
+~8,800 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
+`nodal`, `reserve`, `solvers`), 23 test files, 46 commits.
+
+## 2. Running it
+
+```bash
+node src/server/server.js     # http://localhost:3355
+```
+
+No `npm install` — the server uses only Node built-ins, and the UI is plain
+HTML/JS. Plotly is the single external asset, from a CDN.
+
+```bash
+node --test                       # 198 unit + regression tests
+node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
+```
+
+**Both must pass before any deploy.** The tests are not decoration: many pin
+individual workbook cells to 15 digits, and they are the only thing standing
+between a refactor and a silently wrong reservoir answer.
+
+One development trap worth knowing: **Node caches modules**, so the dev
+server must be restarted after editing anything under `src/server/` or
+`src/core/`. A stale server returning old numbers looks exactly like a
+physics bug.
+
+## 3. Deploying
+
+See **[docs/deploy.md](docs/deploy.md)** — it documents the live Hetzner +
+Caddy setup, the exact deploy command, and two caveats that will bite
+otherwise (the tar deploy never deletes files; `data/` survives only because
+of that).
+
+The one rule that is easy to forget: **bump the asset stamp in
+`src/ui/index.html` whenever `app.js`, `style.css` or `index.html` changes**,
+or returning users get a cached bundle.
+
+## 4. Where things live
+
+```
+src/core/pvt/        oil & gas PVT correlations (sour pseudo-criticals, Brill & Beggs Z)
+src/core/vlp/        wellbore marches — oil/water (modified Griffith), gas (Gray),
+                     water injector (downward march, Ramey temperature), ESP stack
+src/core/ipr/        Darcy / Vogel / Jones / C&n inflow, oil-gas-water
+src/core/nodal/      operating point (Brent), sensitivity families
+src/core/reserve/    oil-reserve (Havlena-Odeh, static MB, reservoir limit)
+                     gas-reserve (p/Z solver, SITHP march, gauge p/Z, reservoir limit, forecast)
+                     tarner.js, walsh.js (the two oil forecast methods)
+src/core/solvers/    Brent, bracketing
+src/server/api.js    every endpoint; the UI's only contract
+src/server/server.js static file serving, security headers, case database, auth
+src/ui/              index.html · app.js · style.css · help.html (the manual)
+docs/                deploy.md · user-guide.md · equations.md
+tests/               23 files — workbook cell pins and physics regressions
+scripts/             validation-sweep.mjs · make-icons.mjs
+```
+
+**Not in git, and deliberately so** (see `.gitignore`): `data/`,
+`data-backups/`, `oil excel/`, `gas excel/`, `training slids/`, `*.xls*`,
+`*.pptx`. The workbooks are the source material and the client cases are
+private; neither belongs in a repository. They **are** in the F: backup.
+
+## 5. Operational knowledge that is not in the code
+
+- **`data/` is the only stateful thing in the entire application.** It holds
+  `users.json` and the company case store, lives at `/opt/wellsim/app/data`,
+  and is not in git. Back it up on its own schedule — the deploy does not
+  touch it, and nothing else will recreate it.
+- **Sessions are in-memory.** Any restart signs users out. Cases on disk are
+  unaffected. This is fine and expected; do not treat it as a bug report.
+- **Charts are drawn by Plotly at their container's width.** Drawing one
+  while its container is hidden yields a stale 700 px canvas, and a
+  `ResizeObserver` does not fire for a `display:none` ancestor. This caused a
+  long tail of "overlapping chart" reports; the fix is the mismatch-driven
+  `refitCharts()` pass in `app.js`. If charts ever look wrong after a solve,
+  start there rather than in the physics.
+- **Secrets** are in `d:\github_token.txt`, `d:\hetzner_token.txt`,
+  `d:\wellsim_token.txt` (Cloudflare). They are never committed and never
+  printed. The server accepts SSH keys only; the private key is
+  `~/.ssh/wellsim_hetzner`. **The root password file `d:\ssh pass` should be
+  deleted and that password rotated** — it was written to disk during setup
+  and never needed again once the key was installed.
+- **The code-signing PFX** and its password are for the desktop distributable.
+  The PFX must not ship inside any distributed zip, and the password belongs
+  in a password manager, not a file.
+
+## 6. Known gaps — accepted, not oversights
+
+These were each raised, discussed and consciously deferred. They are listed
+so nobody rediscovers them as surprises.
+
+**Water injector** (all four acknowledged by the author):
+1. No fracture / formation-parting pressure limit — the model will happily
+   report an injection rate above what would fracture the formation.
+2. Injected-water temperature affects the bottom-hole temperature only; it
+   does not feed back into viscosity along the march.
+3. Skin is static — no fall-off-derived or time-dependent skin.
+4. No surface-pressure ceiling — no pump or wellhead rating is enforced.
+
+**Gas reserve, memory-gauge method:** the entered Pr is taken as already
+corrected to datum. A gauge sitting off-datum needs its own gas-column
+correction first. This was explicitly descoped; the machinery to do it
+already exists in the SITHP static march if it is ever wanted.
+
+**Oil forecast:** the material balance has no water-production term, so the
+Forecast W.C affects lift only, never the balance. On a high-water-cut well
+that is a real modelling limit, not a rounding issue.
+
+**Demo data self-consistency:** the demo oil well carries a measured GOR of
+5000 scf/stb against an Rsi of 700 at a pressure above the bubble point. The
+material balance cannot reproduce that, so MB-derived and measured GOR
+diverge sharply on the demo case. Real, consistent data does not show this.
+Worth remembering before chasing it as a bug.
+
+## 7. If you change the physics
+
+1. Find the workbook cell it comes from. The workbooks are in `oil excel/`
+   and `gas excel/` in the backup.
+2. Pin it with a test at 15 digits, the way the existing tests do.
+3. Run `node --test` **and** `node scripts/validation-sweep.mjs`.
+4. Verify in the browser — the app is the deliverable, not the API.
+5. Only then deploy, and bump the asset stamp.
+
+## 8. Contact
+
+**M. El-Ashry — muhamad.elashry@gmail.com**

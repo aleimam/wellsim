@@ -1,114 +1,113 @@
-# Deploying WellSim to thepwf.net
+# Deploying WellSim
 
-WellSim is a Node app (API + company case database), so **GitHub Pages cannot
-host it** — Pages serves static files only. The production architecture is:
+This documents the **live production setup**, not a hypothetical one. WellSim
+is a Node app (API + company case database), so a static host such as GitHub
+Pages or Cloudflare Pages **cannot run it** — those serve files only.
 
 ```
-GitHub repo (source of truth)  →  Node host (runs the server, auto-TLS)  →  thepwf.net (DNS)
+GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  →  wellsim.app
 ```
 
-The case database (`data/`) holds **user credentials and client cases** — it
-is gitignored and must live on a **persistent disk** on the host.
+## Production facts
 
-## 1. Push the repo to GitHub
+| | |
+|---|---|
+| Host | Hetzner VPS, **91.98.23.255**, Ubuntu 24.04 LTS |
+| Runtime | Node **v22** at `/usr/bin/node` — no npm install, the app has zero dependencies |
+| App path | `/opt/wellsim/app`, owned by the `wellsim` service user |
+| Service | systemd `wellsim.service`, `PORT=3355`, `Restart=always` |
+| TLS / proxy | **Caddy v2**, `/etc/caddy/Caddyfile` — automatic Let's Encrypt, renews itself |
+| Firewall | ufw: OpenSSH, 80/tcp, 443/tcp only |
+| DNS | Cloudflare (both domains) |
+| Also on this box | **thepwf.net** — a static site served by the same Caddy from `/opt/thepwf` |
+| Access | SSH key only, password auth disabled. Private key: `~/.ssh/wellsim_hetzner` |
 
-The repo is already initialized and committed locally. On GitHub, create an
-empty **private** repo (e.g. `wellsim`), then:
+Caddyfile (whole file — Caddy handles certificates unprompted):
 
-```bash
-git remote add origin https://github.com/<your-user>/wellsim.git
-git push -u origin main
 ```
-
-(Or install GitHub CLI and run `gh repo create wellsim --private --source . --push`.)
-
-## 2. Host — Render (recommended, simplest with TLS + disk)
-
-1. render.com → New → **Blueprint** → pick the GitHub repo. The included
-   `render.yaml` configures everything: zero build step,
-   `node src/server/server.js`, and a **1 GB persistent disk mounted on
-   `data/`** (Starter plan — the free plan has no disk, so the case database
-   would vanish on every deploy).
-2. After the first deploy the app is live at `https://wellsim-XXXX.onrender.com`.
-3. Service → **Settings → Custom Domains** → add `thepwf.net` and
-   `www.thepwf.net`. Render provisions Let's Encrypt TLS automatically and
-   renews it forever.
-
-**DNS at your registrar for thepwf.net:**
-
-| Type  | Name | Value |
-|-------|------|-------|
-| A     | @    | `216.24.57.1` (Render's apex IP — confirm in the Custom Domains screen) |
-| CNAME | www  | `<your-service>.onrender.com` |
-
-Propagation takes minutes to a few hours; Render shows a green check per
-domain when TLS is issued.
-
-## 3. Alternative — your own VPS (nginx + certbot)
-
-For full control (any provider: Hetzner, DigitalOcean, Lightsail…):
-
-```bash
-# on the server (Ubuntu)
-sudo apt install -y nginx certbot python3-certbot-nginx nodejs git
-git clone https://github.com/<your-user>/wellsim.git /opt/wellsim
-```
-
-systemd unit `/etc/systemd/system/wellsim.service`:
-
-```ini
-[Unit]
-Description=WellSim
-After=network.target
-[Service]
-WorkingDirectory=/opt/wellsim
-ExecStart=/usr/bin/node src/server/server.js
-Environment=PORT=3355
-Restart=always
-User=www-data
-[Install]
-WantedBy=multi-user.target
-```
-
-nginx site `/etc/nginx/sites-available/thepwf.net` (best-practice reverse
-proxy: TLS termination, HSTS, gzip, proxy headers):
-
-```nginx
-server {
-  server_name thepwf.net www.thepwf.net;
-  location / {
-    proxy_pass http://127.0.0.1:3355;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Real-IP $remote_addr;
-  }
-  gzip on;
-  gzip_types text/html text/css application/javascript application/json;
-  add_header Strict-Transport-Security "max-age=31536000" always;
+wellsim.app {
+    reverse_proxy 127.0.0.1:3355
+}
+www.wellsim.app {
+    redir https://wellsim.app{uri} permanent
+}
+thepwf.net {
+    root * /opt/thepwf
+    file_server
+}
+www.thepwf.net {
+    redir https://thepwf.net{uri} permanent
 }
 ```
 
-```bash
-sudo ln -s /etc/nginx/sites-available/thepwf.net /etc/nginx/sites-enabled/
-sudo systemctl enable --now wellsim nginx
-sudo certbot --nginx -d thepwf.net -d www.thepwf.net   # TLS + auto-renew
-```
+## Deploy a new version
 
-DNS: A records for `@` and `www` → the VPS IP.
-
-## 4. Docker (any container host)
+From a clean working tree on `main`, after `node --test` passes:
 
 ```bash
-docker build -t wellsim .
-docker run -d -p 3355:3355 -v wellsim-data:/app/data --restart=always wellsim
+git archive --format=tar.gz -o /tmp/wellsim-src.tar.gz HEAD
+scp -i ~/.ssh/wellsim_hetzner /tmp/wellsim-src.tar.gz root@91.98.23.255:/root/
+ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 \
+  'tar -xzf /root/wellsim-src.tar.gz -C /opt/wellsim/app \
+   && chown -R wellsim:wellsim /opt/wellsim/app \
+   && systemctl restart wellsim && systemctl is-active wellsim'
 ```
+
+`git archive` ships **exactly the committed tree**, so gitignored material
+(`data/`, the Excel workbooks, training slides) never leaves the machine.
+
+**Bump the asset stamp whenever `app.js`, `style.css` or `index.html`
+changes.** Both are versioned by a query string in `src/ui/index.html`
+(`?v=YYYY-MM-DD<letter>`); browsers cache those assets for 5 minutes and will
+otherwise serve a stale bundle. HTML itself is sent `no-cache` and always
+revalidates, so `help.html` needs no stamp.
+
+### Two caveats of the tar deploy
+
+1. **It overwrites, it never deletes.** A file removed from the repo stays on
+   the server forever. To prune, delete it on the server explicitly (or wipe
+   `/opt/wellsim/app` and re-extract — but move `data/` aside first).
+2. **`data/` survives only because of that.** The case database lives at
+   `/opt/wellsim/app/data` and is gitignored, so the archive does not contain
+   it and tar leaves it alone. It is the only stateful thing in the
+   application — **back it up separately**:
+
+```bash
+ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 'tar -czf - -C /opt/wellsim/app data' > wellsim-data-backup.tar.gz
+```
+
+## Routine operations
+
+```bash
+systemctl status wellsim          # is it up
+journalctl -u wellsim -n 100      # app log
+journalctl -u caddy -n 50         # TLS / proxy log
+systemctl restart wellsim         # after a deploy
+```
+
+A restart signs users out — sessions are in-memory. The case database on disk
+is unaffected.
+
+## Credentials
+
+API tokens live in files on the workstation and are **never** committed or
+printed: `d:\github_token.txt`, `d:\hetzner_token.txt`,
+`d:\wellsim_token.txt` (Cloudflare), `d:\render_token.txt` (unused). The
+server takes SSH keys only. Rotate anything that has ever been pasted into a
+chat, a terminal recording, or a shared document.
+
+## Alternatives (not in use)
+
+- **Docker** — the repo carries a `Dockerfile`:
+  `docker run -d -p 3355:3355 -v wellsim-data:/app/data --restart=always wellsim`
+- **Render** — `render.yaml` is still present and configures a 1 GB persistent
+  disk on `data/`. It needs a paid plan (the free tier has no disk, so the case
+  database would vanish on every deploy); this was the original target before
+  the move to Hetzner.
 
 ## Production notes
 
-- The app already sends security headers (nosniff, frame-deny, no-referrer)
-  and sane cache-control; **TLS/HSTS terminate at the platform or nginx**.
-- Sessions are in-memory: a deploy/restart signs users out (they sign in
-  again; the case database itself is on the persistent disk).
-- Back up `data/` — it is the only stateful thing in the whole app.
-- The free version stays free: no account is needed for any calculation;
-  accounts only gate the server case store.
+- The app sends its own security headers (nosniff, frame-deny, no-referrer)
+  and cache policy; TLS and HSTS terminate at Caddy.
+- No account is needed for any calculation — accounts only gate the server
+  case store, so an auth outage never blocks engineering work.

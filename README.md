@@ -15,6 +15,10 @@ against the original workbook cells.
 | **2 — Reserve estimate** (minimum connected volume) | ✔ 3 methods: Havlena–Odeh MB on prod data · MB on measured static pressures (memory gauge) · reservoir limit | ✔ 4 methods: p/Z on prod data · p/Z from SITHP statics · reservoir limit · p/Z from measured memory-gauge pressures |
 | **3 — Forecast** | ✔ Tarner · Walsh generalized-MB with Rv (saturation-tracking MB + nodal) | ✔ p/Z tank + nodal, history + forecast chart |
 
+Picking this up cold? Start with **[HANDOVER.md](HANDOVER.md)** — what it is,
+how to run and deploy it, the operational knowledge that is not in the code,
+and the known gaps.
+
 ## Run
 
 ```bash
