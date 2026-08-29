@@ -12,7 +12,7 @@ against the original workbook cells.
 | Module | Oil | Gas |
 |---|---|---|
 | **1 — Well model** (nodal analysis) | Natural flow ✔ · Gas lift ✔ · **ESP full stack** ✔ (68-pump database, shared with water) · **Water Well tab** ✔ (producer + injector, ESP on the same catalog) | Natural ✔ |
-| **2 — Reserve estimate** (minimum connected volume) | ✔ 3 methods: Havlena–Odeh MB on prod data · MB on measured static pressures (memory gauge) · reservoir limit | ✔ 3 methods: p/Z on prod data · p/Z from SITHP statics · reservoir limit |
+| **2 — Reserve estimate** (minimum connected volume) | ✔ 3 methods: Havlena–Odeh MB on prod data · MB on measured static pressures (memory gauge) · reservoir limit | ✔ 4 methods: p/Z on prod data · p/Z from SITHP statics · reservoir limit · p/Z from measured memory-gauge pressures |
 | **3 — Forecast** | ✔ Tarner · Walsh generalized-MB with Rv (saturation-tracking MB + nodal) | ✔ p/Z tank + nodal, history + forecast chart |
 
 ## Run
@@ -51,7 +51,7 @@ src/core/vlp/         wellpath, common (Chen friction, Ramey T), ashry factor,
 src/core/ipr/         oil-ipr (composite Vogel + Darcy J), gas-ipr (Darcy Pr^2 + C&n),
                       multilayer, inflow, skin-guidance
 src/core/nodal/       nodal (operating point), calibrate (get_Pwf), sensitivity, gaslift
-src/core/reserve/     gas-reserve (Pres solver, p/Z, SITHP march, reservoir limit, forecast)
+src/core/reserve/     gas-reserve (Pres solver, p/Z, SITHP march, gauge p/Z, reservoir limit, forecast)
                       oil-reserve (Pres solver, Havlena-Odeh MB, static MB, reservoir limit)
                       tarner (oil forecast), walsh (generalized-MB forecast)
 src/core/solvers/     brent

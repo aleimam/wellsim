@@ -427,6 +427,12 @@ per-station explicit z, from the well-model data — validated to 1.2 % against 
 workbook's 7661.9 psi case). Gp comes from the prod-data cumulative — no IPR/VLP
 matching involved. Defaults: 2500 / 2000 / 1300 psi on the same dates.
 
+### 5.3 Reservoir limit
+
+Same method as the oil version, gas units: **GIIP = q̄/(Ct·m)** with defaults
+Sg 0.85 · So 0 · Sw 0.15 · Co/Cw 1e-6 · Cf 3e-6, Cg grey = calculated from two
+Bg points. Slim table + Pwf-decline chart with the slope line.
+
 ### 5.4 Pres from memory gauges
 
 Measured static reservoir pressures — the shortest route to a p/Z line: **no march
@@ -443,14 +449,11 @@ Defaults: 3266.3 / 2607.1 / 1671.0 psi on the same three dates — *these are ex
 what selection 2 computes from its own 2500 / 2000 / 1300 psi SITHP defaults*, so the
 two routes return the same 120.19 Bscf out of the box and can be cross-checked.
 
-### 5.3 Reservoir limit
-
-Same method as the oil version, gas units: **GIIP = q̄/(Ct·m)** with defaults
-Sg 0.85 · So 0 · Sw 0.15 · Co/Cw 1e-6 · Cf 3e-6, Cg grey = calculated from two
-Bg points. Slim table + Pwf-decline chart with the slope line.
-
 Each selection carries a best-practice/limitation note; demo answers differ
-(≈150 / 120 / 91 / 120 Bscf — selections 2 and 4 agree by construction) — that spread is the tool exposing input uncertainty.
+on the demo well (≈150 / 120 / 91 / 120 Bscf). Selections 2 and 4 agree by
+construction — the gauge defaults ARE what the SITHP march computes — so their
+agreement is a round-trip check, while the spread across 1 / 3 is the tool exposing
+input uncertainty.
 
 ---
 
