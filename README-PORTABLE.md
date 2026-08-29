@@ -1,6 +1,6 @@
 # WellSim — standalone portable program
 
-**Build 1.2 — 30 August 2026**, from commit `5349c2b` of the main project.
+**Build 1.2 — 30 August 2026**, from commit `ce63b3f` of the main project.
 Identical physics to https://wellsim.app at that commit: 210 tests, 43/43
 validation sweep. Changes since build 1.1 (29 Aug):
 

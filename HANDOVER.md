@@ -142,7 +142,7 @@ private; neither belongs in a repository. They **are** in the F: backup.
   because they are ~200 MB per build. It serves the identical UI and physics,
   stores cases in a `cases/` folder **beside the exe**, has no accounts, and
   takes the first free port from 3355. Current: **build 1.2, 30 Aug 2026**,
-  from commit `5349c2b`; it lives on the Transcend at `F:\petrosim\` and on
+  from commit `ce63b3f`; it lives on the Transcend at `F:\petrosim\` and on
   the Desktop under `WellSim\`.
 
   Two things about it are easy to get wrong, and both were wrong until
