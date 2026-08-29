@@ -758,6 +758,9 @@ function fillOilProdRows(rows, startIdx = 0) {
 }
 
 const PRES_FRACTIONS = [0.75, 0.5, 0.25];
+// the ESP Pres sensitivity uses SHALLOWER steps: a pump still has to lift at
+// modest depletion, and 0.25 x Pr kills most ESP wells outright
+const ESP_PRES_FRACTIONS = [0.9, 0.8, 0.7];
 /** What refreshPresDefaults last wrote, per prefix — a field still holding
  *  one of these is untouched and may be refreshed; anything else is the
  *  user's and is left alone. */
@@ -777,10 +780,10 @@ function renderPresList(id, prefix, defaults) {
  * sit above the current pressure. A value the user has typed is never
  * overwritten.
  */
-function refreshPresDefaults(prefix, prId = `${prefix}-prPsi`, priId = `${prefix}-priPsi`) {
+function refreshPresDefaults(prefix, prId = `${prefix}-prPsi`, priId = `${prefix}-priPsi`, fractions = PRES_FRACTIONS) {
   const pr = Number(val(prId)) || Number(val(priId));
   if (!(pr > 0)) return;
-  const next = PRES_FRACTIONS.map((x) => Math.round(pr * x));
+  const next = fractions.map((x) => Math.round(pr * x));
   const prev = presAuto[prefix] ?? [];
   for (let i = 0; i < next.length; i++) {
     const el = document.getElementById(`${prefix}-pres-${i}`);
@@ -1247,6 +1250,18 @@ function switchWaterEspPump() {
 
 // ---- ESP view: Model match (final charts) | Sensitivity (Pres cases) ----
 
+const espTab = () => document.querySelector('input[name="oil-esptab"]:checked')?.value ?? 'match';
+
+function switchEspTab() {
+  const sens = espTab() === 'sens';
+  document.getElementById('oil-espsens-inputs').style.display = sens ? '' : 'none';
+  if (oilLiftType() !== 'esp' || espPumpMode() === 'manual') return;
+  for (const id of ['oil-cr-nodal', 'oil-cr-gl', 'oil-cr-whp', 'oil-cr-esptrav'])
+    document.getElementById(id).style.display = sens ? 'none' : '';
+  document.getElementById('oil-cr-espsens').style.display = sens ? '' : 'none';
+  resizeVisibleCharts();
+}
+
 /** Fill the oil and water pump selectors from the shared 68-pump database
  *  (the water tab has no custom-curve builder, so no "add new" option). */
 async function loadEspPumps() {
@@ -1457,7 +1472,7 @@ function switchOilModule() {
     document.getElementById(id).style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('oil-cr-fc').style.display = m === 'forecast' ? '' : 'none';
   if (m !== 'well') {
-    for (const id of ['oil-cr-esptrav', 'oil-cr-senspump', 'oil-cr-senstrav'])
+    for (const id of ['oil-cr-esptrav', 'oil-cr-espsens', 'oil-cr-senspump', 'oil-cr-senstrav'])
       document.getElementById(id).style.display = 'none';
   }
   resizeVisibleCharts();
@@ -1875,6 +1890,43 @@ async function espRun() {
   document.getElementById('oil-cr-esptrav').style.display = '';
 }
 
+
+async function espSensRun() {
+  const body = oilForm();
+  body.presList = collectPres('oil-esp', 3);
+  const r = await api('oil/espsens', body);
+  const traces = [];
+  r.cases.forEach((c, i) => {
+    traces.push({
+      x: c.iprCurve.map((p) => p.qOilStbD), y: c.iprCurve.map((p) => p.pwfPsi),
+      name: `IPR ${c.label}`, mode: 'lines', line: { width: 2 },
+    });
+    if (c.op) {
+      traces.push({
+        x: [c.op.qOilStbD], y: [c.op.pwfPsi], name: `node ${c.label}`, mode: 'markers',
+        marker: { symbol: 'star', size: 14 },
+      });
+    }
+  });
+  plot('oil-chart-espsens', traces, {
+    ...LAYOUT(),
+    title: `ESP Pres sensitivity — ${r.pump.name}, ${r.opts.stages} stages @ ${r.opts.freqHz} Hz (solved nodes)`,
+    xaxis: { title: 'Oil rate, stb/d', rangemode: 'tozero' },
+    yaxis: { title: 'Pwf, psi', rangemode: 'tozero' },
+  });
+  mobileShowResults();
+  renderTables('oil-table-espsens', [{
+    title: 'ESP data at the solved node',
+    headers: ['case', 'J', 'q stb/d', 'Pwf', 'Pint', 'Pdis', 'ΔP', 'head ft', 'Qg@pump', 'grad', 'free gas %', 'WHT °F', 'thrust'],
+    rows: r.cases.map((c) =>
+      c.op
+        ? [c.label, fmt(c.j, 3), fmt(c.op.qOilStbD, 0), fmt(c.op.pwfPsi, 0), fmt(c.op.pintPsi, 0), fmt(c.op.pdisPsi, 0), fmt(c.op.dpPsi, 0), fmt(c.op.headFt, 0), fmt(c.op.qGrossPumpBpd, 0), fmt(c.op.gradPsiFt, 4), fmt(c.op.freeGasPct, 1), fmt(c.op.whtF, 1), c.op.thrust]
+        : [c.label, fmt(c.j, 3), c.opStatus, '—', '—', '—', '—', '—', '—', '—', '—', '—', '—']),
+  }]);
+  const sr = document.querySelector('input[name="oil-esptab"][value="sens"]');
+  if (sr) sr.checked = true;
+  switchEspTab();
+}
 
 async function espStagesRun() {
   const r = await api('oil/espstages', oilForm());
@@ -2936,6 +2988,7 @@ switchWaterType();
 
 // oil Reserve estimate module
 renderOilProdTable(OIL_PROD_DEFAULTS);
+renderPresList('oil-esppres-list', 'oil-esp', ESP_PRES_FRACTIONS.map((x) => Math.round(3550 * x)));
 const oilStaticTable = dynamicTable({ tableId: 'oil-static-table', prefix: 'oil-static', cols: OIL_STATIC_COLS, defaults: OIL_STATIC_ROWS });
 renderFieldRow('oil-rlt-fields', 'oil', OIL_RLT_FIELDS);
 renderFieldRow('oil-fc-fields', 'oil', OIL_FC_FIELDS);
@@ -3008,7 +3061,10 @@ switchGasModule();
 for (const prefix of ['oil', 'water', 'gas'])
   for (const k of ['prPsi', 'priPsi']) {
     const el = document.getElementById(`${prefix}-${k}`);
-    if (el) el.addEventListener('input', () => refreshPresDefaults(prefix));
+    if (el) el.addEventListener('input', () => {
+      refreshPresDefaults(prefix);
+      if (prefix === 'oil') refreshPresDefaults('oil-esp', 'oil-prPsi', 'oil-priPsi', ESP_PRES_FRACTIONS);
+    });
   }
 document.getElementById('tab-oil').onclick = () => switchTab('oil');
 document.getElementById('tab-water').onclick = () => switchTab('water');
@@ -3071,6 +3127,8 @@ document.getElementById('oil-btn-gl').onclick = guard(oilGl);
 document.getElementById('oil-btn-reserve').onclick = guard(oilReserveRun);
 document.getElementById('oil-btn-forecast').onclick = guard(oilForecastRun);
 document.getElementById('oil-btn-espstages').onclick = guard(espStagesRun);
+document.getElementById('oil-btn-espsens').onclick = guard(espSensRun);
+document.querySelectorAll('input[name="oil-esptab"]').forEach((r) => (r.onchange = switchEspTab));
 document.getElementById('oil-btn-espwear').onclick = guard(espWearRun);
 document.getElementById('gas-btn-solve').onclick = guard(gasSolve);
 document.getElementById('gas-btn-calibrate').onclick = guard(gasCalibrate);

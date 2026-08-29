@@ -279,16 +279,23 @@ inputs are required; there is no input THT.
    matched K carries it into the Darcy record). Validation: from the demo
    well's measured gauges the solver recovers the workbook's PI input
    (2.698 vs 2.7).
-   Solving an ESP well draws the final charts — IPR vs the coupled ESP-VLP
-   nodal plot, wellhead PQ & WHT, the PumpCurve with the results block beside
-   it, and the Traverse on its own row with the measured Pint/Pdis markers.
-   The Traverse also draws in **Manual ΔP** mode, where your input ΔP appears
-   as the highlighted pressure step at pump depth merged into the march.
-   ESP cases are run from the **main VLP/IPR sensitivity block** (§ the
-   sensitivity charts above) — one place for every fluid and lift type. Its
-   VLP sets take an ESP **frequency** column, each set gets the real coupled
-   pump solve at its own frequency, and the results carry the pump curve per
-   set, the traverse per set and the full pump state at each solved node.
+   **Two ESP views** (radio under the ESP inputs). *Model match* draws the
+   final charts — IPR vs the coupled ESP-VLP nodal plot, wellhead PQ & WHT,
+   the PumpCurve with the results block beside it, and the Traverse on its own
+   row with the measured Pint/Pdis markers. The Traverse also draws in
+   **Manual ΔP** mode, where your input ΔP appears as the highlighted pressure
+   step at pump depth.
+
+   *Sensitivity* runs future-Pres cases at **0.9 / 0.8 / 0.7 × Pr** — shallower
+   than the 0.75/0.5/0.25 the other modules use, because a pump still has to
+   lift at modest depletion and 0.25 × Pr kills most ESP wells outright. Each
+   case takes the Darcy future-J chain and is then **fully solved** with the
+   coupled pump: the chart overlays every case's IPR with its solved node
+   starred, and the table lists the ESP data at that node (rate, Pwf, Pint,
+   Pdis, ΔP, head, Qg@pump, gradient, free gas %, WHT, thrust). That is where
+   you see the pump working harder and the intake falling as the reservoir
+   depletes. ESP sets also run in the main VLP/IPR sensitivity block, but that
+   block solves at the CURRENT Pr only.
 
 ### Multi-layer IPR (optional, oil & gas well models)
 

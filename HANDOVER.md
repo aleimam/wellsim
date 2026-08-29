@@ -71,9 +71,12 @@ src/core/reserve/    oil-reserve (Havlena-Odeh, static MB, reservoir limit)
                      gas-reserve (p/Z solver, SITHP march, gauge p/Z, reservoir limit, forecast)
                      tarner.js, walsh.js (the two oil forecast methods)
 src/core/solvers/    Brent, bracketing
-src/server/api.js    every endpoint; the UI's only contract. ONE sensitivity
-                     path (oilSensitivity / gasSensitivity) serves every fluid
-                     and lift type, ESP included
+src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
+                     paths by design: oilSensitivity / gasSensitivity solve every
+                     VLP set at the CURRENT Pr (all fluids, all lift types), and
+                     oilEspSens solves an ESP FULLY at each future Pres
+                     (0.9/0.8/0.7 x Pr) — the one place a pump is solved on a
+                     depleted reservoir
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
@@ -163,13 +166,6 @@ already exists in the SITHP static march if it is ever wanted.
 **Oil forecast:** the material balance has no water-production term, so the
 Forecast W.C affects lift only, never the balance. On a high-water-cut well
 that is a real modelling limit, not a rounding issue.
-
-**ESP nodes at future pressures.** An ESP-only Pres sensitivity used to
-solve the pump operating point AT each future reservoir pressure. It was
-removed so that the VLP/IPR block is the single sensitivity path. That block
-solves each set at the CURRENT Pr and draws the future pressures as IPR
-curves without solving nodes on them, so the capability is genuinely gone
-rather than relocated — it would need adding to the main block.
 
 **Demo data self-consistency:** the demo oil well carries a measured GOR of
 5000 scf/stb against an Rsi of 700 at a pressure above the bubble point. The
