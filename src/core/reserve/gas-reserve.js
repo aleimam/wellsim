@@ -265,20 +265,56 @@ export function sithpReserve(cfg, sithpRows, prodRows) {
  * from the flowing production rows (the same trapezoid the other routes use).
  * prodRows: [{ date, qMMscfd }].
  */
+/**
+ * Correct a measured pressure from the gauge depth to the datum, through the
+ * static gas column between them — the SAME average-T&Z correlation the SITHP
+ * route uses (Pws = P * exp(0.01875*gg*dD/(TavgR*Zavg)), Zavg iterated), just
+ * over a partial interval instead of the whole well.
+ *
+ * A memory gauge sits at its running depth, which is rarely the datum. Left
+ * uncorrected a gauge ABOVE the datum reads low, and every p/Z point with it,
+ * which biases the fitted GIIP.
+ *
+ * dTvdFt > 0 means the gauge is ABOVE the datum (pressure is added).
+ */
+export function gaugeToDatum({ pPsi, dTvdFt, cfg, gaugeTempF }) {
+  if (!(Math.abs(dTvdFt) > 0.5)) return { presPsi: pPsi, gradientPsiFt: 0, dTvdFt: 0 };
+  const tAvgR = ((gaugeTempF ?? cfg.tresF) + cfg.tresF) / 2 + 460;
+  const pc = gasPseudoCriticals({ gasSg: cfg.gasSg, n2: cfg.n2 ?? 0, co2: cfg.co2 ?? 0, h2s: cfg.h2s ?? 0, method: 'sour' });
+  let out = pPsi;
+  for (let i = 0; i < 60; i++) {
+    const zAvg = zFactorBrillBeggs(((pPsi + out) / 2) / pc.ppc, tAvgR / pc.tpc).z;
+    const next = pPsi * Math.exp((0.01875 * cfg.gasSg * dTvdFt) / (tAvgR * zAvg));
+    if (Math.abs(next - out) < 1e-9) { out = next; break; }
+    out = next;
+  }
+  return { presPsi: out, gradientPsiFt: (out - pPsi) / dTvdFt, dTvdFt };
+}
+
 export function gaugeReserve(cfg, gaugeRows, prodRows) {
   if (gaugeRows.length < 2)
     throw new Error('gauge route needs at least 2 surveys (date + Pr) to see depletion');
   const gp = cumGp(prodRows);
   const t0 = toDays(gaugeRows[0].date);
+  const datumTvdFt = cfg.perfTvdM * 3.281;
   const points = gaugeRows.map((r) => {
     const tDays = toDays(r.date);
-    const z = zAtRes(cfg, r.presPsi);
+    // gaugeTvdM blank -> the reading is already at datum (the previous
+    // behaviour, and still the common case for a corrected report)
+    const gTvdFt = r.gaugeTvdM != null ? r.gaugeTvdM * 3.281 : datumTvdFt;
+    const corr = gaugeToDatum({ pPsi: r.presPsi, dTvdFt: datumTvdFt - gTvdFt, cfg, gaugeTempF: r.gaugeTempF });
+    const presPsi = corr.presPsi;
+    const z = zAtRes(cfg, presPsi);
     return {
       tDays,
       dtDays: tDays - t0,
-      presPsi: r.presPsi,
+      gaugePsi: r.presPsi,
+      gaugeTvdM: r.gaugeTvdM ?? null,
+      dTvdFt: corr.dTvdFt,
+      corrPsi: presPsi - r.presPsi,
+      presPsi,
       z,
-      pOverZ: r.presPsi / z,
+      pOverZ: presPsi / z,
       gpBscf: gp.at(tDays),
     };
   });

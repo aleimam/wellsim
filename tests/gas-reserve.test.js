@@ -267,3 +267,30 @@ test('gauge route needs two surveys to see depletion', async () => {
     /at least 2 surveys/
   );
 });
+
+test('gauge datum correction: a gauge off datum is corrected through the gas column', async () => {
+  const { gaugeToDatum, gaugeReserve } = await import('../src/core/reserve/gas-reserve.js');
+  const cfg = { perfTvdM: 2810, tresF: 201, gasSg: 0.842, n2: 0, co2: 0, h2s: 0 };
+  // at datum: no correction at all, so the previous behaviour is preserved
+  const same = gaugeToDatum({ pPsi: 3266.3, dTvdFt: 0, cfg });
+  close(same.presPsi, 3266.3, 1e-12);
+  // above datum: pressure is ADDED, at a sane gas gradient
+  const up = gaugeToDatum({ pPsi: 3266.3, dTvdFt: 100 * 3.281, cfg });
+  assert.ok(up.presPsi > 3266.3, 'a gauge above datum reads low');
+  assert.ok(
+    up.gradientPsiFt > 0.05 && up.gradientPsiFt < 0.25,
+    `gas gradient out of range: ${up.gradientPsiFt} psi/ft`
+  );
+  // below datum: symmetric, and the round trip returns the original
+  const down = gaugeToDatum({ pPsi: up.presPsi, dTvdFt: -100 * 3.281, cfg });
+  close(down.presPsi, 3266.3, 2e-3);
+  // and it moves the fitted GIIP the right way
+  const prod = [{ date: 0, qMMscfd: 18.56 }, { date: 1826, qMMscfd: 17 }, { date: 3662, qMMscfd: 11 }];
+  const mk = (gaugeTvdM) => gaugeReserve(cfg,
+    [{ date: 0, presPsi: 3266.3, gaugeTvdM }, { date: 1826, presPsi: 2607.1, gaugeTvdM },
+     { date: 3662, presPsi: 1671, gaugeTvdM }], prod);
+  const atDatum = mk(undefined), above = mk(2400);
+  close(atDatum.points[0].corrPsi, 0, 1e-12);
+  assert.ok(above.points[0].corrPsi > 100, 'a 410 m offset is worth more than 100 psi');
+  assert.ok(above.fit.giipBscf > atDatum.fit.giipBscf, 'correcting up raises the fitted GIIP');
+});

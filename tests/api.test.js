@@ -362,3 +362,31 @@ test('ESP back-traverse is marched at the SOLVED rate', async () => {
   assert.ok(deep.tvdFt >= shallow.tvdFt, 'stations run shallow -> deep');
   assert.ok(deep.pPsi > shallow.pPsi, 'pressure must rise with depth');
 });
+
+test('injector reports formation parting, and the THP that avoids it', () => {
+  const F = {
+    fluid: 'water', wellType: 'injector', thpPsi: '2000', injTempF: '90',
+    tubingIdIn: '2.992', roughness: '0.00006', topPerfAhM: '2810',
+    devStartM: '1910', devAngleDeg: '7', api: '10', wcPct: '100',
+    gorScfStb: '0', rsiScfStb: '0', pbPsi: '0', gasSg: '0.842', tresF: '201',
+    oilViscCp: '6', waterSg: '1.05', soilTempF: '90', htcBtu: '3',
+    tubingOdIn: '3.5', cpBtu: '0.51', priPsi: '4800', permMd: '50',
+    thicknessFt: '42.653', reFt: '1640.5', rwFt: '0.5104166667', skin: '0',
+    matchHead: '1', matchFriction: '1',
+  };
+  // no gradient given -> no parting check at all (the previous behaviour)
+  const none = handlers['water/injector']({ ...F });
+  assert.equal(none.fracPsi, null);
+  assert.equal(none.aboveFracPsi, null);
+  // a high gradient clears the solved BHIP
+  const ok = handlers['water/injector']({ ...F, fracGradPsiFt: '0.7' });
+  assert.ok(ok.fracPsi > ok.op.pwfPsi, `parting ${ok.fracPsi} should clear BHIP ${ok.op.pwfPsi}`);
+  assert.equal(ok.aboveFracPsi, null);
+  // a low one does not, and the reported THP must land ON the parting pressure
+  const over = handlers['water/injector']({ ...F, fracGradPsiFt: '0.6' });
+  assert.ok(over.aboveFracPsi > 0, `should be above parting: ${over.aboveFracPsi}`);
+  assert.ok(over.thpAtFracPsi > 0 && over.thpAtFracPsi < 2000);
+  const fixed = handlers['water/injector']({ ...F, thpPsi: String(over.thpAtFracPsi), fracGradPsiFt: '0.6' });
+  close(fixed.op.pwfPsi, over.fracPsi, 1e-3);
+  assert.ok(fixed.op.qBpd < over.op.qBpd, 'staying below parting must cost rate');
+});

@@ -3,7 +3,7 @@
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
 **As of:** 30 August 2026 — commit `65c86aa`, asset stamp `2026-08-30h`,
-201 tests passing, 43/43 validation sweep.
+207 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -35,7 +35,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 201 unit + regression tests
+node --test                       # 207 unit + regression tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -169,17 +169,21 @@ These were each raised, discussed and consciously deferred. They are listed
 so nobody rediscovers them as surprises.
 
 **Water injector** (all four acknowledged by the author):
-1. No fracture / formation-parting pressure limit — the model will happily
-   report an injection rate above what would fracture the formation.
+1. ~~No fracture / formation-parting limit~~ — **closed 30 Aug 2026**: a
+   fracture-gradient input gives the parting pressure and the THP that lands
+   on it. The gradient is an INPUT because it belongs to the rock (step-rate
+   or leak-off test); no correlation here can predict it.
 2. Injected-water temperature affects the bottom-hole temperature only; it
    does not feed back into viscosity along the march.
 3. Skin is static — no fall-off-derived or time-dependent skin.
 4. No surface-pressure ceiling — no pump or wellhead rating is enforced.
 
-**Gas reserve, memory-gauge method:** the entered Pr is taken as already
-corrected to datum. A gauge sitting off-datum needs its own gas-column
-correction first. This was explicitly descoped; the machinery to do it
-already exists in the SITHP static march if it is ever wanted.
+**Gas reserve, memory-gauge method:** ~~datum correction descoped~~ —
+**closed 30 Aug 2026.** A *Gauge TVD* column corrects the reading through the
+static gas column between gauge and perforations (`gaugeToDatum()`, reusing
+the SITHP average-T&Z correlation), reporting the correction in its own
+column. A blank depth keeps the previous behaviour of trusting the entered
+value, so existing cases are unaffected.
 
 **Oil forecast:** the material balance has no water-production term, so the
 Forecast W.C affects lift only, never the balance. On a high-water-cut well

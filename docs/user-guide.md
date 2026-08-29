@@ -513,8 +513,13 @@ and no IPR**, because the gauge reading *is* the datum. Table
 same explicit Brill & Beggs at reservoir temperature the other routes use, Gp is the
 prod-data cumulative at the survey date, and the fitted p/Z line gives the same
 minimum connected GIIP.
-Each entry must be a **stabilized** (built-up or extrapolated) pressure **corrected to
-the datum depth** — a flowing gauge reading is not Pr and will read as a smaller tank.
+Each entry must be a **stabilized** (built-up or extrapolated) pressure. It no
+longer has to be corrected to datum by hand: enter the **Gauge TVD** and
+WellSim corrects the reading through the static gas column between the gauge
+and the perforations — the same average-T&Z correlation the SITHP route uses —
+and reports the correction in the *to datum psi* column. Leave the depth blank
+if the reading is already at datum. A gauge above datum reads low, so the
+correction is positive and raises the fitted GIIP — a flowing gauge reading is not Pr and will read as a smaller tank.
 A survey dated outside the production record is flagged: its Gp is held at the
 nearest end, which biases the fit.
 Defaults: 3266.3 / 2607.1 / 1671.0 psi on the same three dates — *these are exactly

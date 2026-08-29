@@ -1,0 +1,12 @@
+{
+  "main": "build/bundle.cjs",
+  "output": "build/sea-prep.blob",
+  "disableExperimentalSEAWarning": true,
+  "assets": {
+    "index.html": "src/ui/index.html",
+    "app.js": "src/ui/app.js",
+    "style.css": "src/ui/style.css",
+    "help.html": "src/ui/help.html",
+    "vendor/plotly.min.js": "src/ui/vendor/plotly.min.js"
+  }
+}

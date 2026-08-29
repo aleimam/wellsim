@@ -95,6 +95,9 @@ const WATER_SCHEMA = [
     ['reFt', 'Re', 'ft', 1640.5],
     ['rwFt', 'Rw', 'ft', 0.5104166667],
     ['skin', 'Skin (user judgment)', '-', 0],
+    // injector only: the field's own step-rate / leak-off number. Blank = no
+    // parting check at all, which is how the injector behaved before.
+    ['fracGradPsiFt', 'Fracture gradient (injector)', 'psi/ft', 0.7],
   ]},
   { title: 'Match factors', fields: [
     ['matchHead', 'Matching head', '-', 1],
@@ -624,6 +627,9 @@ const GAS_GAUGE_ROWS = [
 const GAS_GAUGE_COLS = [
   { key: 'date', label: 'Date dd-MMM-yy' },
   { key: 'presPsi', label: 'Pr psi (gauge)' },
+  // blank = the reading is already at datum (the perf depth)
+  { key: 'gaugeTvdM', label: 'Gauge TVD m' },
+  { key: 'corrPsi', label: 'to datum psi', out: true },
   { key: 'dtDays', label: 'dt d', out: true },
   { key: 'z', label: 'z', out: true },
   { key: 'gpBscf', label: 'Gp Bscf', out: true },
@@ -2103,6 +2109,17 @@ async function waterInjSolve() {
     { k: 'J injectivity', v: fmt(r.jInj, 3) },
     { k: 'Pr', v: `${fmt(r.prPsi, 0)} psi` },
     r.deficitPsi != null ? { k: 'THP deficit', v: `${fmt(r.deficitPsi, 0)} psi`, warn: true } : null,
+    // formation parting — shown only when a fracture gradient was entered
+    r.fracPsi != null ? { k: 'Parting pressure', v: `${fmt(r.fracPsi, 0)} psi` } : null,
+    r.aboveFracPsi != null
+      ? {
+          k: 'Above parting by',
+          v: r.fracUnavoidable
+            ? `${fmt(r.aboveFracPsi, 0)} psi — no THP injects below it`
+            : `${fmt(r.aboveFracPsi, 0)} psi — drop THP to ${fmt(r.thpAtFracPsi, 0)}`,
+          warn: true,
+        }
+      : null,
   ]);
   plotNodal('water-chart-nodal', 'Injection rate, bbl/d', r.injCurve, r.vlpCurve,
     r.op ? { q: r.op.qBpd, pwfPsi: r.op.pwfPsi } : null,
@@ -2487,6 +2504,7 @@ async function gasReserveRun() {
     r.rows.forEach((row, k) => {
       const i = gIdx[k];
       if (i == null) return;
+      setOut(`gas-gauge-${i}-corrPsi`, row.corrPsi, 1);
       setOut(`gas-gauge-${i}-dtDays`, row.dtDays, 2);
       setOut(`gas-gauge-${i}-z`, row.z, 4);
       setOut(`gas-gauge-${i}-gpBscf`, row.gpBscf, 3);

@@ -81,6 +81,24 @@ export function pwfAtQInj(qBpd, { j, prPsi }) {
  * friction) crossing the required Pr + q/J (rises with rate). Unique root
  * when the well takes water at all at this THP: available(0) > Pr.
  */
+/**
+ * Formation parting (fracture) pressure at the perfs, from a fracture
+ * GRADIENT in psi/ft — the field's own number, measured by a step-rate or
+ * leak-off test. Typical range 0.6-0.8 psi/ft; 0.7 is a common default but is
+ * a placeholder, not a prediction: it is an input because it belongs to the
+ * rock, and no correlation here can know it.
+ *
+ * Injecting above this parts the formation. The model does not stop you — a
+ * fracture-injection scheme is a legitimate design — but an injectivity that
+ * silently sits above the parting pressure is a rate the matrix cannot take,
+ * and it must be visible rather than implied.
+ */
+export function fracturePressurePsi(cfg) {
+  const grad = cfg.fracGradPsiFt;
+  if (!(grad > 0)) return null;
+  return grad * cfg.perfTvdM * 3.281;
+}
+
 export function injectorOperatingPoint(cfg, { j, prPsi }, { qMaxBpd = 50000 } = {}) {
   const avail = (q) => waterInjectorMarch({ ...cfg, qOilStbD: q }).pwfPsi;
   const R = (q) => avail(q) - pwfAtQInj(q, { j, prPsi });
@@ -94,8 +112,46 @@ export function injectorOperatingPoint(cfg, { j, prPsi }, { qMaxBpd = 50000 } = 
   }
   let hi = 1000;
   while (R(hi) > 0 && hi < qMaxBpd) hi *= 2;
-  if (R(hi) > 0) return { status: 'grid-cap', qOp: hi, pwfPsi: avail(hi) };
+  const frac = fracturePressurePsi(cfg);
+  // the rate at which the BHIP would reach the parting pressure, when the
+  // solved point is already above it — the matrix-injection ceiling
+  // The control for over-parting is the SURFACE pressure, not the rate.
+  // Available BHIP = THP + head - friction, so it is HIGHEST at low rate:
+  // injecting less raises the bottomhole pressure, it does not lower it. The
+  // useful answer is therefore the injection THP whose own operating point
+  // lands exactly on the parting pressure, solved by re-running the nodal
+  // solve at trial THPs.
+  const fracInfo = (pwfPsi) => {
+    if (frac == null) return {};
+    const over = pwfPsi - frac;
+    if (over <= 0) return { fracPsi: frac, aboveFracPsi: null };
+    let thpAtFrac = null;
+    const bhipAtThp = (thp) => {
+      const o = injectorOperatingPoint({ ...cfg, thpPsi: thp, fracGradPsiFt: undefined }, { j, prPsi }, { qMaxBpd });
+      return o.status === 'ok' || o.status === 'grid-cap' ? o.pwfPsi : null;
+    };
+    const lo = Math.max(cfg.thpPsi - over * 2, 0);
+    const a = bhipAtThp(lo);
+    if (a != null && a < frac) {
+      thpAtFrac = brent((t) => {
+        const p = bhipAtThp(t);
+        return p == null ? 1e6 : p - frac;
+      }, lo, cfg.thpPsi, { tol: 1e-4 }).root;
+    }
+    // no THP both injects AND stays below parting: the well cannot take water
+    // into the matrix at this reservoir pressure — every feasible THP fractures
+    return {
+      fracPsi: frac,
+      aboveFracPsi: over,
+      thpAtFracPsi: thpAtFrac,
+      fracUnavoidable: thpAtFrac == null,
+    };
+  };
+  if (R(hi) > 0) {
+    const p = avail(hi);
+    return { status: 'grid-cap', qOp: hi, pwfPsi: p, ...fracInfo(p) };
+  }
   const { root } = brent(R, 1, hi, { tol: 1e-7 });
   const m = waterInjectorMarch({ ...cfg, qOilStbD: root });
-  return { status: 'ok', qOp: root, pwfPsi: m.pwfPsi, bhtF: m.bhtF };
+  return { status: 'ok', qOp: root, pwfPsi: m.pwfPsi, bhtF: m.bhtF, ...fracInfo(m.pwfPsi) };
 }

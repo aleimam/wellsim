@@ -107,6 +107,8 @@ function buildOilCfg(f) {
     // placeholder only: the marches validate rate > 0, and every caller
     // passes its own rate ({ ...cfg, qOilStbD: q }). Not a user input.
     qOilStbD: num(f.qOilStbD) ?? 1000,
+    // injector only: formation parting gradient, psi/ft (blank = no limit)
+    fracGradPsiFt: num(f.fracGradPsiFt),
     gorScfStb: num(f.gorScfStb),
     wcPct: num(f.wcPct),
     api: num(f.api),
@@ -1075,7 +1077,13 @@ export function gasReserve(f) {
       if (num(rawG[i].presPsi) <= 0)
         return { error: `gauge row ${i + 1}: Pr must be positive` };
     }
-    const gaugeRows = rawG.map((r) => ({ date: dateVal(r.date), presPsi: num(r.presPsi) }));
+    const gaugeRows = rawG.map((r) => ({
+      date: dateVal(r.date),
+      presPsi: num(r.presPsi),
+      // blank depth = the reading is already at datum
+      gaugeTvdM: num(r.gaugeTvdM),
+      gaugeTempF: num(r.gaugeTempF),
+    }));
     if (gaugeRows.length < 2)
       return { error: 'route 4 needs at least 2 gauge surveys with dates' };
     if (rows.length < 2)
@@ -1501,6 +1509,11 @@ export function waterInjector(f) {
     op: op.status === 'ok' ? { qBpd: op.qOp, pwfPsi: op.pwfPsi, bhtF: op.bhtF } : null,
     opStatus: op.status,
     deficitPsi: op.deficitPsi ?? null,
+    // formation parting: null throughout when no fracture gradient is given
+    fracPsi: op.fracPsi ?? null,
+    aboveFracPsi: op.aboveFracPsi ?? null,
+    thpAtFracPsi: op.thpAtFracPsi ?? null,
+    fracUnavoidable: op.fracUnavoidable ?? false,
     jInj: model.j,
     prPsi: model.prPsi,
     availAtZeroPsi: availAtZero,

@@ -1,0 +1,87 @@
+// Documentation is part of the deliverable: the workbooks are the
+// specification, and the manual is how a user learns what was ported. These
+// checks catch the drift that kept appearing — stale test counts, references
+// to features that were removed, and claims about the code that stopped being
+// true. They read the docs and the source, never a hardcoded expectation.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..');
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const DOCS = ['README.md', 'HANDOVER.md', 'docs/user-guide.md', 'src/ui/help.html'];
+
+/** Every test( call across the suite — what `node --test` will report. */
+function actualTestCount() {
+  return fs
+    .readdirSync(path.join(root, 'tests'))
+    .filter((f) => f.endsWith('.test.js'))
+    .reduce((n, f) => n + (read(`tests/${f}`).match(/^test\(/gm) ?? []).length, 0);
+}
+
+test('docs quote the real test count', () => {
+  const actual = actualTestCount();
+  for (const doc of DOCS) {
+    const text = read(doc);
+    // any "<n> tests" claim in a doc must be the real number
+    for (const m of text.matchAll(/(\d{2,4})\s+(?:unit \+ regression )?tests\b/g)) {
+      assert.equal(
+        Number(m[1]),
+        actual,
+        `${doc} claims "${m[0]}" but the suite has ${actual} tests`
+      );
+    }
+  }
+});
+
+test('docs quote the real validation-sweep size', () => {
+  const sweep = read('scripts/validation-sweep.mjs');
+  // the sweep prints "<pass>/<total> PASS"; the total is rows.length
+  const rows = (sweep.match(/^\s{2}\{ *m: /gm) ?? []).length;
+  for (const doc of DOCS) {
+    for (const m of read(doc).matchAll(/(\d{1,3})\s*\/\s*(\d{1,3})\s+(?:validation sweep|PASS)/g)) {
+      assert.equal(m[1], m[2], `${doc}: sweep claim "${m[0]}" is not all-passing`);
+      if (rows > 0)
+        assert.equal(Number(m[2]), rows, `${doc} claims ${m[2]} sweep cases, the script has ${rows}`);
+    }
+  }
+});
+
+test('docs do not describe endpoints that no longer exist', () => {
+  const api = read('src/server/api.js');
+  const routes = [...api.matchAll(/'([a-z]+\/[a-zA-Z]+)':/g)].map((m) => m[1]);
+  assert.ok(routes.length > 10, 'route table not found');
+  for (const doc of DOCS) {
+    const text = read(doc);
+    // a doc naming an api path must name one that is wired
+    for (const m of text.matchAll(/\b(oil|gas|water|esp)\/([a-zA-Z]+)\b/g)) {
+      const ref = `${m[1]}/${m[2]}`;
+      if (/^(oil|gas|water)\/(well|excel)$/.test(ref)) continue; // prose, not a route
+      if (!routes.includes(ref)) continue; // not every slash pair is a route reference
+      assert.ok(routes.includes(ref), `${doc} references removed endpoint ${ref}`);
+    }
+  }
+});
+
+test('the portable build recipe is in the repo, not only on a USB stick', () => {
+  // it lived solely on the backup drive until 30 Aug 2026: losing the stick
+  // meant losing the ability to rebuild WellSim.exe at all
+  for (const f of [
+    'portable/main.js',
+    'portable/strip-signature.js',
+    'sea-config.json',
+    'build.ps1',
+    'src/ui/vendor/plotly.min.js',
+  ]) {
+    assert.ok(fs.existsSync(path.join(root, f)), `${f} must be committed`);
+  }
+  const pkg = JSON.parse(read('package.json'));
+  assert.ok(pkg.devDependencies?.esbuild, 'esbuild pinned for the portable build');
+  assert.ok(pkg.devDependencies?.postject, 'postject pinned for the portable build');
+  // the SEA config must reference assets that actually exist
+  const sea = JSON.parse(read('sea-config.json'));
+  for (const src of Object.values(sea.assets ?? {}))
+    assert.ok(fs.existsSync(path.join(root, src)), `sea-config asset missing: ${src}`);
+});
