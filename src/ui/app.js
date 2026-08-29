@@ -52,9 +52,9 @@ const OIL_FC_FIELDS = [
   ['startPresPsi', 'Start Pres (blank = solved)', 'psi', ''],
   ['nMMstb', 'STOIIP N (blank = MB avg)', 'MMstb', ''],
   ['stepDays', 'Time step', 'days', 30],
-  ['forecastFthpPsi', 'Forecast FTHP', 'psi', 150],
+  ['forecastFthpPsi', 'Forecast THP (blank = last prod)', 'psi', ''],
   ['fcWcPct', 'Forecast W.C (blank = last prod)', '%', ''],
-  ['startGorScfStb', 'Start GOR (blank = last prod)', 'scf/stb', ''],
+  ['fcGorScfStb', 'Forecast GOR (blank = last prod)', 'scf/stb', ''],
   ['minPwfPsi', 'Minimum Pwf', 'psi', 500],
   ['swiFrac', 'Connate water Swi', 'frac', 0.15],
   ['tarCw', 'Cw', '1/psi', 0.00000263],
@@ -1418,13 +1418,14 @@ async function oilForecastRun() {
     (r.method === 'walsh'
       ? `J (constant PI) = ${fmt(r.j, 3)}. `
       : `J1 (mobility PI) = ${fmt(r.j1, 3)}. `) +
-    `Start: Np ${fmt(r.startNpMMstb, 3)} MMstb, Pres ${fmt(r.startPresPsi, 0)} psi, W.C ${fmt(r.fcWcPct, 1)}%, GOR ${fmt(r.startGorScfStb, 0)} scf/stb.`;
+    `Start: Np ${fmt(r.startNpMMstb, 3)} MMstb, Pres ${fmt(r.startPresPsi, 0)} psi, THP ${fmt(r.forecastFthpPsi, 0)} psi, W.C ${fmt(r.fcWcPct, 1)}%, GOR ${fmt(r.fcGorScfStb, 0)} scf/stb.`;
   setComputed('oil-nMMstb', r.nMMstb, 2);
   setComputed('oil-startNpMMstb', r.startNpMMstb, 3);
   setComputed('oil-startPresPsi', r.startPresPsi, 1);
   setComputed('oil-startDate', dayToDateStr(r.startDay) ?? r.startDay, 'str');
+  setComputed('oil-forecastFthpPsi', r.forecastFthpPsi, 0);
   setComputed('oil-fcWcPct', r.fcWcPct, 1);
-  setComputed('oil-startGorScfStb', r.startGorScfStb, 0);
+  setComputed('oil-fcGorScfStb', r.fcGorScfStb, 0);
   const hist = r.history ?? [];
   const all = [...hist.map((p) => p.tDays), ...r.rows.map((p) => p.tDays)];
   const useDates = all.length > 0 && all.every((t) => dayToDateStr(t) != null);

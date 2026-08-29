@@ -343,14 +343,19 @@ the date defaulting to the **last prod-data date**. Both methods book an
 **anchor row at that date** — the state the first step departs from — so the
 forecast series begins exactly at the start date and joins the history rather
 than opening one time step later. The forecast stream continues the well as last
-measured: **Forecast W.C** and **Start GOR** are grey input-or-calculated and
-default to the **last prod row&rsquo;s** values (type your own to override — 0 %
-restores the workbook&rsquo;s dry-oil forecast). W.C is an input and holds for the
-whole run; GOR is a material-balance OUTPUT, so the seed sets the anchor and
-the first step&rsquo;s lift, after which the MB governs it. Where a measured GOR
-sits far above solution GOR the series will step down sharply at the first
-solved point — that gap is the data disagreeing with the PVT, not a solver
-fault.
+measured: **Forecast THP**, **Forecast W.C** and **Forecast GOR** are all grey
+input-or-calculated and default to the **last prod row** (300 psi / 60 % /
+5000 scf/stb on the demo well). Type over any of them to run a different
+case.
+
+All three are wellbore conditions and hold for the whole run — the GOR feeds
+the lift march every step, so a well producing free gas keeps that gas
+helping it flow. This matters: the material balance computes its own
+reservoir GOR from saturation, and where the two disagree (the demo measures
+5000 scf/stb against an Rsi of 700) letting the MB value drive the lift makes
+the column far heavier than the real well&rsquo;s and kills the forecast
+prematurely. The **F GOR** series on the chart remains the MB reservoir GOR —
+the model&rsquo;s prediction — not the lift input.
 chained off the Reserve module's fit and Pres solver; both methods share
 the same inputs, and per step both solve the same two residuals
 deterministically (Brent/alternation instead of GoalSeek loops): pressure

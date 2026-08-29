@@ -1248,6 +1248,7 @@ export function oilForecastApi(f) {
   let startPres = num(f.startPresPsi);
   let lastWcPct = null;
   let lastGorScfStb = null;
+  let lastThpPsi = null;
   let startDay = null;
   if (f.startDate != null && String(f.startDate).trim() !== '') {
     startDay = toDays(f.startDate);
@@ -1269,6 +1270,7 @@ export function oilForecastApi(f) {
     // stream at the MB saturation GOR
     lastWcPct = last.wcPct ?? null;
     lastGorScfStb = last.gorScfStb ?? null;
+    lastThpPsi = last.thpPsi ?? null;
   }
   if (n == null || !(n > 0))
     return { error: 'STOIIP N not given and no production rows to derive it from — run the Reserve module first or type N' };
@@ -1276,8 +1278,11 @@ export function oilForecastApi(f) {
   // method (one active): 'tarner' (default) | 'walsh' — the Walsh sheet of
   // the "Walsh and turner variable Pwf" workbook (generalized MB with Rv)
   const method = f.fcMethod === 'walsh' ? 'walsh' : 'tarner';
+  // the forecast stream — THP, W.C and GOR — is input-or-calculated and
+  // defaults to the LAST PROD ROW, so the run continues the well as measured
+  const fcThp = num(f.forecastFthpPsi) ?? lastThpPsi ?? cfg.thpPsi;
   const fcWc = num(f.fcWcPct) ?? lastWcPct ?? 0;
-  const fcGor = num(f.startGorScfStb) ?? lastGorScfStb ?? undefined;
+  const fcGor = num(f.fcGorScfStb) ?? num(f.startGorScfStb) ?? lastGorScfStb ?? undefined;
   const shared = {
     // the forecast stream: W.C and GOR are input-or-calculated, defaulting
     // to the LAST PROD ROW so the forecast departs from the well as measured
@@ -1295,8 +1300,8 @@ export function oilForecastApi(f) {
     stepDays: num(f.stepDays) ?? 30,
     maxSteps: Math.min(num(f.maxSteps) ?? 60, 200),
     pwfMode: f.pwfMode === 'fixed' ? 'fixed' : 'vlp',
-    fthpPsi: num(f.forecastFthpPsi) ?? cfg.thpPsi,
-    startGorScfStb: fcGor,
+    fthpPsi: fcThp,
+    fcGorScfStb: fcGor,
     minPwfPsi: num(f.minPwfPsi) ?? 500,
     abandonQoStbD: num(f.abandonQoStbD) ?? 50,
   };
@@ -1319,7 +1324,8 @@ export function oilForecastApi(f) {
     startNpMMstb: startNp ?? 0,
     startPresPsi: startPres ?? ipr.priPsi,
     fcWcPct: fcWc,
-    startGorScfStb: fcGor ?? null,
+    fcGorScfStb: fcGor ?? null,
+    forecastFthpPsi: fcThp,
     pbPsi: pb,
   };
 }
