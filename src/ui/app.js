@@ -973,11 +973,31 @@ function plot(div, traces, layout) {
   return p.then((gd) => {
     const el = gd ?? (typeof div === 'string' ? document.getElementById(div) : div);
     if (!el || !el.layout || el.offsetParent === null) return el;
-    // both must fit at ANY width: a narrow results column clips a long
-    // title, and a many-trace legend overruns the bottom margin. Both are
-    // no-ops when nothing overlaps.
-    return fitChartTitle(el).then(() => fitChartLegend(el));
+    // Three measure-after-draw corrections, each a no-op when nothing is
+    // wrong. Width FIRST: it changes what the other two are measuring.
+    return fitChartWidth(el)
+      .then(() => fitChartTitle(el))
+      .then(() => fitChartLegend(el));
   });
+}
+
+/**
+ * A chart can be drawn WIDER than the box holding it: inside a .chartrow the
+ * chart is a flex child sharing the row with a 250px table, and if the flex
+ * layout has not settled when Plotly measures (a row revealed in the same
+ * tick, or drawn while hidden) it sizes to the pre-layout width. The SVG then
+ * overhangs and laps the table beside it — measured 51px over, 42px of lap on
+ * the gas-lift and traverse rows.
+ * Measure against the container and resize when they disagree. A no-op when
+ * they already match, which is the normal case.
+ */
+function fitChartWidth(el) {
+  const svg = el.querySelector('svg.main-svg');
+  if (!svg) return Promise.resolve(el);
+  const have = svg.getBoundingClientRect().width;
+  const want = el.getBoundingClientRect().width;
+  if (!(want > 0) || Math.abs(have - want) <= 2) return Promise.resolve(el);
+  return Promise.resolve(Plotly.Plots.resize(el)).then(() => el);
 }
 
 /** Keep the chart title inside the canvas: shrink it to fit, and if that
@@ -1203,14 +1223,7 @@ function switchLift() {
   const t = oilLiftType();
   document.getElementById('oil-lift-gl').style.display = t === 'gaslift' ? '' : 'none';
   document.getElementById('oil-lift-esp').style.display = t === 'esp' ? '' : 'none';
-  if (t !== 'esp')
-    for (const id of ['oil-cr-senspump', 'oil-cr-senstrav'])
-      document.getElementById(id).style.display = 'none';
-  if (t !== 'esp') document.getElementById('oil-cr-esptrav').style.display = 'none';
-  // shared gas-lift / ESP-pump-curve row (see switchOilModule)
-  const gl = document.getElementById('oil-cr-gl');
-  const wellModule = document.querySelector('input[name="oil-module"]:checked')?.value === 'well';
-  if (gl && wellModule) gl.style.display = t === 'natural' ? 'none' : '';
+  applyOilRows();
   refreshOilSens();
   // per-lift GOR default: ESP wells 300, natural/gas-lift 5000 — swap only
   // while the field still holds the other type's default (user values kept)
@@ -1229,10 +1242,12 @@ const pumpModeOf = (prefix) => {
 const espPumpMode = () => pumpModeOf('oil');
 
 function switchEspPump() {
+  // manual dP has no Sensitivity view — applyOilRows accounts for that
   const mode = espPumpMode();
   document.getElementById('oil-esp-custom').style.display = mode === 'custom' ? '' : 'none';
   document.getElementById('oil-esp-manual').style.display = mode === 'manual' ? '' : 'none';
   document.getElementById('oil-esp-matchrow').style.display = mode === 'manual' ? 'none' : '';
+  applyOilRows();
 }
 
 /** Water tab: the same catalog, minus the custom-curve builder. */
@@ -1255,11 +1270,7 @@ const espTab = () => document.querySelector('input[name="oil-esptab"]:checked')?
 function switchEspTab() {
   const sens = espTab() === 'sens';
   document.getElementById('oil-espsens-inputs').style.display = sens ? '' : 'none';
-  if (oilLiftType() !== 'esp' || espPumpMode() === 'manual') return;
-  for (const id of ['oil-cr-nodal', 'oil-cr-gl', 'oil-cr-whp', 'oil-cr-esptrav'])
-    document.getElementById(id).style.display = sens ? 'none' : '';
-  document.getElementById('oil-cr-espsens').style.display = sens ? '' : 'none';
-  resizeVisibleCharts();
+  applyOilRows();
 }
 
 /** Fill the oil and water pump selectors from the shared 68-pump database
@@ -1455,26 +1466,49 @@ const OIL_RESERVE_GUIDANCE = {
     'Limitations: assumes pss and constant Ct over the window; sensitive to Ct and to rate variations; differs from the material-balance methods by design.',
 };
 
+/**
+ * Oil chart rows are a pure function of (module, lift, pump mode, ESP view).
+ * Every switch calls this instead of setting rows itself — the scattered
+ * version left rows stranded whenever two switches disagreed.
+ * Rows whose CONTENT is drawn conditionally (gas-lift/pump-curve, traverses)
+ * are only ever HIDDEN here; the drawing code reveals them once it fills them.
+ */
+function applyOilRows() {
+  const m = document.querySelector('input[name="oil-module"]:checked')?.value ?? 'well';
+  const lift = oilLiftType();
+  const well = m === 'well';
+  const espView = well && lift === 'esp' && espPumpMode() !== 'manual' && espTab() === 'sens';
+  const set = (id, show) => {
+    const e = document.getElementById(id);
+    if (e) e.style.display = show ? '' : 'none';
+  };
+  set('oil-summary', well);
+  set('oil-cr-nodal', well && !espView);
+  set('oil-cr-whp', well && !espView);
+  set('oil-cr-sens', well);
+  set('oil-cr-espsens', espView);
+  set('oil-cr-rsv1', m === 'reserve');
+  set('oil-cr-rsv2', m === 'reserve');
+  set('oil-cr-fc', m === 'forecast');
+  // conditionally-drawn rows: hide when they cannot apply, never force-show
+  // the gas-lift row is shared with the ESP pump curve: it belongs to those
+  // two lifts, and must be SHOWN again when one of them comes back
+  set('oil-cr-gl', well && !espView && lift !== 'natural');
+  if (!well || espView || lift !== 'esp') set('oil-cr-esptrav', false);
+  if (!well || lift !== 'esp') {
+    set('oil-cr-senspump', false);
+    set('oil-cr-senstrav', false);
+  }
+  resizeVisibleCharts();
+}
+
 function switchOilModule() {
   const m = document.querySelector('input[name="oil-module"]:checked').value;
   document.getElementById('oil-mod-well').style.display = m === 'well' ? '' : 'none';
   document.getElementById('oil-mod-reserve').style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('oil-mod-forecast').style.display = m === 'forecast' ? '' : 'none';
   document.getElementById('panel-oil').classList.toggle('mode-reserve', m === 'reserve');
-  for (const id of ['oil-summary', 'oil-cr-nodal', 'oil-cr-sens', 'oil-cr-whp'])
-    document.getElementById(id).style.display = m === 'well' ? '' : 'none';
-  // the gas-lift row is SHARED with the ESP pump curve, so it belongs to those
-  // two lifts only — left always-on it showed a natural-flow well the pump
-  // curve of the ESP run before it
-  document.getElementById('oil-cr-gl').style.display =
-    m === 'well' && oilLiftType() !== 'natural' ? '' : 'none';
-  for (const id of ['oil-cr-rsv1', 'oil-cr-rsv2'])
-    document.getElementById(id).style.display = m === 'reserve' ? '' : 'none';
-  document.getElementById('oil-cr-fc').style.display = m === 'forecast' ? '' : 'none';
-  if (m !== 'well') {
-    for (const id of ['oil-cr-esptrav', 'oil-cr-espsens', 'oil-cr-senspump', 'oil-cr-senstrav'])
-      document.getElementById(id).style.display = 'none';
-  }
+  applyOilRows();
   resizeVisibleCharts();
 }
 
@@ -1762,6 +1796,9 @@ async function liquidSolve(c) {
   if (c.prefix === 'oil') {
     if (r.espTraverse) {
       const t = r.espTraverse;
+      // reveal BEFORE plotting: drawn into a display:none row Plotly falls back
+      // to a 700px canvas that then overhangs the container and laps the table
+      document.getElementById('oil-cr-esptrav').style.display = '';
       plot('oil-chart-esptrav', [
         { x: t.stations.map((s) => s.pPsi), y: t.stations.map((s) => s.tvdFt), name: 'Traverse top-down', mode: 'lines+markers', line: { color: '#0B1418', width: 2 } },
         { x: t.backStations.map((s) => s.pPsi), y: t.backStations.map((s) => s.tvdFt), name: 'IPR back-calc', mode: 'lines+markers', line: { color: '#2C7048', width: 2, dash: 'dash' } },
@@ -1776,7 +1813,6 @@ async function liquidSolve(c) {
         title: 'Traverse', headers: ['TVD ft', 'P psi'],
         rows: t.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
       }]);
-      document.getElementById('oil-cr-esptrav').style.display = '';
     } else {
       document.getElementById('oil-cr-esptrav').style.display = 'none';
     }
@@ -1875,6 +1911,7 @@ async function espRun() {
     tv.push({ x: [r.measured.pintPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pint', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#C2540B' } });
   if (r.measured.pdisPsi != null)
     tv.push({ x: [r.measured.pdisPsi], y: [r.measured.pumpTvdFt], name: 'Measured Pdis', mode: 'markers', marker: { symbol: 'diamond', size: 12, color: '#A93A2C' } });
+  document.getElementById('oil-cr-esptrav').style.display = ''; // before plotting — see above
   plot('oil-chart-esptrav', tv, {
     ...LAYOUT(),
     title: 'Traverse gradient — top-down vs IPR back-calc',
@@ -1885,9 +1922,6 @@ async function espRun() {
     title: 'Traverse', headers: ['TVD ft', 'P psi'],
     rows: op.stations.map((s) => [fmt(s.tvdFt, 0), fmt(s.pPsi, 1)]),
   }]);
-  // the row starts hidden (it belongs to ESP only), so the function that
-  // draws into it reveals it — it used to rely on the ESP view switcher
-  document.getElementById('oil-cr-esptrav').style.display = '';
 }
 
 
@@ -2914,6 +2948,14 @@ async function acctSaveCase() {
 // after every render as well as on every tab/module switch — that is what
 // catches a solve which finished while its panel was still hidden (Plotly
 // then draws at its 700 px fallback and would otherwise stay that way).
+/**
+ * Re-fit every visible chart: canvas to its container, then title and legend.
+ * The startup solve draws before web fonts and the flex layout have settled,
+ * so the first paint can be a size out — visible as a jump a few seconds
+ * after every page load. Plotly's own responsive handler eventually corrects
+ * the CANVAS but never re-runs our title/legend fitting, so this is wired to
+ * fonts-ready, window load and resize below.
+ */
 function refitCharts() {
   document.querySelectorAll('.chart').forEach((el) => {
     if (!el.data || el.offsetParent === null) return;
@@ -2927,6 +2969,19 @@ function refitCharts() {
     }
   });
 }
+
+// nothing called refitCharts before this: charts were left at whatever size
+// they were first drawn at, and the fitters never re-ran on a window resize
+let refitTimer = null;
+const refitSoon = () => {
+  clearTimeout(refitTimer);
+  refitTimer = setTimeout(refitCharts, 150);
+};
+if (document.fonts?.ready) document.fonts.ready.then(refitCharts).catch(() => {});
+window.addEventListener('load', refitCharts);
+window.addEventListener('resize', refitSoon);
+window.addEventListener('orientationchange', refitSoon);
+
 
 /** Title (any width) and legend (phone) fitting, applied to a chart that
  *  is on screen NOW.
