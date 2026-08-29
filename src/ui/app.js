@@ -423,6 +423,7 @@ function renderTables(containerId, tables) {
 // short, unit-bearing headers for the VLP sensitivity columns
 const SENS_LABELS = {
   thpPsi: 'FTHP psi',
+  __injThpPsi: 'Inj THP psi', // injector override (no flowing THP exists)
   gorScfStb: 'GOR scf/stb',
   wcPct: 'W.C %',
   tubingIdIn: 'Tbg ID in',
@@ -431,7 +432,7 @@ const SENS_LABELS = {
   injTempF: 'Inj water T °F',
 };
 
-function renderSensTable(id, prefix, cols, rows) {
+function renderSensTable(id, prefix, cols, rows, labelOverrides = {}) {
   const t = document.getElementById(id);
   // keep whatever the user already typed when the column set changes
   const prev = {};
@@ -439,7 +440,7 @@ function renderSensTable(id, prefix, cols, rows) {
     for (const el of t.querySelectorAll(`input[id^="${prefix}-sens-${i}-"]`))
       prev[el.id] = el.value;
   t.innerHTML =
-    `<tr><th>set</th>${cols.map((c) => `<th>${SENS_LABELS[c] ?? c}</th>`).join('')}</tr>` +
+    `<tr><th>set</th>${cols.map((c) => `<th>${labelOverrides[c] ?? SENS_LABELS[c] ?? c}</th>`).join('')}</tr>` +
     rows
       .map((r, i) => {
         const cell = (c) => {
@@ -1022,7 +1023,9 @@ function refreshOilSens() {
   renderSensTable('oil-sens-table', 'oil', oilSensCols(), OIL_SENS_ROWS);
 }
 function refreshWaterSens() {
-  renderSensTable('water-sens-table', 'water', waterSensCols(), waterSensRows());
+  const inj = waterWellType() === 'injector';
+  renderSensTable('water-sens-table', 'water', waterSensCols(), waterSensRows(),
+    inj ? { thpPsi: SENS_LABELS.__injThpPsi } : {});
 }
 
 function switchLift() {

@@ -85,7 +85,7 @@ A water well is head-dominated: it flows naturally only when Pr beats
 THP + the static water column (≈ 0.446 psi/ft at SG 1.05); otherwise the
 solver reports no-intersection — that is the physics, not an error.
 
-**Well type selector: Producer | Injector.** The injector reverses the march —
+**Well type selector: Producer | Injector.** An injector has **no FLOWING tubing head pressure**: every surface pressure it shows is the **injection THP**, in the marches, on the injectivity side and in the sensitivity columns alike (the inputs read *Injection THP* and *Test injection THP*, the sensitivity column reads *Inj THP psi*, and the wellhead chart is *injection THP required*). The injector reverses the march —
 water flows DOWN, so **BHIP = injection THP + head − friction**. Selecting
 Injector swaps the THP default from 200 to **2000 psi** (and back to 200 on
 Producer; a value you typed yourself is kept). Temperatures
