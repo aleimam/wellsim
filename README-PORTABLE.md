@@ -1,7 +1,7 @@
 # WellSim — standalone portable program
 
 **Build 1.2 — 30 August 2026**, from commit `5349c2b` of the main project.
-Identical physics to https://wellsim.app at that commit: 209 tests, 43/43
+Identical physics to https://wellsim.app at that commit: 210 tests, 43/43
 validation sweep. Changes since build 1.1 (29 Aug):
 
 - **Gas reserves, memory-gauge method:** a *Gauge TVD* column corrects an

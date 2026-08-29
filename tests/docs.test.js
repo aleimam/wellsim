@@ -36,6 +36,17 @@ test('docs quote the real test count', () => {
   }
 });
 
+test('docs quote the real number of test FILES', () => {
+  // the test count was guarded and the file count was not, so "25 test files"
+  // sat in the handover while the suite had 24 — the same drift, one line up
+  const actual = fs.readdirSync(path.join(root, 'tests')).filter((f) => f.endsWith('.test.js')).length;
+  for (const doc of DOCS) {
+    for (const m of read(doc).matchAll(/(\d{1,3})\s+test files\b/g)) {
+      assert.equal(Number(m[1]), actual, `${doc} claims "${m[0]}" but tests/ holds ${actual}`);
+    }
+  }
+});
+
 test('docs quote the real validation-sweep size', () => {
   const sweep = read('scripts/validation-sweep.mjs');
   // the sweep prints "<pass>/<total> PASS"; the total is rows.length

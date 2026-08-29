@@ -2,8 +2,8 @@
 
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
-**As of:** 30 August 2026 — commit `2564647`, asset stamp `2026-08-30k`,
-209 tests passing, 43/43 validation sweep.
+**As of:** 30 August 2026 — commit `6cea1f2`, asset stamp `2026-08-30k`,
+210 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -23,7 +23,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 25 test files, 63 commits.
+`nodal`, `reserve`, `solvers`), 24 test files, 67 commits.
 
 ## 2. Running it
 
@@ -35,7 +35,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 209 unit + regression tests
+node --test                       # 210 unit + regression tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -80,7 +80,7 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               25 files — workbook cell pins, physics regressions, and
+tests/               24 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)
@@ -136,6 +136,35 @@ private; neither belongs in a repository. They **are** in the F: backup.
   docs.test.js asserts the two match. Note app.js runs at the end of body, so
   registration checks `document.readyState` rather than waiting on `load`,
   which has usually already fired.
+- **There is a second deliverable: `WellSim.exe`**, a single-file desktop
+  build of the same app (Node SEA). `npm install && .\build.ps1` produces it
+  from committed source; the outputs (`WellSim.exe`, `build/`) are gitignored
+  because they are ~200 MB per build. It serves the identical UI and physics,
+  stores cases in a `cases/` folder **beside the exe**, has no accounts, and
+  takes the first free port from 3355. Current: **build 1.2, 30 Aug 2026**,
+  from commit `5349c2b`; it lives on the Transcend at `F:\petrosim\` and on
+  the Desktop under `WellSim\`.
+
+  Two things about it are easy to get wrong, and both were wrong until
+  30 Aug 2026:
+
+  1. **The web app loads Plotly from a CDN; the portable must not.** That
+     swap used to be a hand edit to `src/ui/index.html` that existed only in
+     the build folder and was never committed, so builds 1.0 and 1.1 were
+     offline-capable *by accident* and the next clean-checkout rebuild would
+     have shipped an exe with the whole UI and no charts. It is now done at
+     serve time in `portable/main.js`, and docs.test.js asserts both the
+     rewrite and that the vendored Plotly version equals the version
+     index.html asks the CDN for.
+  2. **The portable must not register the service worker.** It takes the
+     first free port, so consecutive runs can be different origins, and a
+     worker would strand itself and a cache on every port ever used.
+     Registration is neutered in the served index.html.
+
+  Both fixes live in the portable alone — the website's CDN tag and service
+  worker are correct for the website and are untouched. Verify a build by
+  running the exe and checking the page loads `/vendor/plotly.min.js`, not
+  the CDN.
 - **Secrets** are in `d:\github_token.txt`, `d:\hetzner_token.txt`,
   `d:\wellsim_token.txt` (Cloudflare). They are never committed and never
   printed. The server accepts SSH keys only; the private key is
