@@ -490,6 +490,101 @@ function renderGridTable(id, prefix, cols, rows) {
       .join('');
 }
 
+/**
+ * A survey table that grows to the pasted/typed data — the prod_data
+ * behaviour (paste, Import CSV, +10 rows, Clear) for the smaller reserve
+ * tables. Clipboard/CSV cells are read in the order the table's INPUT
+ * columns are declared; the calculated columns are skipped. Returns the live
+ * row count through count(), so the form collector and the result-filling
+ * loops follow the table instead of a fixed default length.
+ */
+function dynamicTable({ tableId, prefix, cols, defaults, minRows = 4 }) {
+  const inputCols = cols.filter((c) => !c.out);
+  let count = defaults.length;
+  const values = () => {
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const row = {};
+      for (const c of inputCols) row[c.key] = formVal(`${prefix}-${i}-${c.key}`);
+      out.push(row);
+    }
+    return out;
+  };
+  const render = (vals) => {
+    count = Math.min(Math.max(vals.length, minRows), MAX_PROD_ROWS);
+    const rows = vals.slice(0, count);
+    while (rows.length < count) rows.push({});
+    renderGridTable(tableId, prefix, cols, rows);
+  };
+  const ensure = (n) => {
+    if (n <= count) return;
+    const vals = values();
+    while (vals.length < Math.min(n, MAX_PROD_ROWS)) vals.push({});
+    render(vals);
+  };
+  const fill = (rows, startIdx = 0) => {
+    if (rows.length === 0) return;
+    ensure(startIdx + rows.length);
+    rows.forEach((r, k) => {
+      const i = startIdx + k;
+      if (i >= count) return;
+      for (const c of inputCols) {
+        const el = document.getElementById(`${prefix}-${i}-${c.key}`);
+        if (el && r[c.key] != null && r[c.key] !== '') el.value = r[c.key];
+      }
+    });
+  };
+  const parse = (text) => parseTableClipboard(text, inputCols.map((c) => c.key));
+  render(defaults);
+  wireTableInput({ tableId, prefix, parse, fill, render, ensure, count: () => count, minRows });
+  return { count: () => count, render, ensure, fill, parse, values };
+}
+
+/** Clipboard/CSV text (TSV, CSV or semicolon) -> rows keyed by `keys` in
+ *  column order. A first line whose first cell STARTS with a letter is a
+ *  header; a d-MMM-yy date does not (it only contains letters). */
+function parseTableClipboard(text, keys) {
+  const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '');
+  const rows = [];
+  for (const line of lines) {
+    const cells = line.split(/\t|;|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((c) => c.trim().replace(/^"|"$/g, ''));
+    if (rows.length === 0 && /^[A-Za-z]/.test(cells[0] ?? '')) continue; // header
+    if ((cells[0] ?? '') === '') continue;
+    const row = {};
+    keys.forEach((k, i) => (row[k] = cells[i]));
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** Wire the four action buttons and in-cell Ctrl+V for a dynamic table. */
+function wireTableInput({ tableId, prefix, parse, fill, render, ensure, count, minRows }) {
+  const el = document.getElementById(tableId);
+  if (el) {
+    el.addEventListener('paste', (e) => {
+      const text = e.clipboardData?.getData('text') ?? '';
+      if (!text.includes('\n') && !text.includes('\t')) return; // single value: default behavior
+      e.preventDefault();
+      const m = e.target?.id?.match(new RegExp(`^${prefix}-(\d+)-`));
+      fill(parse(text), m ? Number(m[1]) : 0);
+    });
+  }
+  const on = (id, fn) => {
+    const b = document.getElementById(id);
+    if (b) b.onclick = fn;
+  };
+  on(`${prefix}-paste`, async () => {
+    try {
+      fill(parse(await navigator.clipboard.readText()), 0);
+    } catch {
+      showError('Clipboard read not permitted — click a cell in the table and press Ctrl+V instead.');
+    }
+  });
+  on(`${prefix}-csv`, () => csvImport(parse, fill));
+  on(`${prefix}-add`, () => ensure(count() + 10));
+  on(`${prefix}-clear`, () => render(Array.from({ length: minRows }, () => ({}))));
+}
+
 function collectGrid(prefix, cols, n) {
   const out = [];
   for (let i = 0; i < n; i++) {
@@ -575,16 +670,7 @@ function ensureProdRows(n) {
 /** Parse clipboard text (TSV/CSV/semicolon) into prod rows; header line
  *  auto-skipped. Column order: Date, FTHP, q, CGR, WGR, Pwf. */
 function parseProdClipboard(text) {
-  const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '');
-  const rows = [];
-  for (const line of lines) {
-    const cells = line.split(/\t|;|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((c) => c.trim().replace(/^"|"$/g, ''));
-    if (rows.length === 0 && /[A-Za-z]{2,}/.test(cells[0] ?? '')) continue; // header
-    const [date, thpPsi, qMMscfd, cgrStbMMscf, wgrStbMMscf, pwfPsi] = cells;
-    if ((date ?? '') === '') continue;
-    rows.push({ date, thpPsi, qMMscfd, cgrStbMMscf, wgrStbMMscf, pwfPsi });
-  }
-  return rows;
+  return parseTableClipboard(text, ['date', 'thpPsi', 'qMMscfd', 'cgrStbMMscf', 'wgrStbMMscf', 'pwfPsi']);
 }
 
 function fillProdRows(rows, startIdx = 0) {
@@ -652,16 +738,7 @@ function ensureOilProdRows(n) {
 
 /** Clipboard column order: Date, FTHP, q oil, GOR, WC, Pwf. */
 function parseOilProdClipboard(text) {
-  const lines = text.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '');
-  const rows = [];
-  for (const line of lines) {
-    const cells = line.split(/\t|;|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((c) => c.trim().replace(/^"|"$/g, ''));
-    if (rows.length === 0 && /[A-Za-z]{2,}/.test(cells[0] ?? '')) continue; // header
-    const [date, thpPsi, qOilStbD, gorScfStb, wcPct, pwfPsi] = cells;
-    if ((date ?? '') === '') continue;
-    rows.push({ date, thpPsi, qOilStbD, gorScfStb, wcPct, pwfPsi });
-  }
-  return rows;
+  return parseTableClipboard(text, ['date', 'thpPsi', 'qOilStbD', 'gorScfStb', 'wcPct', 'pwfPsi']);
 }
 
 function fillOilProdRows(rows, startIdx = 0) {
@@ -1296,7 +1373,7 @@ function oilForm() {
   f.mlMode = mlMode('oil');
   f.mlLayers = collectGrid('oil-ml', OIL_ML_COLS, OIL_ML_ROWS.length);
   f.prodRows = collectGrid('oil-prod', OIL_PROD_COLS, oilProdCount);
-  f.staticRows = collectGrid('oil-static', OIL_STATIC_COLS, OIL_STATIC_ROWS.length);
+  f.staticRows = collectGrid('oil-static', OIL_STATIC_COLS, oilStaticTable.count());
   return f;
 }
 
@@ -1407,7 +1484,7 @@ async function oilReserveRun() {
   if (r.mode === 'static') {
     // fill the survey table's output columns
     const sIdx = [];
-    for (let i = 0; i < OIL_STATIC_ROWS.length; i++) {
+    for (let i = 0; i < oilStaticTable.count(); i++) {
       if (val(`oil-static-${i}-date`) !== '' && val(`oil-static-${i}-presPsi`) !== '') sIdx.push(i);
     }
     r.rows.forEach((row, k) => {
@@ -2200,8 +2277,8 @@ function gasForm() {
   f.presSource = document.querySelector('input[name="gas-pressource"]:checked')?.value ?? 'flowing';
   f.testPoints = collectGasTests();
   f.prodRows = collectGrid('gas-prod', PROD_COLS, gasProdCount);
-  f.sithpRows = collectGrid('gas-sithp', SITHP_COLS, GAS_SITHP_ROWS.length);
-  f.gaugeRows = collectGrid('gas-gauge', GAS_GAUGE_COLS, GAS_GAUGE_ROWS.length);
+  f.sithpRows = collectGrid('gas-sithp', SITHP_COLS, gasSithpTable.count());
+  f.gaugeRows = collectGrid('gas-gauge', GAS_GAUGE_COLS, gasGaugeTable.count());
   return f;
 }
 
@@ -2247,7 +2324,7 @@ async function gasReserveRun() {
   if (r.mode === 'sithp') {
     // fill the survey table's output columns (dt, pr, z from the static march)
     const sIdx = [];
-    for (let i = 0; i < GAS_SITHP_ROWS.length; i++) {
+    for (let i = 0; i < gasSithpTable.count(); i++) {
       if (val(`gas-sithp-${i}-date`) !== '' && val(`gas-sithp-${i}-sithpPsi`) !== '') sIdx.push(i);
     }
     r.rows.forEach((row, k) => {
@@ -2273,7 +2350,7 @@ async function gasReserveRun() {
   if (r.mode === 'gauge') {
     // fill the survey table's output columns (dt, z, Gp, p/Z)
     const gIdx = [];
-    for (let i = 0; i < GAS_GAUGE_ROWS.length; i++) {
+    for (let i = 0; i < gasGaugeTable.count(); i++) {
       if (val(`gas-gauge-${i}-date`) !== '' && val(`gas-gauge-${i}-presPsi`) !== '') gIdx.push(i);
     }
     r.rows.forEach((row, k) => {
@@ -2820,7 +2897,7 @@ switchWaterType();
 
 // oil Reserve estimate module
 renderOilProdTable(OIL_PROD_DEFAULTS);
-renderGridTable('oil-static-table', 'oil-static', OIL_STATIC_COLS, OIL_STATIC_ROWS);
+const oilStaticTable = dynamicTable({ tableId: 'oil-static-table', prefix: 'oil-static', cols: OIL_STATIC_COLS, defaults: OIL_STATIC_ROWS });
 renderFieldRow('oil-rlt-fields', 'oil', OIL_RLT_FIELDS);
 renderFieldRow('oil-fc-fields', 'oil', OIL_FC_FIELDS);
 document.getElementById('oil-prod-table').addEventListener('paste', (e) => {
@@ -2859,8 +2936,8 @@ renderTestTable('gas-test-table', 'gas', GAS_TEST_ROWS);
 renderSensTable('gas-sens-table', 'gas', GAS_SENS_COLS, GAS_SENS_ROWS);
 renderPresList('gas-pres-list', 'gas', [2850, 1900, 950]);
 renderProdTable(GAS_PROD_DEFAULTS);
-renderGridTable('gas-sithp-table', 'gas-sithp', SITHP_COLS, GAS_SITHP_ROWS);
-renderGridTable('gas-gauge-table', 'gas-gauge', GAS_GAUGE_COLS, GAS_GAUGE_ROWS);
+const gasSithpTable = dynamicTable({ tableId: 'gas-sithp-table', prefix: 'gas-sithp', cols: SITHP_COLS, defaults: GAS_SITHP_ROWS });
+const gasGaugeTable = dynamicTable({ tableId: 'gas-gauge-table', prefix: 'gas-gauge', cols: GAS_GAUGE_COLS, defaults: GAS_GAUGE_ROWS });
 // clipboard paste into the prod table (Ctrl+V in any cell, or the button)
 document.getElementById('gas-prod-table').addEventListener('paste', (e) => {
   const text = e.clipboardData?.getData('text') ?? '';

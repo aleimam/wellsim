@@ -286,6 +286,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 </table></div>
 <p>IPR basis (one active): <b>Darcy Pr&sup2;</b> (default, dominant) or <b>C&nbsp;&amp;&nbsp;n</b> (grey = fitted from the test). Calibration fits C&amp;n, computes the test J, and matches Darcy K at your judged skin. Impurities feed the sour pseudo-critical route everywhere.</p>
 
+<p class="note">The reserve <b>survey tables</b> &mdash; oil memory-gauge, gas SITHP and gas memory-gauge &mdash; take <b>Paste from clipboard</b>, <b>Import CSV</b>, <b>+10 rows</b> and <b>Clear</b>, and grow to the data just like prod_data. Clipboard cells are read in the table&rsquo;s own input-column order; a first line starting with a letter is treated as a header and skipped (a <code>17-Nov-14</code> date is not).</p>
 <h2 id="gas-reserve"><span class="sect">Gas</span> &mdash; Reserve estimate</h2>
 <div class="selgrid">
   <div class="selcard"><span class="n">1</span><h5>Prod data &amp; macro</h5>

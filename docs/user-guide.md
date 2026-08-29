@@ -318,6 +318,8 @@ Direct **measured** static reservoir pressures — `Date | Pres` input rows, no 
 VLP involved (the strongest data). Np and Gp are integrated from the (hidden)
 prod-data table. Outputs per survey: dt, Np, Gp, per-row N. Same MB, banner and charts.
 Defaults: `17-Nov-14 3550 · 1-Dec-14 3200 · 17-Dec-14 2900 psi`.
+The survey table takes **Paste from clipboard / Import CSV / +10 rows / Clear** and
+grows to the data, exactly like prod_data.
 
 ### 3.3 Reservoir limit (constant rate)
 
@@ -426,6 +428,8 @@ from the **static gas march** (gas-head-only station march, geothermal temperatu
 per-station explicit z, from the well-model data — validated to 1.2 % against the
 workbook's 7661.9 psi case). Gp comes from the prod-data cumulative — no IPR/VLP
 matching involved. Defaults: 2500 / 2000 / 1300 psi on the same dates.
+The survey table takes **Paste from clipboard / Import CSV / +10 rows / Clear** and
+grows to the data, exactly like prod_data.
 
 ### 5.3 Reservoir limit
 
@@ -448,6 +452,8 @@ nearest end, which biases the fit.
 Defaults: 3266.3 / 2607.1 / 1671.0 psi on the same three dates — *these are exactly
 what selection 2 computes from its own 2500 / 2000 / 1300 psi SITHP defaults*, so the
 two routes return the same 120.19 Bscf out of the box and can be cross-checked.
+The table takes **Paste from clipboard / Import CSV / +10 rows / Clear** and grows to
+the data, exactly like prod_data.
 
 Each selection carries a best-practice/limitation note; demo answers differ
 on the demo well (≈150 / 120 / 91 / 120 Bscf). Selections 2 and 4 agree by
