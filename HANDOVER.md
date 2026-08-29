@@ -101,9 +101,26 @@ private; neither belongs in a repository. They **are** in the F: backup.
 - **Secrets** are in `d:\github_token.txt`, `d:\hetzner_token.txt`,
   `d:\wellsim_token.txt` (Cloudflare). They are never committed and never
   printed. The server accepts SSH keys only; the private key is
-  `~/.ssh/wellsim_hetzner`. **The root password file `d:\ssh pass` should be
-  deleted and that password rotated** — it was written to disk during setup
-  and never needed again once the key was installed.
+  `~/.ssh/wellsim_hetzner`. The root password file `d:\ssh pass` written
+  during setup was **deleted on 29 Aug 2026**, and no rotation was needed:
+  on the server `root` carries no password hash at all (`!*` in
+  `/etc/shadow`) and `wellsim` is locked, so **no account on the box can be
+  logged into with a password**. `PermitRootLogin without-password` enforces
+  the same for root at the sshd level.
+
+  One cheap hardening is still open. `PasswordAuthentication` is globally
+  `yes`, which is why the auth log carries ~39,500 failed password attempts
+  from internet background scanning. They all fail — there is nothing to
+  guess — but sshd need not entertain them:
+
+  ```bash
+  ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 \
+    "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config \
+     && sshd -t && systemctl reload ssh"
+  ```
+
+  Safe here because key auth is the only thing in use — but keep an existing
+  session open until a fresh key login is confirmed.
 - **The code-signing PFX** and its password are for the desktop distributable.
   The PFX must not ship inside any distributed zip, and the password belongs
   in a password manager, not a file.
