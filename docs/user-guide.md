@@ -44,6 +44,17 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   restart signs everyone out); add TLS for internet deployment.
 - **Mobile**: below 640 px the layout stacks, inputs grow to finger size, and the main
   action button stays pinned while you scroll.
+- **Your inputs survive a refresh.** Everything you type is saved in the
+  browser and restored on the next load, so a reload no longer discards work —
+  and the first solve runs on your restored case, not the demo. **Reset**
+  (header) forgets the saved session and reloads the demo well. The store is
+  per-browser and never leaves your machine; Save as / Open remain the way to
+  move a case between machines or people.
+- **Installable, and it works offline.** WellSim is a PWA: your browser can
+  install it to the desktop or home screen, and the UI, charting library and
+  manual are cached so it opens without a connection. Calculations are never
+  cached — a stale reservoir answer would be worse than none — so the physics
+  needs the app running, which it is once installed.
 - **Charts size themselves to the space they are in.** Each one is measured
   after it draws and corrected if needed: the canvas to its container (so it
   never laps the table beside it), the title to the canvas (shrunk, then

@@ -2789,6 +2789,59 @@ async function gasSens() {
 // ---------- init ----------
 
 // ---- case Save as / Open: the full UI state as a JSON file ----
+/* ---- session persistence: the form survives a refresh ------------------
+ * Every input is autosaved (debounced) and restored on load, so a reload no
+ * longer discards typed work. It reuses the Save-as/Open serialisation rather
+ * than a second one, so anything those handle, this handles.
+ * Storage can throw outright (private mode, quota, blocked site data), so
+ * every access is guarded and failure simply means "start from defaults".
+ */
+const SESSION_KEY = 'wellsim.session.v1';
+let sessionTimer = null;
+let restoringSession = false;
+
+function saveSession() {
+  if (restoringSession) return;
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(collectCase()));
+  } catch { /* private mode, quota, or site data blocked — not worth reporting */ }
+}
+
+const saveSessionSoon = () => {
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(saveSession, 400);
+};
+
+/** true if a previous session was restored. */
+function restoreSession() {
+  let c = null;
+  try {
+    c = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+  } catch { return false; }
+  if (!c || c.app !== 'WellSim' || c.version !== 1) return false;
+  restoringSession = true;
+  try {
+    applyCase(c);
+    return true;
+  } catch {
+    // a stored state the current build cannot apply must not brick the app
+    clearSession();
+    return false;
+  } finally {
+    restoringSession = false;
+  }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch { /* nothing to clear */ }
+}
+
+/** Header "Reset": forget the saved session and reload into the demo case. */
+function resetToDefaults() {
+  clearSession();
+  location.reload();
+}
+
 function collectCase() {
   const c = {
     app: 'WellSim',
@@ -2848,6 +2901,7 @@ function applyCase(c) {
   switchMl('oil');
   switchMl('gas');
   switchEspPump();
+  switchEspTab();
   switchWaterType();
   switchWaterLift();
   switchGasModule();
@@ -3235,5 +3289,24 @@ document.getElementById('gas-btn-forecast').onclick = guard(gasForecastRun);
 // keep every chart fitted to its own box, however the layout changes
 observeCharts();
 
-// first load: solve the prefilled oil case
+// autosave every edit, and offer a way back to the demo case
+document.addEventListener('input', saveSessionSoon);
+document.addEventListener('change', saveSessionSoon);
+const resetLink = document.getElementById('reset-case');
+if (resetLink) resetLink.onclick = (e) => { e.preventDefault(); resetToDefaults(); };
+
+// restore the previous session BEFORE the first solve, so the solve runs on
+// the restored inputs rather than the demo ones
+restoreSession();
+
+// installable + offline: registration is best-effort and never blocks the app
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // app.js runs at the end of body, so 'load' may ALREADY have fired — waiting
+  // for it then means waiting forever and the worker never registers
+  const registerSW = () => navigator.serviceWorker.register('/sw.js').catch(() => { /* blocked or unsupported */ });
+  if (document.readyState === 'complete') registerSW();
+  else window.addEventListener('load', registerSW);
+}
+
+// first load: solve whatever case we now hold (restored, or the prefilled demo)
 guard(oilSolve)();

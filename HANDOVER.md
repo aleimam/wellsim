@@ -2,8 +2,8 @@
 
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
-**As of:** 30 August 2026 — commit `65c86aa`, asset stamp `2026-08-30h`,
-207 tests passing, 43/43 validation sweep.
+**As of:** 30 August 2026 — commit `HEAD`, asset stamp `2026-08-30k`,
+208 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -23,7 +23,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 23 test files, 61 commits.
+`nodal`, `reserve`, `solvers`), 25 test files, 63 commits.
 
 ## 2. Running it
 
@@ -35,7 +35,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 207 unit + regression tests
+node --test                       # 208 unit + regression tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -80,7 +80,10 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               23 files — workbook cell pins and physics regressions
+tests/               25 files — workbook cell pins, physics regressions, and
+                     docs.test.js, which fails when documentation drifts from
+                     the code (stale counts, removed endpoints, an unversioned
+                     service worker)
 scripts/             validation-sweep.mjs · make-icons.mjs
 ```
 
@@ -121,6 +124,18 @@ private; neither belongs in a repository. They **are** in the F: backup.
   rows stranded — most visibly, leaving the ESP Sensitivity view hid the
   nodal and wellhead charts for every other lift. Add new rows there, not in
   a switch.
+- **The UI autosaves to localStorage** (`wellsim.session.v1`) using the same
+  collectCase()/applyCase() serialisation as Save as / Open, and restores
+  BEFORE the first solve so the startup run uses the restored case. Every
+  storage access is guarded — private mode and blocked site data must degrade
+  to "start from defaults", never to a broken app. Header **Reset** clears it.
+- **The service worker is version-pinned to the asset stamp.** `sw.js` caches
+  HTML network-first and never touches `/api/`, so a deploy is picked up
+  immediately and no calculation is ever served from cache. A worker whose
+  cache key did not move with the stamp would pin users to an old bundle —
+  docs.test.js asserts the two match. Note app.js runs at the end of body, so
+  registration checks `document.readyState` rather than waiting on `load`,
+  which has usually already fired.
 - **Secrets** are in `d:\github_token.txt`, `d:\hetzner_token.txt`,
   `d:\wellsim_token.txt` (Cloudflare). They are never committed and never
   printed. The server accepts SSH keys only; the private key is

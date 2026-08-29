@@ -85,3 +85,16 @@ test('the portable build recipe is in the repo, not only on a USB stick', () => 
   for (const src of Object.values(sea.assets ?? {}))
     assert.ok(fs.existsSync(path.join(root, src)), `sea-config asset missing: ${src}`);
 });
+
+test('the service-worker cache version tracks the asset stamp', () => {
+  // a worker whose cache key never changes serves an old index.html forever,
+  // pinning users to an old bundle and defeating the stamp entirely
+  const stamp = read('src/ui/index.html').match(/app\.js\?v=([0-9a-z-]+)/)?.[1];
+  assert.ok(stamp, 'asset stamp not found in index.html');
+  const sw = read('src/ui/sw.js');
+  const cacheV = sw.match(/CACHE_VERSION\s*=\s*'([^']+)'/)?.[1];
+  assert.equal(cacheV, stamp, 'sw.js CACHE_VERSION must equal the index.html asset stamp');
+  // a cached calculation is worse than no calculation
+  assert.ok(sw.includes("pathname.startsWith('/api/')"), 'sw must bypass /api/');
+  assert.ok(/network first/i.test(sw), 'HTML must be network-first');
+});

@@ -206,7 +206,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-node --test                             # 207 tests
+node --test                             # 208 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is distributed separately as <code>WellSim-1.0.zip</code>.</p>
 
@@ -219,6 +219,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 <ul>
   <li><b>Selection modules</b>: where the workbook had parallel sheets, one radio selection is active and the rest hide (lift type, IPR basis, module, reserve pressure-source).</li>
   <li><b>Side tables</b> beside each chart hold the plotted numbers with a Copy button (tab-separated, pastes into Excel).</li>
+  <li><b>Your inputs survive a refresh.</b> Everything typed is autosaved in the browser and restored on the next load, and the first solve runs on the restored case rather than the demo. <b>Reset</b> (header) forgets it and reloads the demo well. The store is per-browser and never leaves your machine &mdash; Save as / Open remain the way to move a case between machines. WellSim is also an <b>installable PWA</b>: the UI, charts and manual are cached so it opens offline, while calculations are never cached, since a stale reservoir answer is worse than none.</li>
   <li><b>Charts size themselves to the space they are in.</b> Each is measured after it draws and corrected: the canvas to its container (so it never laps the table beside it), the title to the canvas (shrunk, then wrapped rather than made unreadable), and the legend clear of the x-axis title. They re-fit on font load, page load, resize and rotate, so a reload settles straight into its final layout. <b>Result rows follow the active selection</b> &mdash; the ESP <em>Sensitivity</em> view replaces the model-match charts and leaving it restores them; rows belonging to another lift are cleared rather than left showing the previous run.</li>
   <li><b>There is no current-rate input.</b> The well model SOLVES for the rate &mdash; the operating point is the IPR/VLP intersection &mdash; so a typed rate would either be ignored or quietly contradict the answer. Rates are entered only where they are genuine data: the calibration <b>test rate</b>, the prod-data table, and the ESP/gas-lift matches.</li>
   <li><b>Production tables</b> accept clipboard paste (button or Ctrl+V in a cell); column order <code>Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf</code>; header lines auto-skip; up to 200 rows.</li>
