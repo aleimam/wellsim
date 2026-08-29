@@ -1246,6 +1246,8 @@ export function oilForecastApi(f) {
   let n = num(f.nMMstb);
   let startNp = num(f.startNpMMstb);
   let startPres = num(f.startPresPsi);
+  let lastWcPct = null;
+  let lastGorScfStb = null;
   let startDay = null;
   if (f.startDate != null && String(f.startDate).trim() !== '') {
     startDay = toDays(f.startDate);
@@ -1262,6 +1264,11 @@ export function oilForecastApi(f) {
     startNp = startNp ?? last.npMMstb;
     startDay = startDay ?? last.tDays;
     startPres = startPres ?? Math.min(...rsv.rows.map((r) => r.presPsi));
+    // the forecast continues the well as last measured: its stream defaults
+    // to the last prod row's water cut and producing GOR, not to a dry oil
+    // stream at the MB saturation GOR
+    lastWcPct = last.wcPct ?? null;
+    lastGorScfStb = last.gorScfStb ?? null;
   }
   if (n == null || !(n > 0))
     return { error: 'STOIIP N not given and no production rows to derive it from — run the Reserve module first or type N' };
@@ -1269,10 +1276,12 @@ export function oilForecastApi(f) {
   // method (one active): 'tarner' (default) | 'walsh' — the Walsh sheet of
   // the "Walsh and turner variable Pwf" workbook (generalized MB with Rv)
   const method = f.fcMethod === 'walsh' ? 'walsh' : 'tarner';
+  const fcWc = num(f.fcWcPct) ?? lastWcPct ?? 0;
+  const fcGor = num(f.startGorScfStb) ?? lastGorScfStb ?? undefined;
   const shared = {
-    // the forecast stream is oil+gas (the sheet's W.C input, default 0) —
-    // the march must not inherit the well model's producing water cut
-    cfg: { ...cfg, wcPct: num(f.fcWcPct) ?? 0 },
+    // the forecast stream: W.C and GOR are input-or-calculated, defaulting
+    // to the LAST PROD ROW so the forecast departs from the well as measured
+    cfg: { ...cfg, wcPct: fcWc },
     pvt,
     nMMstb: n,
     priPsi: ipr.priPsi,
@@ -1287,6 +1296,7 @@ export function oilForecastApi(f) {
     maxSteps: Math.min(num(f.maxSteps) ?? 60, 200),
     pwfMode: f.pwfMode === 'fixed' ? 'fixed' : 'vlp',
     fthpPsi: num(f.forecastFthpPsi) ?? cfg.thpPsi,
+    startGorScfStb: fcGor,
     minPwfPsi: num(f.minPwfPsi) ?? 500,
     abandonQoStbD: num(f.abandonQoStbD) ?? 50,
   };
@@ -1308,6 +1318,8 @@ export function oilForecastApi(f) {
     startDay: startDay ?? 0,
     startNpMMstb: startNp ?? 0,
     startPresPsi: startPres ?? ipr.priPsi,
+    fcWcPct: fcWc,
+    startGorScfStb: fcGor ?? null,
     pbPsi: pb,
   };
 }

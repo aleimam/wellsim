@@ -105,6 +105,10 @@ export function oilPresSolver(marchCfg, ipr, pvt, rows) {
       dtDays: tDays - t0,
       qOilStbD: r.qOilStbD,
       thpPsi: r.thpPsi ?? null,
+      // the per-row stream the march actually used (row value, else the well
+      // model default) — the forecast seeds its start state from the last one
+      wcPct: wc,
+      gorScfStb: gor,
       pwfPsi,
       pwfSource,
       presPsi,

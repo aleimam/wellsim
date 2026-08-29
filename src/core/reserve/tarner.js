@@ -153,7 +153,9 @@ export function tarnerForecast(opts) {
   let gp = opts.startGpMMscf ?? 0;
   const f0 = pvtAt(p, ctx);
   let so = clampSo(soFromMb({ swi, nMMstb, npMMstb: np, bo: f0.bo, boi, ct: ctOf(p) }));
-  let prevGor = mobAt(so, swi, f0).gor;
+  // the forecast continues the WELL, so it departs from the last measured
+  // producing GOR when one is given; the MB value is the fallback
+  let prevGor = opts.startGorScfStb ?? mobAt(so, swi, f0).gor;
 
   /** Pwf for the step at the beginning-of-step state and frozen PVT f. */
   const solvePwf = (pStart, soStart, f, gorForMarch) => {
@@ -198,7 +200,7 @@ export function tarnerForecast(opts) {
       presPsi: p,
       pwfPsi: pw0.pwfPsi,
       qOilStbD: qo0,
-      gorScfStb: m0.gor,
+      gorScfStb: prevGor,
       npMMstb: np,
       gpBscf: gp / 1000,
       soFrac: so,

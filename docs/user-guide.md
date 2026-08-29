@@ -342,9 +342,15 @@ Select **Oil Well → Forecast**, then pick the **Method (one active)**.
 the date defaulting to the **last prod-data date**. Both methods book an
 **anchor row at that date** — the state the first step departs from — so the
 forecast series begins exactly at the start date and joins the history rather
-than opening one time step later. Expect a step in rate at the join: the
-forecast stream carries the **Forecast W.C** input (default 0), not the well
-model&rsquo;s producing water cut.
+than opening one time step later. The forecast stream continues the well as last
+measured: **Forecast W.C** and **Start GOR** are grey input-or-calculated and
+default to the **last prod row&rsquo;s** values (type your own to override — 0 %
+restores the workbook&rsquo;s dry-oil forecast). W.C is an input and holds for the
+whole run; GOR is a material-balance OUTPUT, so the seed sets the anchor and
+the first step&rsquo;s lift, after which the MB governs it. Where a measured GOR
+sits far above solution GOR the series will step down sharply at the first
+solved point — that gap is the data disagreeing with the PVT, not a solver
+fault.
 chained off the Reserve module's fit and Pres solver; both methods share
 the same inputs, and per step both solve the same two residuals
 deterministically (Brent/alternation instead of GoalSeek loops): pressure

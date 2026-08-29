@@ -130,7 +130,9 @@ export function walshForecast(opts) {
   let gp = opts.startGpMMscf ?? np * rsi;
   const f0 = pvtAtWalsh(p, ctx);
   let so = clampSo(soWalsh({ swi, nMMstb, npMMstb: np, bo: f0.bo, boi, bg: f0.bg, rv: f0.rv, ct: ctOf(p) }));
-  let prevGor = mobWalsh(so, swi, f0).gor;
+  // the forecast continues the WELL, so it departs from the last measured
+  // producing GOR when one is given; the MB value is the fallback
+  let prevGor = opts.startGorScfStb ?? mobWalsh(so, swi, f0).gor;
 
   /** Pwf for the step (frozen PVT f): VLP-coupled, floored at minPwf.
    *  opts.pwfSeries (array, psi) overrides per step — used for sheet-parity
@@ -176,7 +178,7 @@ export function walshForecast(opts) {
       pwfPsi: pw0.pwfPsi,
       qOilStbD: qo0,
       qtBblD: qt0,
-      gorScfStb: m0.gor,
+      gorScfStb: prevGor,
       npMMstb: np,
       gpBscf: gp / 1000,
       soFrac: so,
