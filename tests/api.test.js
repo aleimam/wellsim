@@ -97,7 +97,7 @@ test('oil sensitivity endpoint: families with default sets', () => {
   for (const m of r.vlpFamily) assert.ok(m.op ? m.op.qOilStbD > 0 : m.opStatus);
 });
 
-test('a depleted well shows BOTH current Pr and Pri as reference curves', () => {
+test('a depleted well references CURRENT Pr only — Pri is not drawn', () => {
   const r = handlers['oil/sensitivity']({
     ...OIL_FORM,
     prPsi: '2800', // below Pri 3550
@@ -105,15 +105,14 @@ test('a depleted well shows BOTH current Pr and Pri as reference curves', () => 
     presList: [],
   });
   assert.equal(r.error, undefined);
-  const refs = r.iprFamily.filter((m) => m.isCurrent || m.isPri);
-  assert.equal(refs.length, 2);
+  const refs = r.iprFamily.filter((m) => m.isCurrent);
+  assert.equal(refs.length, 1);
   close(refs[0].presPsi, 2800, 1e-9);
-  close(refs[1].presPsi, 3550, 1e-9);
-  // and only one when they coincide
-  const same = handlers['oil/sensitivity']({
-    ...OIL_FORM, vlpSets: [{ label: 'VLP1', thpPsi: '400' }], presList: [],
-  });
-  assert.equal(same.iprFamily.filter((m) => m.isCurrent || m.isPri).length, 1);
+  // Pri is history on a depleted well: no curve may sit at it
+  assert.ok(!r.iprFamily.some((m) => m.isPri));
+  assert.ok(!r.iprFamily.some((m) => Math.abs(m.presPsi - 3550) < 1));
+  // the solution is still solved and reported at the CURRENT Pr
+  assert.ok(r.vlpFamily[0].op.pwfPsi < 2800);
 });
 
 test('gas nodal endpoint (Darcy J mode) and calibrate (C&n from table)', () => {

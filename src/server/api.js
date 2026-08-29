@@ -183,17 +183,17 @@ function oilDarcyAtPr(f, pvt, prPsi) {
 }
 
 /**
- * Reference IPR curves for a sensitivity chart: the CURRENT Pr — the one the
- * per-set nodal solutions in the table are actually solved against — and Pri
- * when the well is already depleted below it. Without these the chart showed
- * only the reduced FUTURE pressures, so the solutions listed in the table had
- * no curve to sit on and the reader could not see where they came from.
+ * The reference IPR curve for a sensitivity chart: the CURRENT Pr — the one
+ * the per-set nodal solutions in the table are actually solved against.
+ * Without it the chart showed only the reduced FUTURE pressures, so the
+ * solutions listed in the table had no curve to sit on.
+ * Pri is deliberately NOT drawn: on a depleted well it is history, and a
+ * second high curve only competes with the one the answers belong to.
  * curveAt(presPsi) returns the IPR curve at that pressure.
  */
 function referenceIprs(ipr, curveAt) {
   const prNow = ipr.prPsi;
-  const pri = ipr.priPsi ?? prNow;
-  const out = [
+  return [
     {
       label: 'Pr=' + Math.round(prNow) + ' psi (current)',
       presPsi: prNow,
@@ -202,15 +202,6 @@ function referenceIprs(ipr, curveAt) {
       isCurrent: true,
     },
   ];
-  if (Math.abs(pri - prNow) > 1)
-    out.push({
-      label: 'Pri=' + Math.round(pri) + ' psi',
-      presPsi: pri,
-      j: ipr.j,
-      curve: curveAt(pri),
-      isPri: true,
-    });
-  return out;
 }
 
 function buildOilIpr(f, cfg, pb) {

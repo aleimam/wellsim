@@ -1032,16 +1032,15 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
     return base ? `${base} ${lab}` : lab;
   };
   const traces = [];
-  // the reference curves (current Pr, and Pri when the well is depleted below
-  // it) are what the per-set solutions are solved against, so they lead the
-  // legend and are drawn solid and heavier than the future-pressure family
-  const refs = iprFam.filter((m) => m.isCurrent || m.isPri);
-  const future = iprFam.filter((m) => !m.isCurrent && !m.isPri);
+  // the current-Pr curve is what the per-set solutions are solved against, so
+  // it leads the legend and is drawn solid and heavier than the future family
+  const refs = iprFam.filter((m) => m.isCurrent);
+  const future = iprFam.filter((m) => !m.isCurrent);
   refs.forEach((m) =>
     traces.push({
       x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi),
       name: nameOf(iprName, m.label), mode: 'lines',
-      line: { color: m.isCurrent ? '#00636D' : '#7038b0', width: 3.5 },
+      line: { color: '#00636D', width: 3.5 },
     })
   );
   future.forEach((m, i) =>
