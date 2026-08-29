@@ -35,8 +35,25 @@ const ASSETS = ['index.html', 'app.js', 'style.css', 'help.html', 'vendor/plotly
 
 function readAsset(name) {
   if (!ASSETS.includes(name)) return null;
-  if (sea) return Buffer.from(sea.getAsset(name));
-  return fs.readFileSync(path.join(exeDir, 'src/ui', name));
+  const buf = sea
+    ? Buffer.from(sea.getAsset(name))
+    : fs.readFileSync(path.join(exeDir, 'src/ui', name));
+
+  // The portable build has to work with NO internet — that is the whole point
+  // of a single exe on a USB stick. The web app deliberately loads Plotly from
+  // a CDN, so the portable must swap that tag for the embedded copy.
+  //
+  // Until 30 Aug 2026 that swap was a HAND EDIT to src/ui/index.html made only
+  // in the build tree and never committed: builds 1.0 and 1.1 were offline-safe
+  // by accident, and a rebuild from a clean checkout would have silently
+  // shipped an exe that showed the whole UI and not one chart. Doing it here
+  // keeps the web app on the CDN and makes the portable reproducibly offline.
+  if (name === 'index.html')
+    return Buffer.from(
+      String(buf).replace(/https:\/\/cdn\.plot\.ly\/plotly-[\d.]+\.min\.js/g, '/vendor/plotly.min.js'),
+      'utf8'
+    );
+  return buf;
 }
 
 // ---- portable case store: no auth, one shared folder beside the exe ----

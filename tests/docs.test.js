@@ -98,3 +98,29 @@ test('the service-worker cache version tracks the asset stamp', () => {
   assert.ok(sw.includes("pathname.startsWith('/api/')"), 'sw must bypass /api/');
   assert.ok(/network first/i.test(sw), 'HTML must be network-first');
 });
+
+test('the portable build serves Plotly from the embedded copy, not the CDN', () => {
+  // builds 1.0 and 1.1 were offline-safe only because src/ui/index.html had
+  // been hand-edited in the build tree and never committed — a rebuild from a
+  // clean checkout would have shipped an exe with the whole UI and no charts
+  const main = read('portable/main.js');
+  // the host appears inside a regex literal there, so compare with the
+  // backslashes stripped rather than trying to match them
+  assert.ok(
+    main.includes("'/vendor/plotly.min.js'") && main.replace(/\\/g, '').includes('cdn.plot.ly'),
+    'portable/main.js must rewrite the CDN Plotly tag to the embedded asset'
+  );
+  const sea = JSON.parse(read('sea-config.json'));
+  assert.ok(sea.assets?.['vendor/plotly.min.js'], 'the vendored Plotly must be embedded in the exe');
+
+  // and the swap has to be version-identical, or the portable quietly runs a
+  // different Plotly than the web app it is supposed to mirror
+  const wanted = read('src/ui/index.html').match(/cdn\.plot\.ly\/plotly-([\d.]+)\.min\.js/)?.[1];
+  assert.ok(wanted, 'index.html should still name a CDN Plotly version');
+  const fd = fs.openSync(path.join(root, 'src/ui/vendor/plotly.min.js'), 'r');
+  const head = Buffer.alloc(200);
+  fs.readSync(fd, head, 0, 200, 0);
+  fs.closeSync(fd);
+  const shipped = head.toString('utf8').match(/plotly\.js v([\d.]+)/)?.[1];
+  assert.equal(shipped, wanted, `vendored Plotly is v${shipped}, index.html asks for v${wanted}`);
+});
