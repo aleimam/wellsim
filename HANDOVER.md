@@ -108,19 +108,31 @@ private; neither belongs in a repository. They **are** in the F: backup.
   logged into with a password**. `PermitRootLogin without-password` enforces
   the same for root at the sshd level.
 
-  One cheap hardening is still open. `PasswordAuthentication` is globally
-  `yes`, which is why the auth log carries ~39,500 failed password attempts
-  from internet background scanning. They all fail — there is nothing to
-  guess — but sshd need not entertain them:
+  Password authentication was **switched off on 29 Aug 2026**. The auth log
+  had accumulated ~39,500 failed password attempts from internet background
+  scanning; none could ever have succeeded, but sshd was processing them.
+  `sshd_config` only had the directive commented out, so `yes` was sshd's
+  compiled-in default rather than a deliberate setting. The fix is a drop-in
+  rather than an edit to the shipped file, so a future `openssh-server`
+  upgrade cannot quietly revert it:
 
-  ```bash
-  ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 \
-    "sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config \
-     && sshd -t && systemctl reload ssh"
+  ```
+  /etc/ssh/sshd_config.d/99-hardening.conf
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
   ```
 
-  Safe here because key auth is the only thing in use — but keep an existing
-  session open until a fresh key login is confirmed.
+  Drop-ins win because `Include /etc/ssh/sshd_config.d/*.conf` sits at line
+  12 of `sshd_config` and sshd takes the **first** occurrence of a keyword.
+  Applied with `sshd -t` validated first and `systemctl reload ssh` (not
+  restart, so live sessions survive); verified afterwards by a fresh key
+  login and by confirming the server now answers
+  `Permission denied (publickey)` to a password-only attempt. The original
+  file is backed up at `/root/sshd_config.bak-2026-08-29`.
+
+  **The consequence to respect: this host is now reachable only with the
+  private key `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
+  Hetzner console, not SSH. Keep a copy somewhere safe and offline.
 - **The code-signing PFX** and its password are for the desktop distributable.
   The PFX must not ship inside any distributed zip, and the password belongs
   in a password manager, not a file.
