@@ -382,12 +382,11 @@ assumed reservoir pressure").
   to 9+ digits; replaying the sheet's Pwf column tracks its 64-step
   trajectory within ≈1% on pressure (EUR −2.2%).
 
-**Forecast Pwf source (one active):** *Nodal at forecast FTHP* (VLP-coupled,
+**Forecast Pwf source (one active):** *Nodal at forecast THP* (VLP-coupled,
 default — the Walsh workbook's "variable Pwf") or *Fixed minimum Pwf*.
-Defaults: step 30 d · FTHP 150 psi · **forecast W.C 0 %** (the forecast
-stream is oil+gas; the march must not inherit the well model's producing
-water cut) · min Pwf 500 · Swi 0.15 · Cw 2.63e-6 · Cf 3.25e-6 / psi ·
-abandonment 50 stb/d. The chart overlays history + forecast (rate and GOR
+Defaults: step 30 d · **THP, W.C and GOR from the last prod row**
+(300 psi / 60 % / 5000 scf/stb on the demo well) · min Pwf 500 · Swi 0.15 ·
+Cw 2.63e-6 · Cf 3.25e-6 / psi · abandonment 50 stb/d · max 60 steps. The chart overlays history + forecast (rate and GOR
 left, Pres right) with the table below.
 
 ## 4. Gas — Well model
