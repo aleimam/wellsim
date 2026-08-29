@@ -161,6 +161,35 @@ export function walshForecast(opts) {
   let status = 'max-steps';
   const startDay = opts.startDay ?? 0;
 
+  // ANCHOR ROW at the start date itself — see the same note in tarner.js:
+  // the loop books end-of-step states, so the series otherwise began one
+  // step after the declared start and left a gap against the history.
+  {
+    const m0 = mobWalsh(so, swi, f0);
+    const pw0 = solvePwf(p, so, f0, prevGor, 0);
+    const qt0 = pw0.dead ? 0 : jStbDPsi * m0.lambdaT * Math.max(p - pw0.pwfPsi, 0);
+    const qo0 = pw0.dead || !(m0.lambdaT > 0) ? 0 : (qt0 * m0.lambdaO) / (f0.bo * m0.lambdaT);
+    rows.push({
+      tDays: startDay,
+      dtDays: 0,
+      presPsi: p,
+      pwfPsi: pw0.pwfPsi,
+      qOilStbD: qo0,
+      qtBblD: qt0,
+      gorScfStb: m0.gor,
+      npMMstb: np,
+      gpBscf: gp / 1000,
+      soFrac: so,
+      sgFrac: Math.max(0, 1 - swi - so),
+      kro: m0.kro,
+      krg: m0.krg,
+      rv: f0.rv,
+      foo: m0.foo,
+      converged: true,
+      anchor: true,
+    });
+  }
+
   for (let i = 0; i < maxSteps; i++) {
     // 1) PVT once per step at the nearest solved Walsh Pres, then step Pwf
     const f = pvtAtWalsh(p, ctx);

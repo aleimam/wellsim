@@ -1442,7 +1442,7 @@ async function oilForecastRun() {
   plot('oil-chart-fc', traces, {
     ...LAYOUT(),
     margin: { ...LAYOUT().margin, r: window.innerWidth < 640 ? 40 : 55 },
-    title: 'Tarner forecast — history + forecast',
+    title: `${r.method === 'walsh' ? 'Walsh' : 'Tarner'} forecast — history + forecast`,
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate stb/d · GOR scf/stb', rangemode: 'tozero' },
     yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
@@ -1450,7 +1450,7 @@ async function oilForecastRun() {
   mobileShowResults();
   renderTables('oil-table-fc', [
     {
-      title: 'Tarner forecast', headers: ['date', 'q stb/d', 'Pres', 'Pwf', 'GOR', 'Np MMstb', 'Gp Bscf', 'So', 'Sg'],
+      title: `${r.method === 'walsh' ? 'Walsh' : 'Tarner'} forecast (first row = start)`, headers: ['date', 'q stb/d', 'Pres', 'Pwf', 'GOR', 'Np MMstb', 'Gp Bscf', 'So', 'Sg'],
       rows: r.rows.map((p) => [
         useDates ? dayToDateStr(p.tDays) : fmt(p.dtDays, 0),
         fmt(p.qOilStbD, 0), fmt(p.presPsi, 0), fmt(p.pwfPsi, 0), fmt(p.gorScfStb, 0),

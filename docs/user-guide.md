@@ -339,6 +339,12 @@ Defaults: Sg 0.1 · So 0.8 · Sw 0.15 · Co 1e-6 · Cw 1e-6 · Cf 3e-6 (1/psi).
 
 Select **Oil Well → Forecast**, then pick the **Method (one active)**.
 **N and the start state** (date, Np, Pres) are grey input-or-calculated,
+the date defaulting to the **last prod-data date**. Both methods book an
+**anchor row at that date** — the state the first step departs from — so the
+forecast series begins exactly at the start date and joins the history rather
+than opening one time step later. Expect a step in rate at the join: the
+forecast stream carries the **Forecast W.C** input (default 0), not the well
+model&rsquo;s producing water cut.
 chained off the Reserve module's fit and Pres solver; both methods share
 the same inputs, and per step both solve the same two residuals
 deterministically (Brent/alternation instead of GoalSeek loops): pressure

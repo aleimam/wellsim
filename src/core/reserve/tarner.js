@@ -182,6 +182,34 @@ export function tarnerForecast(opts) {
   let status = 'max-steps';
   const startDay = opts.startDay ?? 0;
 
+  // ANCHOR ROW at the start date itself. The loop books end-of-step states,
+  // so without this the series began one step AFTER the declared start and
+  // the forecast chart did not join the history it continues. Booking the
+  // start state changes no physics — it is the state the first step departs
+  // from — and it lets the reader compare the modelled rate at the anchor
+  // with the last measured rate.
+  {
+    const m0 = mobAt(so, swi, f0);
+    const pw0 = solvePwf(p, so, f0, prevGor);
+    const qo0 = pw0.dead ? 0 : Math.max(((j1 * m0.lambdaO) / f0.bo) * (p - pw0.pwfPsi), 0);
+    rows.push({
+      tDays: startDay,
+      dtDays: 0,
+      presPsi: p,
+      pwfPsi: pw0.pwfPsi,
+      qOilStbD: qo0,
+      gorScfStb: m0.gor,
+      npMMstb: np,
+      gpBscf: gp / 1000,
+      soFrac: so,
+      sgFrac: Math.max(0, 1 - swi - so),
+      kro: m0.kro,
+      krg: m0.krg,
+      converged: true,
+      anchor: true,
+    });
+  }
+
   for (let i = 0; i < maxSteps; i++) {
     // 1) PVT at the beginning-of-step pressure for the Pwf solve
     const f = pvtAt(p, ctx);
