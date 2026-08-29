@@ -99,7 +99,7 @@ required Pr + q/J (rises). Charts: the injectivity nodal plot, and the
 works from an injection test (BHIP input-or-marched → J injectivity →
 matched K). Lift types hide for the injector (no artificial lift on
 injection), and the **sensitivities become the injector's own** — injection
-THP, injected-water temperature and tubing ID (see §3 above). Its sensitivity defaults are **injection THP 100 / 1000 / 2000 psi** and **future pressures 0.75 / 0.5 / 0.25 × Pri**, and running them adds the **Injectivity sensitivities** chart: every THP set is solved against Pri *and* each future Pres — a full nodal grid — then plotted as **injection THP (y) vs the solved injection rate (x)**, one line per reservoir pressure, with the grid tabulated beneath (rate, BHIP, BHT, and a "no injection (deficit …)" note wherever THP + head cannot reach that Pres). The injector shows **four result rows** — the injectivity node, the available-BHIP sensitivities, the injectivity-sensitivities grid and the injection-THP-required curve; the gas-lift, ESP pump-curve and ESP-traverse rows are producer-only and are cleared for it, and switching well type wipes the previous type’s results so nothing stale is mistaken for the injector’s. If THP + head
+THP, injected-water temperature and tubing ID (see §3 above). Its sensitivity defaults are **injection THP 100 / 1000 / 2000 psi** and **future pressures 0.75 / 0.5 / 0.25 × the current Pr**, and running them adds the **Injectivity sensitivities** chart: every THP set is solved against Pri *and* each future Pres — a full nodal grid — then plotted as **injection THP (y) vs the solved injection rate (x)**, one line per reservoir pressure, with the grid tabulated beneath (rate, BHIP, BHT, and a "no injection (deficit …)" note wherever THP + head cannot reach that Pres). The injector shows **four result rows** — the injectivity node, the available-BHIP sensitivities, the injectivity-sensitivities grid and the injection-THP-required curve; the gas-lift, ESP pump-curve and ESP-traverse rows are producer-only and are cleared for it, and switching well type wipes the previous type’s results so nothing stale is mistaken for the injector’s. If THP + head
 cannot reach Pr the solver reports the
 **THP deficit** — the extra surface pressure (or pump) needed to start
 injection. Friction uses laminar Fanning (16/Re) below the transition,
@@ -291,6 +291,11 @@ preserved. Sensitivities remain single-layer.
 Every module (oil, water, gas) draws, in this order: the **current-Pr IPR**
 (heavy teal) — the curve the per-set solutions are actually solved against —
 then the future-pressure family, the VLP curve per set, and each set’s
+The three future pressures default to **0.75 / 0.5 / 0.25 × the current Pr**
+and track the current Pr as you edit it — a field you have typed over is left
+alone. They followed Pri before, which on a depleted well could put the first
+future pressure *above* the pressure the well is actually at.
+
 **solved node** as a diamond. **Pri is deliberately not drawn**: on a depleted
 well it is history, and a second high curve only competes with the one the
 answers belong to. The pressure *axis* still tops out at Pri so runs stay

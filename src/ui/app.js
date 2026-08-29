@@ -757,10 +757,38 @@ function fillOilProdRows(rows, startIdx = 0) {
   });
 }
 
+const PRES_FRACTIONS = [0.75, 0.5, 0.25];
+/** What refreshPresDefaults last wrote, per prefix — a field still holding
+ *  one of these is untouched and may be refreshed; anything else is the
+ *  user's and is left alone. */
+const presAuto = {};
+
 function renderPresList(id, prefix, defaults) {
   document.getElementById(id).innerHTML = defaults
     .map((v, i) => `<input id="${prefix}-pres-${i}" value="${v}" />`)
     .join('');
+  presAuto[prefix] = defaults.map((v) => String(v));
+}
+
+/**
+ * Future reservoir pressures track the CURRENT Pr (falling back to Pri while
+ * Pr is blank): they are fractions of the pressure the well is at NOW, not of
+ * one it left behind — on a depleted well the Pri-based list could otherwise
+ * sit above the current pressure. A value the user has typed is never
+ * overwritten.
+ */
+function refreshPresDefaults(prefix, prId = `${prefix}-prPsi`, priId = `${prefix}-priPsi`) {
+  const pr = Number(val(prId)) || Number(val(priId));
+  if (!(pr > 0)) return;
+  const next = PRES_FRACTIONS.map((x) => Math.round(pr * x));
+  const prev = presAuto[prefix] ?? [];
+  for (let i = 0; i < next.length; i++) {
+    const el = document.getElementById(`${prefix}-pres-${i}`);
+    if (!el) continue;
+    const cur = el.value.trim();
+    if (cur === '' || cur === String(prev[i] ?? '')) el.value = String(next[i]);
+  }
+  presAuto[prefix] = next.map((v) => String(v));
 }
 
 const val = (id) => document.getElementById(id)?.value?.trim() ?? '';
@@ -1337,20 +1365,10 @@ function clearWaterProducerResults() {
 }
 
 /** Water sensitivity pressures default to 0.75 / 0.5 / 0.25 x Pri (the
- *  same fractions the oil and gas tabs use). Refilled from the current Pri
+ *  same fractions the oil and gas tabs use). Refilled from the CURRENT Pr
  *  unless the user has typed something of their own. */
-let waterPresAuto = [];
 function refreshWaterPresDefaults() {
-  const pri = Number(val('water-priPsi'));
-  if (!(pri > 0)) return;
-  const next = [0.75, 0.5, 0.25].map((x) => Math.round(pri * x));
-  for (let i = 0; i < 3; i++) {
-    const el = document.getElementById(`water-pres-${i}`);
-    if (!el) continue;
-    const cur = el.value.trim();
-    if (cur === '' || cur === String(waterPresAuto[i] ?? '')) el.value = String(next[i]);
-  }
-  waterPresAuto = next;
+  refreshPresDefaults('water');
 }
 
 function switchWaterType() {
@@ -2954,7 +2972,6 @@ document.getElementById('water-espPumpSel').onchange = switchWaterEspPump;
 document.getElementById('water-btn-espstages').onclick = guard(waterEspStagesRun);
 refreshWaterSens();
 renderPresList('water-pres-list', 'water', [3600, 2400, 1200]); // 0.75/0.5/0.25 x Pri 4800
-waterPresAuto = [3600, 2400, 1200];
 document.querySelectorAll('input[name="water-lift"]').forEach((r) => (r.onchange = switchWaterLift));
 switchWaterLift();
 document.querySelectorAll('input[name="water-welltype"]').forEach((r) => (r.onchange = switchWaterType));
@@ -3030,6 +3047,12 @@ switchGasIpr();
 document.querySelectorAll('input[name="gas-module"]').forEach((r) => (r.onchange = switchGasModule));
 switchGasModule();
 
+// the future-pressure lists follow the reservoir pressure as it is edited
+for (const prefix of ['oil', 'water', 'gas'])
+  for (const k of ['prPsi', 'priPsi']) {
+    const el = document.getElementById(`${prefix}-${k}`);
+    if (el) el.addEventListener('input', () => refreshPresDefaults(prefix));
+  }
 document.getElementById('tab-oil').onclick = () => switchTab('oil');
 document.getElementById('tab-water').onclick = () => switchTab('water');
 document.getElementById('tab-gas').onclick = () => switchTab('gas');
