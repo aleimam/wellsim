@@ -7,6 +7,7 @@
     "app.js": "src/ui/app.js",
     "style.css": "src/ui/style.css",
     "help.html": "src/ui/help.html",
+    "favicon.svg": "src/ui/favicon.svg",
     "vendor/plotly.min.js": "src/ui/vendor/plotly.min.js"
   }
 }

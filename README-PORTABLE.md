@@ -1,11 +1,24 @@
 # WellSim — standalone portable program
 
-**Build 1.1 — 29 August 2026**, from commit `8428b81` of the main project.
-Identical physics to https://wellsim.app at that commit: 201 tests, 43/43
-validation sweep. Changes since build 1.0 (27 Aug) include the fourth gas
-reserve method (p/Z from memory gauges), solved nodes on the sensitivity
-charts, the forecast stream reading the last production row, and the removal
-of the current-rate input.
+**Build 1.2 — 30 August 2026**, from commit `e73eefe` of the main project.
+Identical physics to https://wellsim.app at that commit: 209 tests, 43/43
+validation sweep. Changes since build 1.1 (29 Aug):
+
+- **Gas reserves, memory-gauge method:** a *Gauge TVD* column corrects an
+  off-datum reading through the static gas column to the perforations.
+- **Water injector:** a fracture-gradient input gives the formation-parting
+  pressure and the surface pressure that lands on it.
+- **ESP Pres sensitivity** restored, with its chart and table, at 0.9 / 0.8 /
+  0.7 × Pr.
+- **Charts** no longer overlap their tables, titles or axis labels at any
+  window width, and no longer jump a second after the page settles.
+- **Your work is kept between runs** — the case you are editing is restored
+  when you reopen the program. *Reset* in the header clears it.
+- **Offline charting is now built in rather than inherited.** Builds 1.0 and
+  1.1 loaded the embedded Plotly only because of an edit that lived in the
+  build folder and was never part of the source; a rebuild would have quietly
+  produced an exe that draws no charts without internet. The program now does
+  this by construction, and a test enforces it.
 
 **One file: `WellSim.exe`.** Copy it anywhere (USB stick included), double-click,
 and the default browser opens the full WellSim app. No installation, no Node,

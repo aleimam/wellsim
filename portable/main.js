@@ -31,7 +31,19 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
-const ASSETS = ['index.html', 'app.js', 'style.css', 'help.html', 'vendor/plotly.min.js'];
+const ASSETS = ['index.html', 'app.js', 'style.css', 'help.html', 'favicon.svg', 'vendor/plotly.min.js'];
+
+// The web app installs a service worker so it works offline. The portable is
+// already offline — everything it serves is inside the exe — and a worker here
+// would be actively harmful: the program takes the first FREE port, so run to
+// run it can be a different origin, leaving a registered worker and a cache
+// stranded on every port it has ever used. app.js registers unconditionally,
+// so the portable turns registration into a no-op before app.js loads rather
+// than editing shared UI code for a case only this build has.
+const NO_SERVICE_WORKER =
+  '<script>/* portable build: no service worker — see portable/main.js */' +
+  'if (navigator.serviceWorker) navigator.serviceWorker.register = () => Promise.resolve();' +
+  '</script>';
 
 function readAsset(name) {
   if (!ASSETS.includes(name)) return null;
@@ -50,7 +62,9 @@ function readAsset(name) {
   // keeps the web app on the CDN and makes the portable reproducibly offline.
   if (name === 'index.html')
     return Buffer.from(
-      String(buf).replace(/https:\/\/cdn\.plot\.ly\/plotly-[\d.]+\.min\.js/g, '/vendor/plotly.min.js'),
+      String(buf)
+        .replace(/https:\/\/cdn\.plot\.ly\/plotly-[\d.]+\.min\.js/g, '/vendor/plotly.min.js')
+        .replace('</head>', `${NO_SERVICE_WORKER}</head>`),
       'utf8'
     );
   return buf;
@@ -123,7 +137,12 @@ const server = http.createServer(async (req, res) => {
       try { result = h(body ? JSON.parse(body) : {}); } catch (e) { result = { error: e.message }; }
       return send(res, 200, result);
     }
-    let p = (req.url === '/' ? '/index.html' : req.url.split('?')[0]).slice(1);
+    // strip the query BEFORE deciding this is the root: the old order tested
+    // req.url === '/' against a still-queried URL, so http://localhost:PORT/?x
+    // fell through to an empty asset name and 404'd the entire app
+    const q = req.url.split('?')[0];
+    let p = q === '/' || q === '' ? 'index.html' : q.slice(1);
+
     const data = readAsset(p);
     if (!data) { res.writeHead(404); return res.end('not found'); }
     res.writeHead(200, { 'content-type': MIME[path.extname(p)] ?? 'application/octet-stream' });

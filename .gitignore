@@ -14,3 +14,7 @@ node_modules/
 *.log
 .DS_Store
 backup/
+
+# portable build outputs — the exe is ~94 MB and is rebuilt by build.ps1
+/WellSim.exe
+/build/
