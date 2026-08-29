@@ -1895,33 +1895,56 @@ async function espSensRun() {
   const body = oilForm();
   body.presList = collectPres('oil-esp', 3);
   const r = await api('oil/espsens', body);
+  const phone = window.innerWidth < 640;
   const traces = [];
-  r.cases.forEach((c, i) => {
+  // the reference: where the well sits today, drawn like the main sensitivity
+  if (r.currentIpr)
+    traces.push({
+      x: r.currentIpr.map((p) => p.qOilStbD), y: r.currentIpr.map((p) => p.pwfPsi),
+      name: phone ? `Pr ${Math.round(r.basePrPsi)}` : `IPR Pr=${Math.round(r.basePrPsi)} psi (current)`,
+      mode: 'lines', line: { color: '#00636D', width: 3.5 },
+    });
+  // the future-pressure family
+  r.cases.forEach((c, i) =>
     traces.push({
       x: c.iprCurve.map((p) => p.qOilStbD), y: c.iprCurve.map((p) => p.pwfPsi),
-      name: `IPR ${c.label}`, mode: 'lines', line: { width: 2 },
+      name: phone ? String(Math.round(c.presPsi)) : `IPR ${c.label}`,
+      mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 2.5 },
+    })
+  );
+  // the ESP-coupled VLP every node sits on — one curve: the pump, tubing and
+  // THP do not change with reservoir pressure
+  if (r.vlpCurve)
+    traces.push({
+      x: r.vlpCurve.map((p) => p.q), y: r.vlpCurve.map((p) => p.pwfPsi),
+      name: phone ? 'VLP' : 'ESP VLP (coupled)', mode: 'lines',
+      line: { color: '#C2540B', width: 2.5, dash: 'dot' },
     });
-    if (c.op) {
-      traces.push({
-        x: [c.op.qOilStbD], y: [c.op.pwfPsi], name: `node ${c.label}`, mode: 'markers',
-        marker: { symbol: 'star', size: 14 },
-      });
-    }
+  // and the solved node for each case, as an intersection you can see
+  r.cases.forEach((c, i) => {
+    if (!c.op) return;
+    traces.push({
+      x: [c.op.qOilStbD], y: [c.op.pwfPsi],
+      name: phone ? 'node' : `${c.label} node`, showlegend: !phone || i === 0,
+      mode: 'markers',
+      marker: { symbol: 'diamond', size: 12, color: FAM_REDS[i % 3], line: { width: 1.5, color: '#0B1418' } },
+    });
   });
   plot('oil-chart-espsens', traces, {
     ...LAYOUT(),
-    title: `ESP Pres sensitivity — ${r.pump.name}, ${r.opts.stages} stages @ ${r.opts.freqHz} Hz (solved nodes)`,
+    title: `ESP Pres sensitivity — ${r.pump.name}, ${r.opts.stages} stages @ ${r.opts.freqHz} Hz`,
     xaxis: { title: 'Oil rate, stb/d', rangemode: 'tozero' },
-    yaxis: { title: 'Pwf, psi', rangemode: 'tozero' },
+    // same Pri cap as every other sensitivity chart, so runs stay comparable
+    yaxis: { title: 'Pressure, psi', ...(r.priPsi > 0 ? { range: [0, r.priPsi] } : { rangemode: 'tozero' }) },
   });
   mobileShowResults();
   renderTables('oil-table-espsens', [{
-    title: 'ESP data at the solved node',
-    headers: ['case', 'J', 'q stb/d', 'Pwf', 'Pint', 'Pdis', 'ΔP', 'head ft', 'Qg@pump', 'grad', 'free gas %', 'WHT °F', 'thrust'],
+    title: 'ESP state at each solved node',
+    headers: ['case', 'Pres psi', 'J', 'q stb/d', 'Pwf', 'Pint', 'Pdis', 'ΔP', 'head ft', 'Qg@pump', 'grad', 'free gas %', 'WHT °F', 'thrust'],
     rows: r.cases.map((c) =>
       c.op
-        ? [c.label, fmt(c.j, 3), fmt(c.op.qOilStbD, 0), fmt(c.op.pwfPsi, 0), fmt(c.op.pintPsi, 0), fmt(c.op.pdisPsi, 0), fmt(c.op.dpPsi, 0), fmt(c.op.headFt, 0), fmt(c.op.qGrossPumpBpd, 0), fmt(c.op.gradPsiFt, 4), fmt(c.op.freeGasPct, 1), fmt(c.op.whtF, 1), c.op.thrust]
-        : [c.label, fmt(c.j, 3), c.opStatus, '—', '—', '—', '—', '—', '—', '—', '—', '—', '—']),
+        ? [c.label, fmt(c.presPsi, 0), fmt(c.j, 3), fmt(c.op.qOilStbD, 0), fmt(c.op.pwfPsi, 0), fmt(c.op.pintPsi, 0), fmt(c.op.pdisPsi, 0), fmt(c.op.dpPsi, 0), fmt(c.op.headFt, 0), fmt(c.op.qGrossPumpBpd, 0), fmt(c.op.gradPsiFt, 4), fmt(c.op.freeGasPct, 1), fmt(c.op.whtF, 1), c.op.thrust]
+        : [c.label, fmt(c.presPsi, 0), fmt(c.j, 3), c.opStatus, '—', '—', '—', '—', '—', '—', '—', '—', '—', '—']),
   }]);
   const sr = document.querySelector('input[name="oil-esptab"][value="sens"]');
   if (sr) sr.checked = true;

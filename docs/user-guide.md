@@ -290,9 +290,13 @@ inputs are required; there is no input THT.
    than the 0.75/0.5/0.25 the other modules use, because a pump still has to
    lift at modest depletion and 0.25 × Pr kills most ESP wells outright. Each
    case takes the Darcy future-J chain and is then **fully solved** with the
-   coupled pump: the chart overlays every case's IPR with its solved node
-   starred, and the table lists the ESP data at that node (rate, Pwf, Pint,
-   Pdis, ΔP, head, Qg@pump, gradient, free gas %, WHT, thrust). That is where
+   coupled pump. The chart draws the **current-Pr IPR** (heavy teal — where the
+   well sits today), each case's IPR, and the **coupled ESP VLP** — one curve,
+   since the pump, tubing and THP do not change with reservoir pressure — so
+   every solved node is a visible crossing of that VLP with its own IPR, marked
+   by a diamond. The pressure axis tops out at Pri like the other sensitivity
+   charts. The table lists the ESP state at each node (Pres, J, rate, Pwf,
+   Pint, Pdis, ΔP, head, Qg@pump, gradient, free gas %, WHT, thrust). That is where
    you see the pump working harder and the intake falling as the reservoir
    depletes. ESP sets also run in the main VLP/IPR sensitivity block, but that
    block solves at the CURRENT Pr only.

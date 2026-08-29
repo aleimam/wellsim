@@ -1356,7 +1356,24 @@ export function oilEspSens(f) {
           : null,
     };
   });
-  return { cases, pump: { name: bp.pump.name }, opts, basePrPsi: ipr.prPsi };
+  // the node is an intersection — draw what it intersects. The coupled ESP
+  // VLP is independent of Pr (pump, tubing and THP fixed), so one curve serves
+  // every case; the current-Pr IPR is the reference the well sits on today.
+  const oilFrac = cfg.fluid === 'water' ? 1 : 1 - cfg.wcPct / 100;
+  const cap = Math.min(qMaxGross(ipr) * oilFrac * 0.98, 10000);
+  const vlpCurve = oilRateGrid(Math.max(cap * 0.05, 50), cap).map((q) => {
+    const s = espSolveDp({ ...cfg, qOilStbD: q }, bp.pump, opts);
+    return { q, pwfPsi: s.march.pwfPsi };
+  });
+  return {
+    cases,
+    pump: { name: bp.pump.name },
+    opts,
+    basePrPsi: ipr.prPsi,
+    priPsi: ipr.priPsi ?? ipr.prPsi,
+    currentIpr: iprCurve(ipr, { wcPct: cfg.wcPct }),
+    vlpCurve,
+  };
 }
 
 /** Oil Module 3: Tarner forecast. N grey = the Reserve MB average; start
