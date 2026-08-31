@@ -34,7 +34,7 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-210 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+243 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries.
 
@@ -94,7 +94,8 @@ The header bar carries the three well tabs (**Oil | Water | Gas**) plus
   repo root.
 
 A standalone portable build (`WellSim.exe` — no install, cases saved beside the
-exe) is maintained as a separate fork and distributed as `WellSim-1.0.zip`.
+exe) is built from THIS repo by `build.ps1` — see
+[README-PORTABLE.md](README-PORTABLE.md) for what it is and how to rebuild it.
 
 ## Principles (project-wide)
 

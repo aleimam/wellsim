@@ -17,6 +17,7 @@ import {
   matchWearAndPi,
 } from '../src/core/vlp/esp.js';
 import { createOilIpr } from '../src/core/ipr/oil-ipr.js';
+import { deriveOilFlow } from '../src/core/vlp/oil-march.js';
 
 function close(actual, expected, rel = 1e-9) {
   assert.ok(
@@ -206,4 +207,100 @@ test('wear + PI match from the measured Pint/Pdis couple', () => {
   assert.ok(Math.abs(m.wearFactor) < 0.08, `wear=${m.wearFactor}`);
   close(m.dpMeasPsi, 1328);
   close(m.jMatched, 2.7, 0.15);
+});
+
+// ---- Water Well: the pump intake must not invent an oil phase ----
+// espIntakeState read cfg.qOilStbD directly, but on the Water Well tab that
+// field carries the GROSS WATER rate — oil-march.js encodes exactly that for
+// fluid:'water' (qo = 0, qw = cfg.qOilStbD). The water was therefore counted
+// a SECOND time as oil, so the pump curve was read at ~2x the true rate:
+// head 169 ft where it should have been 5608 ft, and a false up-thrust.
+// Fixed 31 Aug 2026.
+//
+// The six water-ESP tests in sens-params.test.js did not catch it — one of
+// them was PASSING BECAUSE OF IT, the doubled loading having pushed the stage
+// match up into the search range. These pin the invariant directly instead.
+const WATER_ESP_CFG = {
+  fluid: 'water',
+  api: 10,
+  wcPct: 100,
+  gorScfStb: 0,
+  rsiScfStb: 0,
+  pbPsi: 0,
+  oilViscCp: 0.5,
+  waterSg: 1.05,
+  gasSg: 0.842,
+  qOilStbD: 2278.768252127327, // the GROSS WATER rate on this tab
+  tresF: 201,
+  tubingIdIn: 2.992,
+};
+
+test('water well: the pump sees water ONLY — no phantom oil phase', () => {
+  const s = espIntakeState(WATER_ESP_CFG, { pIntakePsi: 1500, tIntakeF: 180, sepEffPct: 0 });
+  assert.equal(s.voBbl, 0, 'a water well has no oil phase at the pump');
+  assert.equal(s.freeGasBbl, 0, 'and no free gas');
+  assert.equal(s.totalGasBbl, 0, 'and no solution gas');
+
+  // the whole pump throughput is the water and only the water; the sheet's
+  // BC65 x1.01 volume factor is the only thing between the rate and the volume
+  const flow = deriveOilFlow(WATER_ESP_CFG);
+  close(s.vwBbl, flow.qw * 1.01, 1e-12);
+  close(s.qGrossPumpBpd, s.vwBbl, 1e-12);
+
+  // the doubling this guards against was 2.05x — anything near that is it back
+  assert.ok(
+    s.qGrossPumpBpd < flow.qw * 1.2,
+    `pump throughput ${s.qGrossPumpBpd} is far above the water rate ${flow.qw}`
+  );
+});
+
+test('water well: the intake gradient is a water gradient', () => {
+  const s = espIntakeState(WATER_ESP_CFG, { pIntakePsi: 1500, tIntakeF: 180, sepEffPct: 0 });
+  // pure water at SG 1.05 carrying the x1.01 volume factor:
+  //   (1.05 * 62.4) / 1.01 / 62.42 * 0.433 = 0.4500 psi/ft
+  // the phantom oil phase used to drag this down to 0.4302
+  assert.ok(
+    Math.abs(s.gradPsiFt - 0.45) < 5e-3,
+    `water gradient ${s.gradPsiFt} should sit at ~0.45 psi/ft, not the 0.43 the phantom oil produced`
+  );
+});
+
+// ---- an unmatchable stage count must say WHY ----
+// The message used to be "no stage count in [...] closes the traverse match —
+// check PI/Pres and the test rate", which sends the engineer off to adjust two
+// inputs that cannot possibly help: the real cause is a duty point past the
+// RIGHT-HAND END of the pump curve, where headAtRateFt floors head at zero and
+// the pump develops nothing at ANY stage count. Named properly 31 Aug 2026.
+//
+// Checked against the shipped UI defaults too (WC 50, 2100 stb/d, the demo
+// pump): 5156 bbl/d against a 4750 bbl/d curve. Each remedy the message offers
+// resolves that case — WG 5200 matches at 276 stages, 60 Hz at 235, 1800 stb/d
+// at 370 — so the advice it gives is advice that works.
+test('stage match names an off-curve duty point instead of blaming PI/Pres', () => {
+  // WD 150 tops out at 308 bbl/d at 50 Hz; this well puts 3333 through the pump
+  const tooSmall = pumpByName('WD 150');
+  assert.throws(
+    () => matchStages(CFG, IPR, tooSmall, { freqHz: 50, sepEffPct: 95, testQOilStbD: 2565 }),
+    (e) => {
+      assert.match(e.message, /cannot pass this rate/, 'must state the pump cannot pass it');
+      assert.match(e.message, /WD 150/, 'must name the pump');
+      assert.ok(e.message.includes('308 bbl/d end of its curve'), 'must quote the curve limit');
+      assert.ok(e.message.includes('3333 bbl/d through the pump'), 'must quote the duty rate');
+      assert.match(e.message, /50 Hz/, 'must say which frequency the limit applies at');
+      assert.ok(
+        !e.message.includes('check PI/Pres'),
+        'must NOT blame PI/Pres, which cannot fix an off-curve duty point'
+      );
+      return true;
+    }
+  );
+});
+
+test('the off-curve check stays silent when the pump can pass the rate', () => {
+  // guard the other direction: a pump with the range still matches normally,
+  // so the new diagnostic cannot swallow a legitimate result
+  const big = pumpByName('WG 5200');
+  const m = matchStages(CFG, IPR, big, { freqHz: 50, sepEffPct: 95, testQOilStbD: 2100 });
+  assert.ok(m.stages > 0, `WG 5200 should match, got ${JSON.stringify(m)}`);
+  assert.equal(m.designOk, true);
 });

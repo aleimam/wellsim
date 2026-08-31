@@ -7,7 +7,9 @@ oil excel/
 gas excel/
 training slids/
 *.pptx
+*.docx
 *.xls
+*.xlsx
 *.xlsm
 
 node_modules/

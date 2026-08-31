@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-08-30k" />
+  <link rel="stylesheet" href="/style.css?v=2026-08-31i" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -50,12 +50,15 @@
       </div>
       <div id="acct-in" style="display:none">
         <div class="acct-title" id="acct-who"></div>
-        <input id="acct-case-name" placeholder="case name" />
+        <div class="acct-saverow">
+          <input id="acct-case-name" placeholder="case name" />
+          <button id="acct-save" class="copybtn">Save</button>
+        </div>
         <div class="acct-btns">
-          <button id="acct-save" class="copybtn">Save case to server</button>
           <button id="acct-refresh" class="copybtn">Refresh</button>
           <button id="acct-signout" class="copybtn">Sign out</button>
         </div>
+        <div class="acct-caseshead" id="acct-caseshead"></div>
         <div id="acct-cases"></div>
       </div>
     </div>
@@ -78,6 +81,14 @@
           <label class="radio"><input type="radio" name="oil-lift" value="esp" /> ESP</label>
         </fieldset>
         <div id="oil-form"></div>
+        <fieldset>
+          <legend>IPR &mdash; one active basis</legend>
+          <label class="radio"><input type="radio" name="oil-iprbasis" value="darcy" checked /> Darcy (from K &amp; pay)</label>
+          <label class="radio"><input type="radio" name="oil-iprbasis" value="pi" /> User PI (J input)</label>
+          <div id="oil-ipr-common"></div>
+          <div id="oil-ipr-darcy"></div>
+          <div class="note" id="oil-ipr-note"></div>
+        </fieldset>
         <fieldset>
           <legend>Layers (one active)</legend>
           <label class="radio"><input type="radio" name="oil-mlmode" value="single" checked /> Single layer (default)</label>
@@ -114,7 +125,7 @@
             <div id="oil-esp-manual" style="display:none"><div id="oil-esp-manual-fields"></div></div>
             <div id="oil-esp-matchrow" style="display:none">
               <button id="oil-btn-espstages" class="action secondary">Match stages (new pump, wear 0)</button>
-              <button id="oil-btn-espwear" class="action secondary">Match wear + PI (measured Pint/Pdis)</button>
+              <button id="oil-btn-espwear" class="action secondary">Match wear (actual Pint/Pdis)</button>
               <div class="senshead">ESP view (one active)</div>
               <label class="radio"><input type="radio" name="oil-esptab" value="match" checked /> Model match</label>
               <label class="radio"><input type="radio" name="oil-esptab" value="sens" /> Sensitivity</label>
@@ -229,6 +240,14 @@
         </fieldset>
         <div class="note" style="margin:0 0 10px">Water well &mdash; the oil marches at their limiting case: API 10 (SG = 1.000), w.c. 100%, no gas. Rates are gross water; the IPR is the pure linear Darcy line (Pb = 0).</div>
         <div id="water-form"></div>
+        <fieldset>
+          <legend>IPR &mdash; one active basis</legend>
+          <label class="radio"><input type="radio" name="water-iprbasis" value="darcy" checked /> Darcy (from K &amp; pay)</label>
+          <label class="radio"><input type="radio" name="water-iprbasis" value="pi" /> User PI (J input)</label>
+          <div id="water-ipr-common"></div>
+          <div id="water-ipr-darcy"></div>
+          <div class="note" id="water-ipr-note"></div>
+        </fieldset>
         <div id="water-lift-gl" style="display:none">
           <fieldset>
             <legend>Gas lift</legend>
@@ -247,6 +266,11 @@
               <select id="water-espPumpSel"></select>
             </div>
             <div id="water-esp-fields"></div>
+            <div id="water-esp-custom" style="display:none">
+              <div class="senshead">Custom pump &mdash; per-stage curve at the reference frequency (add new pump)</div>
+              <div id="water-esp-custom-fields"></div>
+              <table class="sens" id="water-espcurve-table"></table>
+            </div>
             <div id="water-esp-manual" style="display:none"><div id="water-esp-manual-fields"></div></div>
             <div id="water-esp-matchrow" style="display:none">
               <button id="water-btn-espstages" class="action secondary">Match stages (new pump, wear 0)</button>
@@ -404,6 +428,6 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/app.js?v=2026-08-30k"></script>
+  <script src="/app.js?v=2026-08-31i"></script>
 </body>
 </html>

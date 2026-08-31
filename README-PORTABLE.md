@@ -1,8 +1,8 @@
 # WellSim — standalone portable program
 
 **Build 1.2 — 30 August 2026**, from commit `ce63b3f` of the main project.
-Identical physics to https://wellsim.app at that commit: 210 tests, 43/43
-validation sweep. Changes since build 1.1 (29 Aug):
+Identical physics to https://wellsim.app at that commit — the full suite and
+43/43 validation sweep both passing. Changes since build 1.1 (29 Aug):
 
 - **Gas reserves, memory-gauge method:** a *Gauge TVD* column corrects an
   off-datum reading through the static gas column to the perforations.
@@ -45,7 +45,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 (First time: `npm install --save-dev esbuild postject` with Node on PATH.)
 The physics is identical to the main project — `node --test` runs the same
-201-test suite against this copy.
+243 tests against this copy.
 
 ## Code signing
 

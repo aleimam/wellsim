@@ -211,6 +211,22 @@ function buildOilIpr(f, cfg, pb) {
   const prPsi = num(f.prPsi) ?? priPsi;
   const pvt = oilPvtBundle(cfg, pb);
   const darcy = oilDarcyAtPr(f, pvt, prPsi);
+  // IPR basis 'pi' — the ESP workbook's route ('VLP-IPR'!B4 "Iput PI"): the
+  // user types J directly, with the reservoir pressure. Darcy becomes the
+  // DERIVED record: K is back-matched so J(Darcy) = PI (closed form, exact),
+  // which keeps every Darcy consumer — future J, the Pres solver, the ESP
+  // Pres sensitivity — working unchanged. That is literally the workbook:
+  // its J_2 = J. Blank Darcy geometry leaves a pure Jones record (no
+  // matched K, and the future-J routes will say what they are missing).
+  if (f.iprBasis === 'pi') {
+    const pi = num(f.userJ);
+    if (!(pi > 0)) throw new Error('User-PI basis: enter the PI J (bbl/d/psi)');
+    const base = createOilIpr({ jTest: pi, jSource: 'jones', priPsi, pbPsi: pb, prPsi });
+    if (['thicknessFt', 'reFt', 'rwFt'].some((k) => darcy[k] == null)) return base;
+    const m = calibrateDarcyToTest({ ...base, darcy: { ...darcy, permMd: undefined } }, {});
+    m.ipr.matchedPermMd = m.matchedPermMd;
+    return m.ipr;
+  }
   const ipr = createOilIpr({ darcy, priPsi, pbPsi: pb, prPsi });
   if (num(f.jTest) != null) {
     ipr.jTest = num(f.jTest);
@@ -367,7 +383,7 @@ export function oilNodal(f) {
   return {
     pbPsi: pb,
     computed: { pbPsi: pb, prPsi: ipr.prPsi, perfTvdM: cfg.perfTvdM },
-    ipr: { jDarcy: ipr.jDarcy, jTest: ipr.jTest ?? null, j: ipr.j, jSource: ipr.jSource, priPsi: ipr.priPsi, prPsi: ipr.prPsi },
+    ipr: { jDarcy: ipr.jDarcy, jTest: ipr.jTest ?? null, j: ipr.j, jSource: ipr.jSource, priPsi: ipr.priPsi, prPsi: ipr.prPsi, matchedPermMd: ipr.matchedPermMd ?? null },
     aofOilStbD: aofOil,
     iprCurve: iprCurve(ipr, { wcPct: cfg.fluid === 'water' ? 0 : cfg.wcPct }),
     vlpCurve: vlp,
@@ -1614,6 +1630,7 @@ export function oilEsp(f) {
     return { q: p.q, whpPsi: pwfIpr - p.pwfPsi + cfg.thpPsi, pwfIprPsi: pwfIpr, pwfVlpPsi: p.pwfPsi, whtF: p.whtF };
   });
   return {
+    matchedPermMd: ipr.matchedPermMd ?? null,
     op,
     // the pump's full state at the matched node (same shape the sensitivity
     // cases carry, so both views report identical parameters)
@@ -1655,9 +1672,12 @@ export function oilEspStages(f) {
       freqHz: num(f.espFreqHz) ?? 50,
       sepEffPct: num(f.espSepEffPct) ?? 95,
       testQOilStbD: q,
+      // the workbook macro writes the calculated Pwf into the test cell and
+      // the user may overwrite it — a typed value anchors the match instead
+      testPwfPsi: num(f.testPwfPsi),
       minIntakePsi: num(f.espMinIntakePsi) ?? 300,
     });
-    return { ...m, testQOilStbD: q };
+    return { ...m, testQOilStbD: q, pwfSource: num(f.testPwfPsi) != null ? 'input' : 'ipr' };
   } catch (e) {
     return { error: e.message };
   }

@@ -96,7 +96,11 @@ const server = http.createServer(async (req, res) => {
     }
     let p = req.url === '/' ? '/index.html' : req.url.split('?')[0];
     const file = path.resolve(path.join(UI_DIR, p));
-    if (!file.startsWith(UI_DIR)) {
+    // startsWith(UI_DIR) on its own is a STRING test, so it also passes for a
+    // SIBLING whose name merely begins with "ui" (src/ui-old, src/uix) — and
+    // this project does keep spare copies of the UI around. Appending the
+    // separator makes it a real containment check: only children of src/ui.
+    if (file !== UI_DIR && !file.startsWith(UI_DIR + path.sep)) {
       res.writeHead(403);
       return res.end('forbidden');
     }

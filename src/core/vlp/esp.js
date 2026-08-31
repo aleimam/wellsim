@@ -78,7 +78,14 @@ export function thrustStatus(pump, freqHz, qBpd) {
 export function espIntakeState(cfg, { pIntakePsi, tIntakeF, sepEffPct }) {
   const flow = deriveOilFlow(cfg);
   const pvt = resolveOilPvt(cfg, tIntakeF);
-  const qo = cfg.qOilStbD;
+  // A Water Well is the oil march at its limiting case (fluid:'water',
+  // API 10, WC 100), and on that tab cfg.qOilStbD carries the GROSS WATER
+  // rate, not an oil rate — deriveOilFlow encodes exactly that: qo = 0,
+  // qw = cfg.qOilStbD. Reading cfg.qOilStbD here as oil counted the water a
+  // SECOND time as a phantom oil phase, so the pump curve was read at ~2x
+  // the real rate (head 169 ft instead of 5608 ft on the demo, and a false
+  // up-thrust). Found 31 Aug 2026; the oil tabs were never affected.
+  const qo = cfg.fluid === 'water' ? 0 : cfg.qOilStbD;
   const rs = solutionGorScfStb(pIntakePsi, pvt);
   const bo = oilFvf(pIntakePsi, pvt);
   const z = zFactorBrillBeggs(pIntakePsi / pvt.ppc, (tIntakeF + 460) / pvt.tpc).z;
@@ -277,10 +284,14 @@ export function espOperatingPoint(cfg, ipr, pump, opts) {
  * stage count so the traverses meet at the KNOWN test rate. Pint(IPR) is
  * stage-independent; Pint(traverse) falls as stages (dP) grow.
  */
-export function matchStages(cfg, ipr, pump, { freqHz, sepEffPct = 95, testQOilStbD, minIntakePsi = 300 }) {
+export function matchStages(cfg, ipr, pump, { freqHz, sepEffPct = 95, testQOilStbD, testPwfPsi = null, minIntakePsi = 300 }) {
   const c = { ...cfg, qOilStbD: testQOilStbD };
   const oilFrac = oilFraction(cfg);
-  const pwfIpr = pwfAtQGross(testQOilStbD / oilFrac, ipr);
+  // Pwf at the test point: calculated from the IPR at the test rate (the
+  // greyed cell) unless the user typed a measured value, which then anchors
+  // the traverse match instead — the workbook pattern, macro-written cell,
+  // user-overwritable.
+  const pwfIpr = testPwfPsi ?? pwfAtQGross(testQOilStbD / oilFrac, ipr);
   if (!(pwfIpr > 0)) throw new Error('matchStages: test rate exceeds the IPR AOF');
   const solveAt = (stages) =>
     espSolveDp(c, pump, { stages, freqHz, wearFactor: 0, sepEffPct, pwfIprPsi: pwfIpr });
@@ -292,7 +303,13 @@ export function matchStages(cfg, ipr, pump, { freqHz, sepEffPct = 95, testQOilSt
   // downward crossing is the physical stage count (far off-curve states can
   // create spurious high-stage roots)
   const grid = [];
-  for (let s = 5; s <= 800; s = Math.round(s * 1.25) + 1) grid.push(s);
+  // The floor was 5 until 31 Aug 2026. A low stage count is a real answer —
+  // a booster on a well that nearly flows unaided needs only a handful — and
+  // the floor was reporting those as "no match". It surfaced when the water
+  // double-count was fixed: the strong test well (Pri 4800, natural flow
+  // 1836 stb/d) matches 2000 stb/d at ~3 stages, and had only appeared to
+  // need more because the phantom oil phase doubled the pump loading.
+  for (let s = 1; s <= 800; s = Math.round(s * 1.25) + 1) grid.push(s);
   let prevS = grid[0];
   let prevR = R(prevS);
   for (let i = 1; i < grid.length; i++) {
@@ -334,7 +351,25 @@ export function matchStages(cfg, ipr, pump, { freqHz, sepEffPct = 95, testQOilSt
     prevS = grid[i];
     prevR = r;
   }
-  throw new Error('matchStages: no stage count in [5, 800] closes the traverse match — check PI/Pres and the test rate');
+  // Nothing crossed. Before sending the user off to adjust the reservoir
+  // inputs, rule out the one cause no stage count can fix: a duty point
+  // past the RIGHT-HAND END of the pump curve. headAtRateFt floors
+  // extrapolated head at zero, so beyond the last catalog point the pump
+  // develops no head at ANY stage count and the traverses can never meet.
+  // The remedy is a bigger pump, a higher frequency or a lower rate — never
+  // PI or Pres, which is exactly where this message used to point.
+  const fr = freqHz / pump.refFreqHz;
+  const qCurveMaxBpd = pump.points[pump.points.length - 1].rateBpd * fr;
+  const qDutyBpd = solveAt(grid[0]).state.qGrossPumpBpd;
+  if (qDutyBpd > qCurveMaxBpd)
+    throw new Error(
+      `matchStages: ${pump.name} cannot pass this rate. The test point puts ` +
+        `${qDutyBpd.toFixed(0)} bbl/d through the pump, past the ` +
+        `${qCurveMaxBpd.toFixed(0)} bbl/d end of its curve at ${freqHz} Hz, where it ` +
+        `develops no head at any stage count. Choose a larger pump, raise the ` +
+        `frequency, or lower the test rate.`
+    );
+  throw new Error('matchStages: no stage count in [1, 800] closes the traverse match — check PI/Pres and the test rate');
 }
 
 /**

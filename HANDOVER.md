@@ -3,7 +3,7 @@
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
 **As of:** 30 August 2026 — commit `c6f1caa`, asset stamp `2026-08-30k`,
-210 tests passing, 43/43 validation sweep.
+243 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -23,7 +23,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 24 test files, 67 commits.
+`nodal`, `reserve`, `solvers`), 30 test files.
 
 ## 2. Running it
 
@@ -35,7 +35,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 210 unit + regression tests
+node --test                       # 243 unit + regression tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -80,7 +80,7 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               24 files — workbook cell pins, physics regressions, and
+tests/               30 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)
@@ -105,7 +105,11 @@ private; neither belongs in a repository. They **are** in the F: backup.
   on the same disk as the thing it protects, so it survives a bad write and
   not a lost server. That is survivable today only because the case store is
   empty. **Before real client cases go in, add an off-box copy** — a nightly
-  `tar` of `data/` pulled somewhere else is enough.
+  `tar` of `data/` pulled somewhere else is enough. The runbook for that is
+  now written up in **docs/deploy.md → “Backing up `data/` off-box”**: two
+  options (pull from the workstation, or a nightly server job pushed off-box),
+  the restore procedure, and the one-liner that checks whether the server store
+  is still empty. It is a runbook only — nothing has been installed on the box.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
 - **Charts are drawn by Plotly at their container's width**, and that width is
@@ -208,9 +212,30 @@ private; neither belongs in a repository. They **are** in the F: backup.
   **The consequence to respect: this host is now reachable only with the
   private key `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
   Hetzner console, not SSH. A passphrase-protected copy is kept on the F:
-  backup drive under `ssh-key` with its own README; the passphrase is in the
-  password manager and deliberately NOT on that drive. The working copy on
-  the workstation stays passphrase-free so deploys run unattended.
+  backup drive at **`F:\WellSim-Backup-2026-08-29\ssh-key\`** (the key is
+  `wellsim_hetzner` + `.pub`); the passphrase is in the password manager and
+  deliberately NOT on that drive.
+
+  **Recovered once, on 31 Aug 2026** — a new Windows account had no `~/.ssh`
+  at all and the `d:\*.txt` token files had been deleted. What that taught:
+
+  - This entry used to say the copy was at a bare `F:\ssh-key`. It is not;
+    it is inside the dated backup folder above. A wrong path in a recovery
+    procedure costs an hour exactly when you have none.
+  - The restored key is **encrypted (`aes256-ctr`)**, so it prompts for the
+    passphrase on every use. The "working copy stays passphrase-free" state
+    this file used to describe is something you have to RE-CREATE after a
+    restore: `ssh-keygen -p -f ~/.ssh/wellsim_hetzner` on the LOCAL copy
+    only (leave the F: copy protected), or `ssh-add` it per session.
+  - Windows needs the ACL tightened or OpenSSH refuses the key:
+    `icacls %USERPROFILE%\.ssh\wellsim_hetzner /inheritance:r /grant:r "%USERNAME%:(R)"`
+  - Verify without logging in: `ssh -v -o BatchMode=yes -i <key> root@<ip> true`
+    prints **`Server accepts key`** when the key is still in `authorized_keys`.
+    The `Permission denied (publickey)` that follows is only the unsupplied
+    passphrase — not a rejected key. That one line is the whole test.
+  - The two API tokens survived ONLY as WhatsApp transfer-cache copies, i.e.
+    they had been sent through a chat. They were restored to keep work
+    moving and are due for rotation (see Credentials in docs/deploy.md).
 - **The code-signing PFX** and its password are for the desktop distributable.
   The PFX must not ship inside any distributed zip, and the password belongs
   in a password manager, not a file.

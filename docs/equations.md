@@ -195,6 +195,16 @@ J = 0.00708·K·h / [ μ_o·Bo·(ln(Re/Rw) − 0.75 + S) ]     [stb/d/psi]
 **Calibration** (slide-8 workflow): user judges skin → closed-form matched K such
 that J_Darcy = J_test. μ_o·Bo are evaluated at the current Pr.
 
+**User-PI basis** (the ESP workbook route — 'VLP-IPR'!B4 "Iput PI" is a direct
+input; its J_2 simply equals J): the user types J and Pres, and K becomes the
+DERIVED value — the same closed-form match as calibration, run against the
+typed J, so J_Darcy = PI exactly and every Darcy consumer below keeps working.
+Geometry (H/Re/Rw/skin) is optional; blank leaves a pure Jones record. The
+GasLift workbook has no PI cell — its Jones J (B16 = 1.07896794858 at Pres
+5000) is the value the gas-lift demo case types in, and the matched K lands on
+the workbook's own hand-tuned B30 = 16.37. Per-lift demo cases load each
+workbook's saved inputs when the lift type changes on a pristine form.
+
 **Future J (J_2x, sensitivities & the oil Pres solver):** re-evaluate μ_o (with the
 Beggs–Robinson A/B taken at the **current-Pr Rs** — workbook quirk preserved) and Bo
 at the future pressure, then the Darcy J above. Pinned: J_21–23 =
@@ -310,7 +320,157 @@ recovery %. Chart: history + forecast, calendar-date axis, rate/Gp left, Pres ri
 
 ---
 
-## 10. Documented deviations from the workbooks
+## 10. Forecast — oil (Module 3: Tarner | Walsh)
+
+Two saturation-tracking methods over the same skeleton. Each step the workbook
+macro GoalSeeks a **pair** of residuals (the macro loops the pair 5×); WellSim
+alternates the same two updates deterministically to convergence:
+
+```
+AE:  Gp by the trapezoid of the producing GOR over Np  =  Gp from the MB   → solve P
+AF:  the assumed oil saturation                        =  So from the MB   → solve So
+```
+
+So is updated by direct substitution, P by Brent on the AE residual; at most 25
+outer passes, converged at |ΔP| < 1e−6 psi and |ΔSo| < 1e−10. Pwf is frozen for
+the step; the rate stays coupled to the trial pressure, as the sheet's K/M
+columns do under GoalSeek.
+
+**Shared by both methods.** Rel-perm — the sheet's hardcoded 6th-order
+polynomials (Tarner!F16 / G16), used verbatim by Walsh too:
+
+```
+Kro(So) = −8.38190317154e−9·So⁶ + 1.771375536919e−8·So⁵ − 2.24276445806e−8·So⁴
+        + 1.415932551026e−8·So³ + 1.24444443593566·So² − 0.323555551551901·So
+        + 0.021031110321869
+Krg(Sg) = −7.45058059692e−9·Sg⁶ + 2.23517417908e−9·Sg⁵ − 2.7939677238e−10·Sg⁴
+        − 1.860782504082e−8·Sg³ + 2.040816336171·Sg² − 0.204081636387841·Sg
+        + 0.00510204149620779
+
+Sg = max(0, 1 − Swi − So);   Kro floored at 1e−9, Krg at 0
+So clamped to [0.05, 1 − Swi]
+```
+
+Rock + connate-water term (Tarner!R col) — a compressibility × Δp **product**,
+dimensionless, not a compressibility:
+
+```
+ct = (Cw·Swi + Cf)/(1 − Swi) · (Pri − P)
+defaults: Swi 0.15, Cw 2.63e−6 /psi, Cf 3.25e−6 /psi
+```
+
+Cumulative gas by trapezoid, and the step bookkeeping:
+
+```
+Np += qo·Δt/1e6                                  [MMstb, Δt default 30 d]
+Gp += (GOR_prev + GOR_new)/2 · (Np_new − Np_prev) [MMscf]
+```
+
+Flowing pressure — two sources:
+
+```
+'vlp'  : nodal operating point of the inflow line against the REAL oil march at
+         the forecast FTHP (sampled, bracketed, Brent; highest-rate crossing),
+         floored at minPwf (default 500 psi). The author's commented-out intent.
+'fixed': constant minPwf — the sheet's active behaviour.
+```
+
+The march is run at the forecast stream GOR when one is given (an input, like
+W.C and THP); otherwise at the MB GOR carried from the previous step.
+
+An **anchor row** is booked at the start date itself (Δt = 0). It changes no
+physics — it is the state the first step departs from — but without it the
+series began one step after the declared start and did not join the history it
+continues.
+
+```
+stops:  qo < abandonment rate (default 50 stb/d)   → 'abandoned' (or 'died' at qo ≤ 0)
+        Np ≥ 0.999·N                                → 'depleted'
+        P ≤ max(1.02·minPwf, 120)                   → 'depleted'
+        no IPR/VLP intersection                     → 'died'
+        otherwise                                   → 'max-steps' (default 60)
+EUR = Np at stop;  recovery % = Np/N · 100
+```
+
+### 10.1 Tarner — solution-gas material balance
+
+Rates come from the **mobility** Darcy PI (Tarner!I13) — note there is no μ·B in
+it, because mobility enters through λ:
+
+```
+J1 = 0.00708·K·h / ( ln(Re/Rw) − 0.75 + S )
+λt = Kro/μo + Krg/μg          λo = Kro/μo
+qt = J1·λt·(P − Pwf)
+qo = J1·(λo/Bo)·(P − Pwf)
+```
+
+Material balance and producing GOR:
+
+```
+So_MB = (1 − Swi)·(N − Np)·Bo / ( N·Boi·(1 − ct) )                     (Tarner!Y)
+Gp_MB = N·(Rsi − Rs) − ( N·Boi − (N − Np)·Bo )/Bg
+        + N·Boi·ct/Bg + Np·Rs                                          (Tarner!O)
+GOR   = Rs + (Krg/Kro)·(μo·Bo)/(μg·Bg)                                 (Tarner!P)
+
+N, Np in MMstb;  Gp in MMscf;  Boi = Bo(Pri);  Bg in bbl/scf (Section 2 form)
+```
+
+Gas viscosity at reservoir temperature — sweet pseudo-criticals, **local** Tpr:
+
+```
+μg = μ_base(γg, Tres)/Tpr · exp( Dempsey(Ppr, Tpr) )
+```
+
+### 10.2 Walsh — generalized (volatile-oil) material balance
+
+Same residual pair, same rel-perms, same trapezoid. The balance carries the
+**volatilized oil–gas ratio** Rv — the sheet's tuned 6th-order polynomial
+(Walsh!AH), divided by 1000 to bbl/scf:
+
+```
+Rv(P) = ( 1.045159231e−21·P⁶ − 1.7363576978649e−17·P⁵ + 1.17482373317021e−13·P⁴
+        − 4.10981307039167e−10·P³ + 7.87671754746064e−7·P² − 0.000776441401360544·P
+        + 0.332227112083792 ) / 1000
+```
+
+```
+Gp_MB = ( N·( Boi·(1 − Rv·Rs) − (Bg − Rv·Bo)·Rsi − (Bo − Rs·Bg) )
+          + Np·Bo − Np·Rs·Bg ) / ( Bo·Rv − Bg )
+        + (N·Boi/Bg)·( ct/(1 − Swi) )                                  (Walsh!O)
+So_MB = (1 − Swi)·( (1 − Np/N)·Bo·Bg − Boi·Rv·Bo )
+        / ( Boi·(Bg − Rv·Bo)·(1 − ct) )                                (Walsh!Y)
+Foo   = 1 / ( 1 + (Bo·Krg·μo·Rv)/(Bg·Kro·μg) )                         (Walsh!AI)
+GOR   = Foo·( Rs + (Krg/Kro)·(μo·Bo)/(μg·Bg) )                         (Walsh!P)
+```
+
+Rates use the **constant calibrated PI** J (Walsh!$I$13 = J_2) — not a Darcy
+recomputation, which is the substantive difference from Tarner's J1:
+
+```
+qt = J·λt·(P − Pwf)
+qo = qt·λo / (λt·Bo)
+```
+
+**Two workbook quirks preserved:**
+
+1. **μg = μo.** The sheet's "Gas Visc" column (Walsh!W) reads the *oil*
+   viscosity cell (BHP!AQ), so gas mobility and the GOR ratio both run on the
+   oil viscosity. Kept for parity.
+2. **Bg in cf/scf** — the march form `0.0283·z·(T+460)/(P+14.5)`, **without**
+   the /5.615 to bbl/scf, because the Walsh MB is written in those units. This
+   is the one unit that differs between the two methods on this page: Tarner's
+   Bg is bbl/scf, Walsh's is cf/scf.
+
+Starting cumulative gas also differs: Tarner starts at 0, Walsh at Np₀·Rsi.
+
+**Modelling limit (not a rounding issue).** Neither balance carries a
+water-production term, so the Forecast W.C affects the lift calculation only and
+never the material balance. On a high-water-cut well that is a real limit of the
+method as ported.
+
+---
+
+## 11. Documented deviations from the workbooks
 
 1. **Z factor**: the sheets GoalSeek Hall–Yarborough (left unconverged in places —
    BHP!Z50 residual −0.0715); WellSim uses explicit Brill & Beggs everywhere.
@@ -329,3 +489,12 @@ recovery %. Chart: history + forecast, calendar-date axis, rate/Gp left, Pres ri
 7. **Rounding artifacts** preserved where they matter for parity (π = 22/7 for the
    trajectory cosine, `rouhgsc` GoalSeek artifact available as a parameter override
    in tests).
+8. **Oil-forecast PVT evaluation point**: Rs/Bo/Bg/μ are evaluated at the TRIAL
+   pressure inside each step's solve, for both methods. The saved Tarner sheet
+   froze PVT at initial values; the training material directs otherwise ("all the
+   PVT data must be evaluated at the assumed reservoir pressure p2"), and the
+   Walsh Gp residual moves with pressure almost entirely through the PVT
+   (Bg, Rs, Rv) — freezing it leaves no root at all.
+9. **Walsh PVT table pressure**: the sheet reads its PVT table at the parallel
+   TARNER sheet's pressures — a shared-table convenience of the workbook.
+   WellSim reads it at Walsh's own solved pressure.

@@ -11,7 +11,18 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-const DOCS = ['README.md', 'HANDOVER.md', 'docs/user-guide.md', 'src/ui/help.html'];
+// help.html is the same reference as the markdown docs, but its numbers sit
+// inside markup (<b>216</b> regression tests). Strip tags before matching, or
+// the guard cannot see them — which is exactly how the manual's headline chip
+// sat at 196 while the suite grew past 200. Widened 31 Aug 2026.
+const stripTags = (s) => s.replace(/<[^>]+>/g, '');
+const DOCS = [
+  'README.md',
+  'README-PORTABLE.md', // left out until 31 Aug 2026 — that is how "201-test suite" survived
+  'HANDOVER.md',
+  'docs/user-guide.md',
+  'src/ui/help.html',
+];
 
 /** Every test( call across the suite — what `node --test` will report. */
 function actualTestCount() {
@@ -25,8 +36,9 @@ test('docs quote the real test count', () => {
   const actual = actualTestCount();
   for (const doc of DOCS) {
     const text = read(doc);
+    const scan = text + stripTags(text);
     // any "<n> tests" claim in a doc must be the real number
-    for (const m of text.matchAll(/(\d{2,4})\s+(?:unit \+ regression )?tests\b/g)) {
+    for (const m of scan.matchAll(/(\d{2,4})\s+(?:unit \+ regression |regression |unit )?tests\b/g)) {
       assert.equal(
         Number(m[1]),
         actual,
@@ -41,8 +53,14 @@ test('docs quote the real number of test FILES', () => {
   // sat in the handover while the suite had 24 — the same drift, one line up
   const actual = fs.readdirSync(path.join(root, 'tests')).filter((f) => f.endsWith('.test.js')).length;
   for (const doc of DOCS) {
-    for (const m of read(doc).matchAll(/(\d{1,3})\s+test files\b/g)) {
-      assert.equal(Number(m[1]), actual, `${doc} claims "${m[0]}" but tests/ holds ${actual}`);
+    const text = read(doc);
+    // two shapes are in use: "25 test files" in prose, and "tests/   25 files"
+    // in the handover's tree diagram. The second drifted unguarded until
+    // 31 Aug 2026 — sitting wrong one line above the count that WAS guarded.
+    for (const re of [/(\d{1,3})\s+test files\b/g, /^tests\/\s+(\d{1,3})\s+files\b/gm]) {
+      for (const m of text.matchAll(re)) {
+        assert.equal(Number(m[1]), actual, `${doc} claims "${m[0].trim()}" but tests/ holds ${actual}`);
+      }
     }
   }
 });
@@ -134,4 +152,64 @@ test('the portable build serves Plotly from the embedded copy, not the CDN', () 
   fs.closeSync(fd);
   const shipped = head.toString('utf8').match(/plotly\.js v([\d.]+)/)?.[1];
   assert.equal(shipped, wanted, `vendored Plotly is v${shipped}, index.html asks for v${wanted}`);
+});
+
+// ---- pressure axes never show negative pressure ----
+// Pressure is absolute: an axis dipping below zero states something that
+// cannot exist. Nine pressure axes were left on Plotly autorange — including
+// the MAIN nodal chart on all three tabs and the reservoir-limit charts,
+// whose fitted slope line genuinely extrapolates below 0. Floored centrally
+// in plot() on 31 Aug 2026 so the rule also holds for charts not yet written.
+//
+// floorPressureAxes is UI code with no module system, so it is read out of
+// app.js and evaluated — the same trick keeps this honest about the shipped
+// source rather than a copy.
+test('every pressure axis is floored at zero, whatever the data does', () => {
+  const src = fs.readFileSync(path.join(root, 'src/ui/app.js'), 'utf8');
+  const m = src.match(/function floorPressureAxes[\s\S]*?\n}\n/);
+  assert.ok(m, 'floorPressureAxes must exist in app.js');
+  const floorPressureAxes = new Function(m[0] + '; return floorPressureAxes;')();
+
+  // a pressure axis on autorange gets pinned to [0, max]
+  const nodal = floorPressureAxes({ yaxis: { title: 'Pressure, psi' } }, [{ y: [3550, 2000, 500] }]);
+  assert.equal(nodal.yaxis.range[0], 0);
+
+  // THE POINT: negative data must not drag the axis below zero
+  const rlt = floorPressureAxes({ yaxis: { title: 'Pwf, psi' } }, [{ y: [2600, 1200, -450] }]);
+  assert.equal(rlt.yaxis.range[0], 0, 'a slope extrapolating below 0 must not open a negative axis');
+
+  // pressure on the X axis (the traverse charts)
+  const trav = floorPressureAxes(
+    { xaxis: { title: 'Pressure, psi' }, yaxis: { title: 'Depth TVD, ft', autorange: 'reversed' } },
+    [{ x: [160, 900, 2600], y: [0, 5000, 9000] }]
+  );
+  assert.equal(trav.xaxis.range[0], 0);
+  assert.equal(trav.yaxis.range, undefined, 'the reversed depth axis must be left alone');
+
+  // secondary axis reads its OWN traces, not the primary's
+  const fc = floorPressureAxes({ yaxis2: { title: 'Pres, psi' } }, [
+    { y: [99999] },
+    { y: [3550, 900], yaxis: 'y2' },
+  ]);
+  assert.ok(fc.yaxis2.range[1] < 5000, `y2 must scale to its own data, got ${fc.yaxis2.range[1]}`);
+
+  // an axis that pins its own range keeps it (the sensitivity charts use [0, Pri])
+  const pinned = floorPressureAxes({ yaxis: { title: 'Pressure, psi', range: [0, 3550] } }, [{ y: [9999] }]);
+  assert.deepEqual(pinned.yaxis.range, [0, 3550]);
+
+  // non-pressure axes are untouched
+  for (const t of ['WHT, °F', 'Head, ft', 'Rate stb/d · GOR scf/stb', 'Depth TVD, ft']) {
+    const o = floorPressureAxes({ yaxis: { title: t } }, [{ y: [-5, 100] }]);
+    assert.equal(o.yaxis.range, undefined, `${t} must not be floored`);
+  }
+});
+
+test('no chart layout leaves a pressure axis on bare autorange', () => {
+  // the guard above only works if plot() actually applies it
+  const src = fs.readFileSync(path.join(root, 'src/ui/app.js'), 'utf8');
+  assert.match(
+    src,
+    /Plotly\.newPlot\([^)]*floorPressureAxes\(/,
+    'plot() must route its layout through floorPressureAxes'
+  );
 });

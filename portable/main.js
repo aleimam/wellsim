@@ -45,6 +45,42 @@ const NO_SERVICE_WORKER =
   'if (navigator.serviceWorker) navigator.serviceWorker.register = () => Promise.resolve();' +
   '</script>';
 
+// The portable has no accounts: its case store is a plain `cases/` folder
+// beside the exe, and this file serves cases/save|list|load|delete with no
+// auth at all. But it serves the WEBSITE's header panel, and app.js only
+// reaches a case store through its `acct` object — which nothing sets except
+// a call to auth/login or auth/register, endpoints this build deliberately
+// does not have. So every build up to and including 1.2 showed a Sign in form
+// that answered "unknown endpoint auth/register" and never opened the panel:
+// the cases/ folder README-PORTABLE.md promises was unreachable from the UI.
+// Same class of bug as the Plotly one — behaviour that only ever existed in
+// the uncommitted build tree. Found and fixed 31 Aug 2026.
+//
+// Fixed at SERVE TIME like the Plotly swap, so the website's account code is
+// untouched: hand app.js a local session before it reads one. Guarded, in
+// keeping with the app's rule that no storage access may ever break the UI.
+const LOCAL_SESSION =
+  '<script>/* portable build: no accounts — open the local case store directly */' +
+  'try{var s=JSON.stringify({token:"portable",company:"local",username:"portable"});' +
+  'var g=Storage.prototype.getItem;' +
+  'Storage.prototype.getItem=function(k){return k==="wellsimAcct"?s:g.call(this,k);};' +
+  '}catch(e){}' +
+  '</script>';
+
+// app.js loads at the end of <body> and calls acctUi() at top level, so this
+// runs after the labels are written. Sign out is REMOVED rather than hidden:
+// there is no account to sign out of, and clicking it would strand the panel
+// behind a sign-in form until the next reload.
+const LOCAL_LABELS =
+  '<script>/* portable build: label the panel for a build with no accounts */' +
+  'try{' +
+  'document.getElementById("acct-who").textContent="Cases saved beside the program";' +
+  'document.getElementById("acct-link").textContent="Cases";' +
+  'document.getElementById("acct-save").textContent="Save case";' +
+  'document.getElementById("acct-signout").remove();' +
+  '}catch(e){}' +
+  '</script>';
+
 function readAsset(name) {
   if (!ASSETS.includes(name)) return null;
   const buf = sea
@@ -64,7 +100,8 @@ function readAsset(name) {
     return Buffer.from(
       String(buf)
         .replace(/https:\/\/cdn\.plot\.ly\/plotly-[\d.]+\.min\.js/g, '/vendor/plotly.min.js')
-        .replace('</head>', `${NO_SERVICE_WORKER}</head>`),
+        .replace('</head>', `${NO_SERVICE_WORKER}${LOCAL_SESSION}</head>`)
+        .replace('</body>', `${LOCAL_LABELS}</body>`),
       'utf8'
     );
   return buf;

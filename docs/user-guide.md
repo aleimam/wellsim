@@ -102,61 +102,25 @@ curve per set, the traverse per set, and the full pump state at each node.
 
 ## 2. Oil — Well model
 
+**IPR basis (one active).** *Darcy* (default for natural flow): K/H/Re/Rw/skin
+drive the main J. *User PI* (default for ESP and Gas lift, matching those
+workbooks): type the PI J and the reservoir pressure directly; the matched K is
+shown grey (derived, reclaimed if you type), and the Darcy geometry becomes
+optional. Switching lift type on an untouched form loads that workbook's demo
+case — ESP: PI 2.7 @ 2650 (Oil well model_ESP_V5.01); Gas lift: the solved
+Jones J 1.079 @ 5000 (Oil well model_GasLift_V3.1.7). Typed values are never
+overwritten by the swap.
+
+**ESP match macros.** *Match stages* solves the stage count at your test rate;
+the test Pwf cell is written grey with the IPR value (overwrite it with a
+measured Pwf to anchor the match there instead). *Match wear* fits the wear
+factor from the actual Pint/Pdis couple; the implied PI and K are reported as
+QC only and never applied to your inputs.
+
 Select **Oil Well → Well model**. Choose the lift type (one active):
 **Natural flow · Gas lift · ESP**.
 
-### Water Well (its own tab)
-
-The **Water Well tab** (beside Oil Well and Gas Well) is the oil-tab structure
-without the Reserve and Forecast modules — lift types, get-Pwf calibration and
-sensitivities included — running the *same* modified-Griffith march at its
-limiting case: API fixed at 10° (SG = 141.5/(131.5+10) = 1.000 exactly), water
-cut 100 %, GOR = Rsi = 0, Pb = 0. Rates are **gross water** (bbl/d); the IPR
-is built into the tab as the **pure linear Darcy form** (no Vogel curvature —
-there is no gas) with the Darcy J on water properties (μ = 0.5 cp, Bw = 1);
-future-pressure IPR sensitivities keep J constant (water μ·B do not change
-with pressure). No gas/oil-PVT inputs appear (no GOR, API, Rsi, Pb, WC, oil
-viscosity — the liquid viscosity collapses to the sheets' hardcoded 0.5 cp
-water value). Defaults: FTHP 200 psi (producer) · 2000 bbl/d · Pri 4800 psi.
-**Water ESP** runs on the **same 68-pump database as the oil tab** — pick a
-pump from the dropdown and the ΔP is *solved* from its curve (stages ×
-affinity × wear) instead of typed, with head and the down-thrust/BEP/
-up-thrust window reported at the operating point; *Match stages* solves the
-stage count against the same design-floor proof. Water is gas-free, so
-there is no free-gas intake block and no separator — the curve works on the
-water volume at the intake. **Manual ΔP** remains in the dropdown for a
-pump you only know by its ΔP.
-
-Solving a water ESP well also draws two charts, the same pair the oil tab
-shows: the **PumpCurve** — the 30–60 Hz family with the
-down-thrust/BEP/up-thrust envelope and your operating point starred, with
-an ESP results block beside it — and the **Traverse**, the top-down march
-against the IPR back-calculated branch with the pump ΔP step drawn at pump
-depth. Both rows appear only while ESP is the active lift.
-
-A water well is head-dominated: it flows naturally only when Pr beats
-THP + the static water column (≈ 0.446 psi/ft at SG 1.05); otherwise the
-solver reports no-intersection — that is the physics, not an error.
-
-**Well type selector: Producer | Injector.** An injector has **no FLOWING tubing head pressure**: every surface pressure it shows is the **injection THP**, in the marches, on the injectivity side and in the sensitivity columns alike (the inputs read *Injection THP* and *Test injection THP*, the sensitivity column reads *Inj THP psi*, and the wellhead chart is *injection THP required*). The injector reverses the march —
-water flows DOWN, so **BHIP = injection THP + head − friction**. Selecting
-Injector swaps the THP default from 200 to **2000 psi** (and back to 200 on
-Producer; a value you typed yourself is kept). Temperatures
-relax top-down from the injection-water temperature (new input,
-default 90 °F) toward geothermal, making the **bottomhole injection
-temperature (BHT)** the calculated output. The injectivity IPR is
-**q = J·(Pwf − Pr)** with the same water Darcy J; the operating point is the
-crossing of the available BHIP (falls with rate through friction) and the
-required Pr + q/J (rises). Charts: the injectivity nodal plot, and the
-**injection THP required vs rate** with BHT on the second axis. Calibration
-works from an injection test (BHIP input-or-marched → J injectivity →
-matched K). Lift types hide for the injector (no artificial lift on
-injection), and the **sensitivities become the injector's own** — injection
-THP, injected-water temperature and tubing ID (see §3 above). Its sensitivity defaults are **injection THP 100 / 1000 / 2000 psi** and **future pressures 0.75 / 0.5 / 0.25 × the current Pr**, and running them adds the **Injectivity sensitivities** chart: every THP set is solved against Pri *and* each future Pres — a full nodal grid — then plotted as **injection THP (y) vs the solved injection rate (x)**, one line per reservoir pressure, with the grid tabulated beneath (rate, BHIP, BHT, and a "no injection (deficit …)" note wherever THP + head cannot reach that Pres). The injector shows **four result rows** — the injectivity node, the available-BHIP sensitivities, the injectivity-sensitivities grid and the injection-THP-required curve; the gas-lift, ESP pump-curve and ESP-traverse rows are producer-only and are cleared for it, and switching well type wipes the previous type’s results so nothing stale is mistaken for the injector’s. If THP + head
-cannot reach Pr the solver reports the
-**THP deficit** — the extra surface pressure (or pump) needed to start
-injection. Friction uses laminar Fanning (16/Re) below the transition,
-Chen above.
+Water wells have their own tab — see **§2b Water — Well model** below.
 
 ### Inputs and defaults
 
@@ -181,7 +145,17 @@ Chen above.
 | IPR — Darcy | Pri 3550 psi · Pr blank = Pri · K 50 mD · H 42.653 ft · Re 1640.5 ft · Rw 0.5104 ft · Skin 0 |
 | Match factors | Head 1 · Friction 1 |
 | Gas lift | Injection depth 2490.92 mTVD · Injection rate 0 · sweep to 2 MMscf/d in 10 steps |
-| ESP | Pump depth 2993.08 **mAH** (measured/along-hole — the depth a pump is actually run and reported at; = 2985 mTVD on this trajectory) · Pump ΔP 1325.16 psi (manual) · Tubing gas blank = formation gas · selecting ESP swaps the GOR default 5000 → **300 scf/stb** (back on natural/gas lift; a typed value is kept) |
+| ESP | Pump depth in **mAH** (measured/along-hole — the depth a pump is actually run and reported at; the demo case sets 2985) · Pump ΔP 1325.16 psi (Manual-ΔP mode) · Tubing gas blank = formation gas |
+
+**The table above is the Natural-flow demo — and each lift type is a different
+source workbook.** Selecting **Gas lift** or **ESP** while the form still holds
+a pristine demo loads that workbook's own live case (and selecting Natural
+swaps this table back). A value you typed yourself is never overwritten.
+
+| Lift case | Key values (from its workbook) |
+|---|---|
+| ESP (Oil well model_ESP_V5.01) | FTHP 160 · WC 5 % · GOR 384 · perf 3240 mAH / KO 1500 / dev 0° · 32 API · γg 0.812 · Rsi 384 · Tres 230 °F · **User PI 2.7 @ Pres 2650** · test 2565 stb/d @ 160 psi · pump ESP B 538-3600 @ 2985 mAH · 145 stages @ 50 Hz · separator 95 % · actual Pint/Pdis 1392/2720 psi |
+| Gas lift (Oil well model_GasLift_V3.1.7) | FTHP 300 · WC 25 % · GOR 412 · roughness 0.0006 · perf 3380 mAH / KO 2400 / dev 24.6° · 33 API · γg 0.812 · Rsi 442 · Tres 251 °F · **User PI 1.07897 @ Pres 5000** (the workbook's solved Jones J; matched K lands on its hand-tuned 16.37 mD) · test 1365 stb/d @ 300 psi · injection 2490.92 mTVD |
 
 **Well-head temperature is always calculated** (Ramey chain) — the heat-transfer
 inputs are required; there is no input THT.
@@ -274,6 +248,10 @@ inputs are required; there is no input THT.
    background** (WD/WG/WE/FLEX/ESP-B families from ESP_DataBase): pick a pump
    from the dropdown, **add a new pump** as a custom per-stage curve (up to 11
    head/rate points at a reference frequency), or fall back to Manual ΔP.
+   In the custom table the **thrust-marker rows are coloured** — row 4 blue
+   (down-thrust limit), row 6 gold (BEP), row 8 red (up-thrust limit), with a
+   legend beneath — because the physics reads those fixed rows of whatever
+   curve you type; the same colouring appears on the water tab's table.
    The pump curve scales by stages and the affinity laws (head × (f/f₀)²,
    rate × f/f₀) across 30–60 Hz, with the **down-thrust / BEP / up-thrust
    envelope** drawn on the PumpCurve chart. The **gas separator is on by
@@ -296,11 +274,14 @@ inputs are required; there is no input THT.
    300 psi)**. The minimum sits at the pump intake, so the proof binds
    there — if the traverse match would starve the intake below the floor,
    the design is capped at the stage count where intake = floor, and both
-   numbers are reported; *Match wear + PI* — with measured Pint/Pdis, wear =
-   1 − ΔP(measured)/ΔP(theoretical) and PI back-solved at constant Pres (the
-   matched K carries it into the Darcy record). Validation: from the demo
-   well's measured gauges the solver recovers the workbook's PI input
-   (2.698 vs 2.7).
+   numbers are reported. The anchor Pwf is **written grey into the test-Pwf
+   cell** exactly as the workbook macro writes C22 — overwrite it with a
+   measured value to anchor the match there instead. *Match wear (actual
+   Pint/Pdis)* — wear = 1 − ΔP(actual)/ΔP(theoretical) is applied to the
+   wear input; the **implied PI and matched K are reported as QC only and
+   never written to your inputs** (PI stays user judgment, like Pres). On
+   the demo's actual gauges the QC recovers the workbook's PI input:
+   2.698 vs 2.7.
    **Two ESP views** (radio under the ESP inputs). *Model match* draws the
    final charts — IPR vs the coupled ESP-VLP nodal plot, wellhead PQ & WHT,
    the PumpCurve with the results block beside it, and the Traverse on its own
@@ -349,6 +330,63 @@ into the layer table; the layer K *ratios* — your geological input — are
 preserved. Sensitivities remain single-layer.
 
 ---
+
+## 2b. Water — Well model (its own tab)
+
+The **Water Well tab** (beside Oil Well and Gas Well) is the oil-tab structure
+without the Reserve and Forecast modules — lift types, get-Pwf calibration and
+sensitivities included — running the *same* modified-Griffith march at its
+limiting case: API fixed at 10° (SG = 141.5/(131.5+10) = 1.000 exactly), water
+cut 100 %, GOR = Rsi = 0, Pb = 0. Rates are **gross water** (bbl/d); the IPR
+is built into the tab as the **pure linear Darcy form** (no Vogel curvature —
+there is no gas) with the Darcy J on water properties (μ = 0.5 cp, Bw = 1);
+future-pressure IPR sensitivities keep J constant (water μ·B do not change
+with pressure). No gas/oil-PVT inputs appear (no GOR, API, Rsi, Pb, WC, oil
+viscosity — the liquid viscosity collapses to the sheets' hardcoded 0.5 cp
+water value). Defaults: FTHP 200 psi (producer) · 2000 bbl/d · Pri 4800 psi.
+**Water ESP** runs on the **same 68-pump database as the oil tab** — pick a
+pump from the dropdown and the ΔP is *solved* from its curve (stages ×
+affinity × wear) instead of typed, with head and the down-thrust/BEP/
+up-thrust window reported at the operating point; *Match stages* solves the
+stage count against the same design-floor proof. Water is gas-free, so
+there is no free-gas intake block and no separator — the curve works on the
+water volume at the intake. **Manual ΔP** remains in the dropdown for a
+pump you only know by its ΔP, and **Custom pump (add new)…** takes a
+per-stage curve exactly as on the oil tab — same 11-row table, same
+coloured thrust-marker rows. The water tab also carries the **IPR basis**
+selector: *User PI* types J directly on the linear water IPR (Pb = 0) with
+the matched K shown grey and the Darcy geometry optional.
+
+Solving a water ESP well also draws two charts, the same pair the oil tab
+shows: the **PumpCurve** — the 30–60 Hz family with the
+down-thrust/BEP/up-thrust envelope and your operating point starred, with
+an ESP results block beside it — and the **Traverse**, the top-down march
+against the IPR back-calculated branch with the pump ΔP step drawn at pump
+depth. Both rows appear only while ESP is the active lift.
+
+A water well is head-dominated: it flows naturally only when Pr beats
+THP + the static water column (≈ 0.446 psi/ft at SG 1.05); otherwise the
+solver reports no-intersection — that is the physics, not an error.
+
+**Well type selector: Producer | Injector.** An injector has **no FLOWING tubing head pressure**: every surface pressure it shows is the **injection THP**, in the marches, on the injectivity side and in the sensitivity columns alike (the inputs read *Injection THP* and *Test injection THP*, the sensitivity column reads *Inj THP psi*, and the wellhead chart is *injection THP required*). The injector reverses the march —
+water flows DOWN, so **BHIP = injection THP + head − friction**. Selecting
+Injector swaps the THP default from 200 to **2000 psi** (and back to 200 on
+Producer; a value you typed yourself is kept). Temperatures
+relax top-down from the injection-water temperature (new input,
+default 90 °F) toward geothermal, making the **bottomhole injection
+temperature (BHT)** the calculated output. The injectivity IPR is
+**q = J·(Pwf − Pr)** with the same water Darcy J; the operating point is the
+crossing of the available BHIP (falls with rate through friction) and the
+required Pr + q/J (rises). Charts: the injectivity nodal plot, and the
+**injection THP required vs rate** with BHT on the second axis. Calibration
+works from an injection test (BHIP input-or-marched → J injectivity →
+matched K). Lift types hide for the injector (no artificial lift on
+injection), and the **sensitivities become the injector's own** — injection
+THP, injected-water temperature and tubing ID (see §3 above). Its sensitivity defaults are **injection THP 100 / 1000 / 2000 psi** and **future pressures 0.75 / 0.5 / 0.25 × the current Pr**, and running them adds the **Injectivity sensitivities** chart: every THP set is solved against Pri *and* each future Pres — a full nodal grid — then plotted as **injection THP (y) vs the solved injection rate (x)**, one line per reservoir pressure, with the grid tabulated beneath (rate, BHIP, BHT, and a "no injection (deficit …)" note wherever THP + head cannot reach that Pres). The injector shows **four result rows** — the injectivity node, the available-BHIP sensitivities, the injectivity-sensitivities grid and the injection-THP-required curve; the gas-lift, ESP pump-curve and ESP-traverse rows are producer-only and are cleared for it, and switching well type wipes the previous type’s results so nothing stale is mistaken for the injector’s. If THP + head
+cannot reach Pr the solver reports the
+**THP deficit** — the extra surface pressure (or pump) needed to start
+injection. Friction uses laminar Fanning (16/Re) below the transition,
+Chen above.
 
 ## 3. Oil — Reserve estimate (Module 2)
 
@@ -473,7 +511,8 @@ Wichert–Aziz) everywhere gas properties are used.
 ### IPR — one active basis
 
 - **Darcy Pr² (default, dominant):** q = J·(Pr²−Pwf²)/1000, with
-  K 5 mD · H 80 ft · Re 1640.5 · Rw 0.5104 · skin 0.
+  K 8.7 mD · H 45.934 ft · Re 2460.75 · Rw 0.2917 · skin 5 — the workbook's own
+  Darcy block ('VLP-IPR'!B30:B34); its J_2 equals the C&n fit's C at n = 1.
 - **C & n (calculated):** q = C·(Pr²−Pwf²)ⁿ, C and n grey = fitted from the
   multi-rate test.
 

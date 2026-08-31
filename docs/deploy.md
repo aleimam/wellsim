@@ -21,6 +21,8 @@ GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  �
 | DNS | Cloudflare (both domains) |
 | Also on this box | **thepwf.net** — a static site served by the same Caddy from `/opt/thepwf` |
 | Access | SSH key only, password auth disabled. Private key: `~/.ssh/wellsim_hetzner` |
+| Host keys | ED25519 `SHA256:bkTKZB/FixF9hI99Mp+634XNa/3Ohud4AK9kdl6ntI0` · RSA `SHA256:tHM+HmqYYOUok++pJ+bx9WgAzsZZ6HAKWIesnhxc0hg` (recorded 31 Aug 2026 — compare on any first connection from a new machine) |
+| Key backup | `F:\WellSim-Backup-2026-08-29\ssh-key\` — passphrase-protected; passphrase in the password manager |
 
 Caddyfile (whole file — Caddy handles certificates unprompted):
 
@@ -75,6 +77,87 @@ revalidates, so `help.html` needs no stamp.
 ```bash
 ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 'tar -czf - -C /opt/wellsim/app data' > wellsim-data-backup.tar.gz
 ```
+
+## Backing up `data/` off-box
+
+`data/` is the only stateful thing in the application — `users.json` and the
+company case store. The app already writes a rolling daily copy into
+`data-backups/`, but **that sits on the same disk as the thing it protects**:
+it survives a bad write or an accidental delete, not a lost server. Nothing
+else is scheduled — checked 30 Aug 2026: no root crontab, no systemd timer.
+
+**Do this before real client cases go in.** Two options; pick one.
+
+### Option A — pull from the workstation (no server changes)
+
+Simplest and needs nothing installed on the VPS. Run it from a machine that
+holds the key, on whatever schedule you keep (Task Scheduler on Windows):
+
+```bash
+ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 \
+  'tar -czf - -C /opt/wellsim/app data' > wellsim-data-$(date +%F).tar.gz
+```
+
+Keep the archives somewhere that is **not** the workstation alone — the F:
+backup drive, or any cloud folder. Prune to a retention you are happy with
+(30 daily copies is ~a few MB while the case store is small).
+
+### Option B — nightly on the server, pushed off-box
+
+Survives the workstation being off. Create `/root/wellsim-backup.sh`:
+
+```bash
+#!/bin/sh
+set -eu
+STAMP=$(date +%F)
+DEST=/root/wellsim-backups
+mkdir -p "$DEST"
+tar -czf "$DEST/wellsim-data-$STAMP.tar.gz" -C /opt/wellsim/app data
+# keep 30 days locally
+find "$DEST" -name "wellsim-data-*.tar.gz" -mtime +30 -delete
+# --- send it OFF the box (pick one and uncomment) ---
+# rclone copy "$DEST/wellsim-data-$STAMP.tar.gz" remote:wellsim-backups/
+# scp "$DEST/wellsim-data-$STAMP.tar.gz" user@elsewhere:/backups/
+```
+
+```bash
+chmod +x /root/wellsim-backup.sh
+systemctl edit --force --full wellsim-backup.timer   # or a root crontab line
+```
+
+A backup that never leaves the VPS is **not** a backup — the local `find`
+prune plus an off-box copy is the whole point. If you use the crontab route:
+`10 2 * * * /root/wellsim-backup.sh` runs it nightly at 02:10.
+
+### Restoring
+
+```bash
+systemctl stop wellsim
+mv /opt/wellsim/app/data /opt/wellsim/app/data.before-restore
+tar -xzf wellsim-data-YYYY-MM-DD.tar.gz -C /opt/wellsim/app
+chown -R wellsim:wellsim /opt/wellsim/app/data
+systemctl start wellsim && systemctl is-active wellsim
+```
+
+**An untested backup is not a backup.** Restore one into a scratch directory
+and confirm `users.json` parses and a case file opens, at least once — and
+again after any change to the case-store format. Sessions are in-memory, so a
+restore signs everyone out; that is expected.
+
+### Before this is needed
+
+Check whether the server store is still empty:
+
+```bash
+ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 \
+  'ls -la /opt/wellsim/app/data/cases/ 2>/dev/null; wc -c /opt/wellsim/app/data/users.json 2>/dev/null'
+```
+
+HANDOVER §5 accepts the no-off-box-backup risk **only** while that store is
+empty. The moment a real company account and its cases exist, Option A or B
+stops being optional.
+
+---
 
 ## Routine operations
 

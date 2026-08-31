@@ -29,20 +29,86 @@ const OIL_SCHEMA = [
     ['tubingOdIn', 'Tubing OD', 'in', 3.5],
     ['cpBtu', 'Cp', 'BTU/lbm.F', 0.51],
   ]},
-  { title: 'IPR — Darcy (main J)', fields: [
-    ['priPsi', 'Initial Pres (Pri)', 'psi', 3550],
-    ['prPsi', 'Current Pres (blank = Pri)', 'psi', ''],
-    ['permMd', 'Permeability K', 'mD', 50],
-    ['thicknessFt', 'Net pay H', 'ft', 42.653],
-    ['reFt', 'Re', 'ft', 1640.5],
-    ['rwFt', 'Rw', 'ft', 0.5104166667],
-    ['skin', 'Skin (user judgment)', '-', 0],
-  ]},
   { title: 'Match factors', fields: [
     ['matchHead', 'Matching head', '-', 1],
     ['matchFriction', 'Matching friction', '-', 1],
   ]},
 ];
+
+// IPR basis (its own fieldset, like the gas tab): Darcy from reservoir
+// properties, or the ESP workbook's route — the user types the PI J
+// ('VLP-IPR'!B4 "Iput PI") and K becomes the DERIVED value, back-matched so
+// J(Darcy) = PI at the chosen skin. Geometry is optional in PI mode.
+const OIL_IPR_COMMON_FIELDS = [
+  ['priPsi', 'Initial Pres (Pri)', 'psi', 3550],
+  ['prPsi', 'Current Pres (blank = Pri)', 'psi', ''],
+  ['userJ', 'Input PI J', 'bbl/d/psi', ''],
+];
+const OIL_IPR_DARCY_FIELDS = [
+  ['permMd', 'Permeability K', 'mD', 50],
+  ['thicknessFt', 'Net pay H', 'ft', 42.653],
+  ['reFt', 'Re', 'ft', 1640.5],
+  ['rwFt', 'Rw', 'ft', 0.5104166667],
+  ['skin', 'Skin (user judgment)', '-', 0],
+];
+const WATER_IPR_COMMON_FIELDS = [
+  ['priPsi', 'Initial Pres (Pri)', 'psi', 4800],
+  ['prPsi', 'Current Pres (blank = Pri)', 'psi', ''],
+  ['userJ', 'Input PI J', 'bbl/d/psi', ''],
+];
+const WATER_IPR_DARCY_FIELDS = [
+  ['permMd', 'Permeability K', 'mD', 50],
+  ['thicknessFt', 'Net pay H', 'ft', 42.653],
+  ['reFt', 'Re', 'ft', 1640.5],
+  ['rwFt', 'Rw', 'ft', 0.5104166667],
+  ['skin', 'Skin (user judgment)', '-', 0],
+  // injector only: the field's own step-rate / leak-off number. Blank = no
+  // parting check at all, which is how the injector behaved before.
+  ['fracGradPsiFt', 'Fracture gradient (injector)', 'psi/ft', 0.7],
+];
+
+// Per-lift demo cases. Each LIFT TYPE is a different source workbook, and
+// switching lift loads that workbook's live case — but ONLY while the form
+// still equals a pristine case (user-typed values are never clobbered).
+// natural: the shipped demo (Oil well model Natural V3.1.7 route).
+// esp: Oil well model_ESP_V5.01 — PI-input IPR (B4=2.7 @ B3=2650), test
+//      point FTHP 160 / Qoil 2565 (VLP-IPR A22:B22), pump ESP B 538-3600,
+//      145 stages @ 50 Hz, separator 95 % (I33:I37), actual Pint/Pdis
+//      1392/2720 (B26:B27), trajectory 3240 mAH / KO 1500 / dev 0 (D3:D5).
+const OIL_LIFT_CASES = {
+  natural: {
+    iprBasis: 'darcy',
+    thpPsi: 700, wcPct: 50, gorScfStb: 5000, tubingIdIn: 2.992, roughness: 0.00006,
+    topPerfAhM: 2810, devStartM: 1910, devAngleDeg: 7,
+    api: 46, gasSg: 0.842, rsiScfStb: 700, tresF: 201, oilViscCp: 6, waterSg: 1.05, pbPsi: '',
+    priPsi: 3550, prPsi: '', userJ: '',
+    permMd: 50, thicknessFt: 42.653, reFt: 1640.5, rwFt: 0.5104166667, skin: 0,
+    testQOilStbD: 2100, testThpPsi: 700, testPwfPsi: '',
+    pumpAhM: 2993.08, espFreqHz: 50, espStages: 145, espWearFactor: 0,
+    espSepEffPct: 95, espMinIntakePsi: 300, espMeasPintPsi: '', espMeasPdisPsi: '',
+  },
+  esp: {
+    iprBasis: 'pi',
+    thpPsi: 160, wcPct: 5, gorScfStb: 384, tubingIdIn: 2.992, roughness: 0.00006,
+    topPerfAhM: 3240, devStartM: 1500, devAngleDeg: 0,
+    api: 32, gasSg: 0.812, rsiScfStb: 384, tresF: 230, oilViscCp: 6, waterSg: 1.05, pbPsi: '',
+    priPsi: 2650, prPsi: '', userJ: 2.7,
+    permMd: '', thicknessFt: 42.653, reFt: 1640.5, rwFt: 0.5104166667, skin: 0,
+    testQOilStbD: 2565, testThpPsi: 160, testPwfPsi: '',
+    pumpAhM: 2985, espFreqHz: 50, espStages: 145, espWearFactor: 0,
+    espSepEffPct: 95, espMinIntakePsi: 300, espMeasPintPsi: 1392, espMeasPdisPsi: 2720,
+  },
+  gaslift: {
+    iprBasis: 'pi',
+    thpPsi: 300, wcPct: 25, gorScfStb: 412, tubingIdIn: 2.992, roughness: 0.0006,
+    topPerfAhM: 3380, devStartM: 2400, devAngleDeg: 24.6,
+    api: 33, gasSg: 0.812, rsiScfStb: 442, tresF: 251, oilViscCp: 6, waterSg: 1.05, pbPsi: '',
+    priPsi: 5000, prPsi: '', userJ: 1.07896794858,
+    permMd: '', thicknessFt: 65.62, reFt: 1640.5, rwFt: 0.2916666667, skin: 0,
+    testQOilStbD: 1365, testThpPsi: 300, testPwfPsi: '',
+    injDepthTvdM: 2490.92, injRateMMscfd: 0,
+  },
+};
 
 // oil Forecast (Tarner) — grey input-or-calculated chained off Reserve
 const OIL_FC_FIELDS = [
@@ -86,18 +152,6 @@ const WATER_SCHEMA = [
     ['htcBtu', 'U coeff', 'BTU/hr.ft2.F', 3],
     ['tubingOdIn', 'Tubing OD', 'in', 3.5],
     ['cpBtu', 'Cp', 'BTU/lbm.F', 0.51],
-  ]},
-  { title: 'IPR — linear Darcy (water)', fields: [
-    ['priPsi', 'Initial Pres (Pri)', 'psi', 4800],
-    ['prPsi', 'Current Pres (blank = Pri)', 'psi', ''],
-    ['permMd', 'Permeability K', 'mD', 50],
-    ['thicknessFt', 'Net pay H', 'ft', 42.653],
-    ['reFt', 'Re', 'ft', 1640.5],
-    ['rwFt', 'Rw', 'ft', 0.5104166667],
-    ['skin', 'Skin (user judgment)', '-', 0],
-    // injector only: the field's own step-rate / leak-off number. Blank = no
-    // parting check at all, which is how the injector behaved before.
-    ['fracGradPsiFt', 'Fracture gradient (injector)', 'psi/ft', 0.7],
   ]},
   { title: 'Match factors', fields: [
     ['matchHead', 'Matching head', '-', 1],
@@ -173,6 +227,7 @@ const OIL_ESP_FIELDS = [
   ['espMeasPdisPsi', 'Measured Pdis (optional)', 'psi', ''],
 ];
 const OIL_ESP_CUSTOM_FIELDS = [['espRefFreqHz', 'Reference frequency', 'Hz', 60]];
+const WATER_ESP_CUSTOM_FIELDS = [['espRefFreqHz', 'Reference frequency', 'Hz', 60]];
 const OIL_ESP_MANUAL_FIELDS = [
   ['pumpDpPsi', 'Pump ΔP (manual)', 'psi', 1325.16],
   ['tubingGasScfD', 'Tubing gas (blank = formation)', 'scf/d', ''],
@@ -240,11 +295,13 @@ const GAS_SCHEMA = [
 ];
 
 const GAS_DARCY_FIELDS = [
-  ['permMd', 'Permeability K', 'mD', 5],
-  ['thicknessFt', 'Net pay H', 'ft', 80],
-  ['reFt', 'Re', 'ft', 1640.5],
-  ['rwFt', 'Rw', 'ft', 0.5104166667],
-  ['skin', 'Skin (user judgment)', '-', 0],
+  // Gas Well model_temp V6.0.0 'VLP-IPR'!B30:B34, verbatim (31 Aug 2026 —
+  // these five were placeholders before; the workbook is the spec)
+  ['permMd', 'Permeability K', 'mD', 8.7],
+  ['thicknessFt', 'Net pay H', 'ft', 45.934],
+  ['reFt', 'Re', 'ft', 2460.75],
+  ['rwFt', 'Rw', 'ft', 0.2916666667],
+  ['skin', 'Skin (user judgment)', '-', 5],
 ];
 
 // optional multi-layer Darcy IPR (training deck 4) — Re/Rw (and Pb, oil)
@@ -867,6 +924,21 @@ function showError(msg) {
   const bar = document.getElementById('error-bar');
   bar.style.display = msg ? 'block' : 'none';
   bar.textContent = msg;
+  bar.classList.remove('ok');
+}
+
+/** Short-lived confirmation on the same bar. Saving closes the account
+ *  panel, so without this the user gets no acknowledgement at all. */
+let okTimer = null;
+function showOk(msg, ms = 2600) {
+  const bar = document.getElementById('error-bar');
+  bar.textContent = msg;
+  bar.classList.add('ok');
+  bar.style.display = 'block';
+  clearTimeout(okTimer);
+  okTimer = setTimeout(() => {
+    if (bar.classList.contains('ok')) { bar.style.display = 'none'; bar.classList.remove('ok'); }
+  }, ms);
 }
 
 const fmt = (v, d = 1) => (v == null ? '—' : Number(v).toFixed(d));
@@ -974,8 +1046,46 @@ function applyPhoneLegend(layout, traces) {
  * landed against the axis title and nudge it down (growing the canvas by
  * the same amount) if it is still riding on the title.
  */
+/**
+ * Pressure is an absolute quantity: an axis that dips below zero is telling
+ * the reader something that cannot exist. Plotly pads its autorange, so any
+ * pressure axis left on autorange can show negative ticks — and the fitted
+ * slope line on the reservoir-limit charts genuinely extrapolates below 0.
+ *
+ * Neither rangemode helps on its own: 'tozero' still starts negative when the
+ * DATA is negative, and 'nonnegative' does not force the axis to begin AT
+ * zero. So compute the axis maximum from the traces and pin [0, max].
+ *
+ * Done here, in the one function every chart goes through, so the rule holds
+ * for charts that do not exist yet. An axis that already declares its own
+ * range (the sensitivity charts pin [0, Pri]) is left alone.
+ */
+function floorPressureAxes(layout, traces) {
+  if (!layout) return layout;
+  const isPressure = (ax) => /\bpsi\b/i.test(ax?.title?.text ?? ax?.title ?? '');
+  const out = { ...layout };
+  for (const key of ['xaxis', 'yaxis', 'yaxis2']) {
+    const ax = out[key];
+    if (!ax || !isPressure(ax) || ax.range || ax.autorange === false) continue;
+    // which trace values feed this axis
+    const dim = key === 'xaxis' ? 'x' : 'y';
+    const wantSecondary = key === 'yaxis2';
+    let max = -Infinity;
+    for (const t of traces ?? []) {
+      if (dim === 'y' && ((t.yaxis === 'y2') !== wantSecondary)) continue;
+      for (const v of t[dim] ?? []) {
+        const n = typeof v === 'number' ? v : Number(v);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
+    }
+    if (!Number.isFinite(max) || max <= 0) continue; // nothing sane to scale to
+    out[key] = { ...ax, range: [0, max * 1.05] };
+  }
+  return out;
+}
+
 function plot(div, traces, layout) {
-  const p = Plotly.newPlot(div, traces, applyPhoneLegend(layout, traces), PLOT_CFG());
+  const p = Plotly.newPlot(div, traces, applyPhoneLegend(floorPressureAxes(layout, traces), traces), PLOT_CFG());
   return p.then((gd) => {
     const el = gd ?? (typeof div === 'string' ? document.getElementById(div) : div);
     if (!el || !el.layout || el.offsetParent === null) return el;
@@ -1225,19 +1335,84 @@ function refreshWaterSens() {
     inj ? { thpPsi: SENS_LABELS.__injThpPsi } : {}, typeChanged);
 }
 
+const iprBasisOf = (p) => document.querySelector(`input[name="${p}-iprbasis"]:checked`)?.value ?? 'darcy';
+const oilIprBasis = () => iprBasisOf('oil');
+
+function switchIprBasisFor(prefix) {
+  const pi = iprBasisOf(prefix) === 'pi';
+  const jRow = document.getElementById(`${prefix}-userJ`)?.closest('.frow');
+  if (jRow) jRow.style.display = pi ? '' : 'none';
+  const kEl = document.getElementById(`${prefix}-permMd`);
+  const kLab = kEl?.closest('.frow')?.querySelector('label');
+  if (kLab) kLab.firstChild.textContent = pi ? 'Matched K (from PI)' : 'Permeability K';
+  // in PI mode K is DERIVED — clear a typed value so the next solve fills it grey
+  if (pi && kEl && kEl.dataset.computed !== '1') kEl.value = '';
+  const note = document.getElementById(`${prefix}-ipr-note`);
+  if (note)
+    note.textContent = pi
+      ? (prefix === 'water'
+          ? 'J is your input on the linear water IPR (Pb = 0); K is back-matched so J(Darcy) = PI (grey = derived). H/Re/Rw/skin optional.'
+          : 'ESP workbook route: J is your input; K is back-matched so J(Darcy) = PI at your skin (grey = derived). H/Re/Rw/skin optional.')
+      : 'Darcy from reservoir properties is the main J; the test block calibrates K against a production test.';
+}
+const switchOilIprBasis = () => switchIprBasisFor('oil');
+const switchWaterIprBasis = () => switchIprBasisFor('water');
+
+/** Grey-fill the matched K when the PI basis derived it. */
+function showMatchedK(prefix, k) {
+  if (iprBasisOf(prefix) !== 'pi' || k == null) return;
+  const el = document.getElementById(`${prefix}-permMd`);
+  if (!el) return;
+  el.value = Number(k).toFixed(2);
+  el.dataset.computed = '1';
+  el.classList.add('computed');
+}
+
+/** The form equals one of the pristine lift cases? (grey cells count as
+ *  untouched — the program filled them). */
+function oilPristineCase() {
+  outer: for (const [name, c] of Object.entries(OIL_LIFT_CASES)) {
+    for (const [k, v] of Object.entries(c)) {
+      if (k === 'iprBasis') { if (oilIprBasis() !== v) continue outer; continue; }
+      const el = document.getElementById('oil-' + k);
+      if (!el) continue;
+      if (el.dataset.computed === '1') continue;
+      if (el.value.trim() !== String(v)) continue outer;
+    }
+    return name;
+  }
+  return null;
+}
+
+function applyOilLiftCase(name) {
+  const c = OIL_LIFT_CASES[name];
+  if (!c) return;
+  for (const [k, v] of Object.entries(c)) {
+    if (k === 'iprBasis') {
+      const r = document.querySelector(`input[name="oil-iprbasis"][value="${v}"]`);
+      if (r) r.checked = true;
+      continue;
+    }
+    const el = document.getElementById('oil-' + k);
+    if (!el) continue;
+    el.value = String(v);
+    delete el.dataset.computed;
+    el.classList.remove('computed');
+  }
+  switchOilIprBasis();
+  switchWaterIprBasis();
+}
+
 function switchLift() {
   const t = oilLiftType();
   document.getElementById('oil-lift-gl').style.display = t === 'gaslift' ? '' : 'none';
   document.getElementById('oil-lift-esp').style.display = t === 'esp' ? '' : 'none';
   applyOilRows();
   refreshOilSens();
-  // per-lift GOR default: ESP wells 300, natural/gas-lift 5000 — swap only
-  // while the field still holds the other type's default (user values kept)
-  const gor = document.getElementById('oil-gorScfStb');
-  if (gor) {
-    if (t === 'esp' && gor.value.trim() === '5000') gor.value = '300';
-    if (t !== 'esp' && gor.value.trim() === '300') gor.value = '5000';
-  }
+  // each lift type is a different source workbook — load its live case, but
+  // only while the form still equals a pristine case (never clobber typing)
+  const pristine = oilPristineCase();
+  if (OIL_LIFT_CASES[t] && pristine && pristine !== t) applyOilLiftCase(t);
 }
 
 // ---- ESP pump selection: database (background) | custom (add new) | manual ----
@@ -1259,6 +1434,7 @@ function switchEspPump() {
 /** Water tab: the same catalog, minus the custom-curve builder. */
 function switchWaterEspPump() {
   const mode = pumpModeOf('water');
+  document.getElementById('water-esp-custom').style.display = mode === 'custom' ? '' : 'none';
   document.getElementById('water-esp-manual').style.display = mode === 'manual' ? '' : 'none';
   document.getElementById('water-esp-matchrow').style.display = mode === 'manual' ? 'none' : '';
   // stages/wear only mean something against a pump curve
@@ -1287,7 +1463,7 @@ async function loadEspPumps() {
   oil.innerHTML =
     '<option value="__manual">Manual ΔP (no pump model)</option>' +
     '<option value="__custom">Custom pump (add new)…</option>';
-  if (water) water.innerHTML = '<option value="__manual">Manual ΔP (no pump model)</option>';
+  if (water) water.innerHTML = '<option value="__manual">Manual ΔP (no pump model)</option>' + '<option value="__custom">Custom pump (add new)…</option>';
   try {
     const r = await api('esp/pumps', {});
     for (const name of r.pumps) {
@@ -1329,18 +1505,23 @@ const waterWellType = () => document.querySelector('input[name="water-welltype"]
 
 function waterForm() {
   const f = collect('water', WATER_SCHEMA, [
+    ...WATER_IPR_COMMON_FIELDS,
+    ...WATER_IPR_DARCY_FIELDS,
     ...WATER_TEST_FIELDS,
     ...OIL_GL_FIELDS,
     ...OIL_GL_WELL_FIELDS,
     ...WATER_ESP_FIELDS,
     ...WATER_ESP_MANUAL_FIELDS,
   ]);
+  f.iprBasis = iprBasisOf('water');
   f.liftType = waterWellType() === 'injector' ? 'natural' : waterLiftType();
   f.fluid = 'water';
   // the shared ESP database drives the water tab too; water is gas-free, so
   // the separator has nothing to separate
   f.espPumpMode = pumpModeOf('water');
   f.espPumpName = document.getElementById('water-espPumpSel')?.value ?? '';
+  f.espCurve = collectGrid('water-espcurve', ESP_CURVE_COLS, ESP_CURVE_ROWS.length);
+  f.espRefFreqHz = document.getElementById('water-espRefFreqHz')?.value ?? '';
   f.espSepEffPct = 0;
   // the water-well limits (the server enforces the same set)
   f.api = 10; f.wcPct = 100; f.gorScfStb = 0; f.rsiScfStb = 0; f.pbPsi = 0;
@@ -1438,6 +1619,8 @@ function switchWaterType() {
 
 function oilForm() {
   const f = collect('oil', OIL_SCHEMA, [
+    ...OIL_IPR_COMMON_FIELDS,
+    ...OIL_IPR_DARCY_FIELDS,
     ...OIL_TEST_FIELDS,
     ...OIL_GL_FIELDS,
     ...OIL_GL_WELL_FIELDS,
@@ -1454,6 +1637,7 @@ function oilForm() {
   f.presSource = document.querySelector('input[name="oil-pressource"]:checked')?.value ?? 'prod';
   f.pwfMode = document.querySelector('input[name="oil-pwfmode"]:checked')?.value ?? 'vlp';
   f.fcMethod = document.querySelector('input[name="oil-fcmethod"]:checked')?.value ?? 'tarner';
+  f.iprBasis = oilIprBasis();
   f.mlMode = mlMode('oil');
   f.mlLayers = collectGrid('oil-ml', OIL_ML_COLS, OIL_ML_ROWS.length);
   f.prodRows = collectGrid('oil-prod', OIL_PROD_COLS, oilProdCount);
@@ -1739,6 +1923,7 @@ async function liquidSolve(c) {
   const r = await api('oil/nodal', c.form());
   const water = c.prefix === 'water';
   const qh = `q ${c.fluidName}`;
+  if (r.ipr) showMatchedK(c.prefix, r.ipr.matchedPermMd);
   summary(`${c.prefix}-summary`, [
     { k: 'Operating rate', v: r.op ? `${fmt(r.op.qOilStbD, 0)} ${water ? 'bbl/d' : 'stb/d'}` : r.opStatus, warn: !r.op },
     { k: 'Operating Pwf', v: r.op ? `${fmt(r.op.pwfPsi, 0)} psi` : '—' },
@@ -1834,6 +2019,7 @@ const oilSolve = () =>
 // pump curve family + results block shown beside; traverse chart below
 async function espRun() {
   const r = await api('oil/esp', oilForm());
+  showMatchedK('oil', r.matchedPermMd);
   const op = r.op;
   summary('oil-summary', [
     { k: 'Operating rate', v: `${fmt(op.qOilStbD, 0)} stb/d` },
@@ -2002,6 +2188,7 @@ async function espStagesRun() {
       : `stages = ${r.stages} (exact ${fmt(r.stagesExact, 2)}) — design proof OK: ` +
         `intake ${fmt(r.intakePsi, 0)} psi ≥ ${fmt(r.minIntakePsi, 0)} psi floor. Applied to the stages input.`);
   document.getElementById('oil-espStages').value = String(r.stages);
+  if (r.pwfSource === 'ipr') setComputed('oil-testPwfPsi', r.pwfIprPsi, 1); // macro-written cell, user-overwritable
 }
 
 /** Water ESP charts drawn from the single nodal solve: the pump curve with
@@ -2084,16 +2271,16 @@ async function waterEspStagesRun() {
       : `stages = ${r.stages} (exact ${fmt(r.stagesExact, 2)}) — design proof OK: ` +
         `intake ${fmt(r.intakePsi, 0)} psi ≥ ${fmt(r.minIntakePsi, 0)} psi floor. Applied to the stages input.`);
   document.getElementById('water-espStages').value = String(r.stages);
+  if (r.pwfSource === 'ipr') setComputed('water-testPwfPsi', r.pwfIprPsi, 1); // macro-written cell, user-overwritable
 }
 
 async function espWearRun() {
   const r = await api('oil/espwear', oilForm());
   document.getElementById('oil-esp-result').textContent =
-    `Wear + PI match from measured Pint/Pdis:\n` +
-    `ΔP measured = ${fmt(r.dpMeasPsi, 1)} psi vs theoretical ${fmt(r.dpTheoPsi, 1)} → wear = ${fmt(r.wearFactor, 4)} (applied).\n` +
-    `PI = ${fmt(r.jMatched, 4)} bbl/d/psi at constant Pres ${fmt(r.prPsi, 0)} psi → matched K = ${fmt(r.matchedPermMd, 2)} mD (applied to K).`;
+    `Wear match from actual Pint/Pdis:\n` +
+    `\u0394P actual = ${fmt(r.dpMeasPsi, 1)} psi vs theoretical ${fmt(r.dpTheoPsi, 1)} \u2192 wear = ${fmt(r.wearFactor, 4)} (applied to the wear input).\n` +
+    `QC only \u2014 implied PI at constant Pres ${fmt(r.prPsi, 0)} psi = ${fmt(r.jMatched, 4)} bbl/d/psi (K ${fmt(r.matchedPermMd, 2)} mD); NOT applied.`;
   document.getElementById('oil-espWearFactor').value = r.wearFactor.toFixed(4);
-  document.getElementById('oil-permMd').value = r.matchedPermMd.toFixed(4);
 }
 const waterSolve = () => (waterWellType() === 'injector' ? waterInjSolve() : liquidSolve(WATER_CTX));
 
@@ -2897,6 +3084,7 @@ function applyCase(c) {
   switchTab(c.activeTab ?? 'oil');
   switchOilModule();
   switchLift();
+  switchOilIprBasis();
   switchOilPresSource();
   switchMl('oil');
   switchMl('gas');
@@ -2990,11 +3178,19 @@ async function acctRefresh() {
         )
         .join('')
     : '<div class="acct-note">no cases saved yet</div>';
+  // only the newest two rows are visible (see style.css) — say how many
+  // there are, or the rest are invisible as well as out of view
+  const head = document.getElementById('acct-caseshead');
+  if (head)
+    head.textContent = r.cases.length
+      ? `${r.cases.length} case${r.cases.length === 1 ? '' : 's'} \u00b7 newest first${r.cases.length > 2 ? ' \u00b7 scroll for older' : ''}`
+      : '';
   box.querySelectorAll('[data-load]').forEach((b) => (b.onclick = guard(async () => {
     const r2 = await api('cases/load', { token: acct.token, name: b.dataset.load });
     applyCase(r2.case);
     document.getElementById('acct-case-name').value = r2.name;
     document.getElementById('acct-panel').style.display = 'none';
+    showOk(`Loaded \u201c${r2.name}\u201d`);
   })));
   box.querySelectorAll('[data-del]').forEach((b) => (b.onclick = guard(async () => {
     await api('cases/delete', { token: acct.token, name: b.dataset.del });
@@ -3008,6 +3204,11 @@ async function acctSaveCase() {
   if (!name) { showError('enter a case name'); return; }
   await api('cases/save', { token: acct.token, name, case: collectCase() });
   await acctRefresh();
+  // close the panel once the save lands: it used to sit over the app until
+  // the user dismissed it by hand. The NAME stays in the box so the case
+  // you are working on is still tracked when you reopen.
+  document.getElementById('acct-panel').style.display = 'none';
+  showOk(`Saved \u201c${name}\u201d to ${acct.company}`);
 }
 
 // Plotly sizes a chart to its container AT DRAW TIME and afterwards only
@@ -3102,20 +3303,65 @@ function switchTab(which) {
   resizeVisibleCharts();
 }
 
+// The 68-pump catalog is fetched async at startup, but oilForm()/waterForm()
+// read the pump NAME synchronously — so any ESP action firing before the
+// fetch lands sent an empty name and the user saw
+//   pump "" not in the database
+// once, on the startup solve or an early lift switch (re-clicking Solve
+// cleared it). Every button and the startup solve go through guard(), so
+// gating here closes every path at once. A failed fetch still resolves —
+// loadEspPumps falls back to Manual dP — so this can never hang the UI.
+let espPumpsReady = null;
 function guard(fn) {
-  return () => fn().catch((e) => console.error(e));
+  return async () => {
+    try { await espPumpsReady; } catch { /* catalog unavailable: forms fall back to manual */ }
+    return fn().catch((e) => console.error(e));
+  };
 }
 
 renderForm('oil-form', 'oil', OIL_SCHEMA);
+renderFieldRow('water-ipr-common', 'water', WATER_IPR_COMMON_FIELDS);
+renderFieldRow('water-ipr-darcy', 'water', WATER_IPR_DARCY_FIELDS);
+renderFieldRow('oil-ipr-common', 'oil', OIL_IPR_COMMON_FIELDS);
+renderFieldRow('oil-ipr-darcy', 'oil', OIL_IPR_DARCY_FIELDS);
 renderFieldRow('oil-test', 'oil', OIL_TEST_FIELDS);
 renderFieldRow('oil-gl-fields', 'oil', OIL_GL_WELL_FIELDS);
 renderFieldRow('oil-gl-inputs', 'oil', OIL_GL_FIELDS);
 renderFieldRow('oil-esp-fields', 'oil', OIL_ESP_FIELDS);
 renderFieldRow('oil-esp-custom-fields', 'oil', OIL_ESP_CUSTOM_FIELDS);
 renderFieldRow('oil-esp-manual-fields', 'oil', OIL_ESP_MANUAL_FIELDS);
+/** Colour the custom-curve rows that carry the thrust markers. The ESP
+ *  physics reads FIXED positions of the points array (esp-catalog THRUST:
+ *  index 3 = down-thrust limit, 5 = BEP, 7 = up-thrust limit — the
+ *  workbook ESP sheet's own row labels), so the user entering a custom
+ *  pump must know which rows those are. */
+function decorateThrustRows(tableId) {
+  const t = document.getElementById(tableId);
+  if (!t) return;
+  const MARKS = { 3: ['thrust-down', '\u2193 down-thrust'], 5: ['thrust-bep', 'BEP'], 7: ['thrust-up', '\u2191 up-thrust'] };
+  const rows = t.rows;
+  rows[0].insertAdjacentHTML('afterbegin', '<th></th>');
+  for (let i = 1; i < rows.length; i++) {
+    const m = MARKS[i - 1];
+    rows[i].insertAdjacentHTML('afterbegin', `<td class="thrust-cell">${m ? m[1] : ''}</td>`);
+    if (m) rows[i].classList.add(m[0]);
+  }
+  t.insertAdjacentHTML(
+    'afterend',
+    '<div class="thrust-legend">' +
+      '<span><span class="sw" style="background:#E8F0FB"></span>down-thrust limit (row 4)</span>' +
+      '<span><span class="sw" style="background:#FFF3D6"></span>best-efficiency point (row 6)</span>' +
+      '<span><span class="sw" style="background:#FBE9E7"></span>up-thrust limit (row 8)</span>' +
+      '</div>'
+  );
+}
 renderGridTable('oil-espcurve-table', 'oil-espcurve', ESP_CURVE_COLS, ESP_CURVE_ROWS);
+renderGridTable('water-espcurve-table', 'water-espcurve', ESP_CURVE_COLS, ESP_CURVE_ROWS);
+renderFieldRow('water-esp-custom-fields', 'water', WATER_ESP_CUSTOM_FIELDS);
+decorateThrustRows('oil-espcurve-table');
+decorateThrustRows('water-espcurve-table');
 document.getElementById('oil-espPumpSel').onchange = switchEspPump;
-loadEspPumps();
+espPumpsReady = loadEspPumps();
 refreshOilSens();
 renderPresList('oil-pres-list', 'oil', [2662.5, 1775, 887.5]);
 document.querySelectorAll('input[name="oil-lift"]').forEach((r) => (r.onchange = switchLift));
@@ -3128,6 +3374,10 @@ renderFieldRow('water-gl-inputs', 'water', OIL_GL_FIELDS);
 renderFieldRow('water-esp-fields', 'water', WATER_ESP_FIELDS);
 renderFieldRow('water-esp-manual-fields', 'water', WATER_ESP_MANUAL_FIELDS);
 document.getElementById('water-espPumpSel').onchange = switchWaterEspPump;
+document.querySelectorAll('input[name="oil-iprbasis"]').forEach((r) => (r.onchange = switchOilIprBasis));
+document.querySelectorAll('input[name="water-iprbasis"]').forEach((r) => (r.onchange = switchWaterIprBasis));
+switchOilIprBasis(); // initial view: hide the PI row on the darcy default
+switchWaterIprBasis();
 document.getElementById('water-btn-espstages').onclick = guard(waterEspStagesRun);
 refreshWaterSens();
 renderPresList('water-pres-list', 'water', [3600, 2400, 1200]); // 0.75/0.5/0.25 x Pri 4800
