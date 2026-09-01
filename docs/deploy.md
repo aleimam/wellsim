@@ -78,13 +78,18 @@ revalidates, so `help.html` needs no stamp.
 ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 'tar -czf - -C /opt/wellsim/app data' > wellsim-data-backup.tar.gz
 ```
 
-**A nightly on-box snapshot now runs** (installed 1 Sep 2026): a systemd timer
-`wellsim-backup.timer` at 02:30 UTC writes `/var/backups/wellsim/wellsim-data-
-<date>.tar.gz` and keeps 30 days. It lives OUTSIDE `/opt/wellsim/app`, so
-re-extracting or wiping the app directory cannot take the backups with it.
-It is still the SAME DISK: it survives a bad write, a bad deploy or an
-accidental delete, not a lost server. The command above is still the off-box
-pull, and is the one that actually protects you.
+**A nightly on-box snapshot is documented as installed on 1 Sep 2026**: a
+systemd timer `wellsim-backup.timer` at 02:30 UTC writes
+`/var/backups/wellsim/wellsim-data-<date>.tar.gz` and keeps 30 days. The 2 Sep
+infrastructure audit could not independently verify the timer because the
+recovery SSH key was unavailable on that workstation; treat it as unverified
+until the checks in
+[infrastructure-audit-2026-09-02.md](architecture/infrastructure-audit-2026-09-02.md)
+are completed. It lives OUTSIDE `/opt/wellsim/app`, so re-extracting or wiping
+the app directory should not take the archives with it. It is still the SAME
+DISK: it can survive a bad write, bad deploy or accidental app-directory
+delete, not a lost server. The command above is still the off-box pull, and is
+the one that actually protects you.
 
 ## Access logs
 

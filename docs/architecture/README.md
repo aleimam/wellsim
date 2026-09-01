@@ -2,6 +2,9 @@
 
 Status: proposed baseline for implementation and review.
 
+Operational evidence and deployment gates are recorded in
+[infrastructure-audit-2026-09-02.md](infrastructure-audit-2026-09-02.md).
+
 WellSim v2 is an extensible petroleum-engineering workspace. It preserves the
 validated WellSim calculation engines while replacing the current single-page
 shell, JSON account store, and implicit case model with explicit platform
@@ -162,4 +165,3 @@ A platform milestone is not complete until all applicable gates pass:
 - [Module contract](module-contract.md)
 - [Security and tenancy](security-tenancy.md)
 - [Migration plan](migration-plan.md)
-

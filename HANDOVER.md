@@ -106,17 +106,17 @@ private; neither belongs in a repository. They **are** in the F: backup.
   and is not in git. The deploy does not touch it and nothing else will
   recreate it.
 
-  **There is no scheduled backup of it** — checked 30 Aug 2026: no root
-  crontab, no systemd timer. The only thing running is the app's own rolling
-  copy into `data-backups/`, which is written *when a case is saved* and sits
-  on the same disk as the thing it protects, so it survives a bad write and
-  not a lost server. That is survivable today only because the case store is
-  empty. **Before real client cases go in, add an off-box copy** — a nightly
-  `tar` of `data/` pulled somewhere else is enough. The runbook for that is
-  now written up in **docs/deploy.md → “Backing up `data/` off-box”**: two
-  options (pull from the workstation, or a nightly server job pushed off-box),
-  the restore procedure, and the one-liner that checks whether the server store
-  is still empty. It is a runbook only — nothing has been installed on the box.
+  On 30 Aug 2026 there was no root crontab or systemd backup timer. The deploy
+  runbook records that an on-box `wellsim-backup.timer` was installed on 1 Sep,
+  but the 2 Sep infrastructure audit could not independently verify it because
+  the recovery SSH key and its documented `F:` backup were unavailable on the
+  audit workstation and TCP/22 was closed or filtered from that network. Treat
+  the timer as **unverified**, and remember that it is on the same server disk
+  even if it is healthy. No current off-box backup or restore test was confirmed.
+  Before deploying data-bearing features, restore controlled access, verify the
+  timer and latest archive, pull a fresh backup off-box, and restore it into a
+  scratch directory. See **docs/deploy.md → “Backing up `data/` off-box”** and
+  **docs/architecture/infrastructure-audit-2026-09-02.md**.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
 - **Charts are drawn by Plotly at their container's width**, and that width is
