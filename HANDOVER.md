@@ -2,7 +2,7 @@
 
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
-**As of:** 30 August 2026 — commit `c6f1caa`, asset stamp `2026-08-30k`,
+**As of:** 1 September 2026 — commit `2d60c5e`, asset stamp `2026-08-31i`,
 244 tests passing, 43/43 validation sweep.
 
 ---
@@ -99,17 +99,25 @@ private; neither belongs in a repository. They **are** in the F: backup.
   and is not in git. The deploy does not touch it and nothing else will
   recreate it.
 
-  **There is no scheduled backup of it** — checked 30 Aug 2026: no root
-  crontab, no systemd timer. The only thing running is the app's own rolling
-  copy into `data-backups/`, which is written *when a case is saved* and sits
-  on the same disk as the thing it protects, so it survives a bad write and
-  not a lost server. That is survivable today only because the case store is
-  empty. **Before real client cases go in, add an off-box copy** — a nightly
-  `tar` of `data/` pulled somewhere else is enough. The runbook for that is
-  now written up in **docs/deploy.md → “Backing up `data/` off-box”**: two
-  options (pull from the workstation, or a nightly server job pushed off-box),
-  the restore procedure, and the one-liner that checks whether the server store
-  is still empty. It is a runbook only — nothing has been installed on the box.
+  **A nightly backup now runs, and the case store is NOT empty.** Both of
+  those were the other way round until 1 Sep 2026, and this entry said so —
+  it justified having no off-box copy on the grounds that there was nothing
+  to lose. There is now: **4 accounts across 2 companies (bapetco, bap) and
+  8 saved client cases**, growing daily.
+
+  What is installed on the box: `wellsim-backup.timer` (systemd, 02:30 UTC,
+  30 days kept) running `/usr/local/bin/wellsim-backup`, which tars `data/`
+  into **`/var/backups/wellsim/`** — deliberately outside `/opt/wellsim/app`
+  so re-extracting or wiping the app directory cannot take the backups with
+  it. The app also still writes its own rolling copy into `data-backups/`
+  when a case is saved.
+
+  **Neither is off-box.** Both sit on the same disk as the thing they
+  protect: they survive a bad write, a bad deploy or an accidental delete —
+  NOT a lost server. The off-box pull in **docs/deploy.md → “Backing up
+  `data/` off-box”** is still the one that actually protects the client
+  cases, and it is still not scheduled. A full manual snapshot was taken on
+  1 Sep 2026 into `D:\WellSim-FullBackup-2026-09-01\server-data\`.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
 - **Charts are drawn by Plotly at their container's width**, and that width is
