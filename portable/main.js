@@ -112,6 +112,11 @@ const slug = (s) =>
   String(s ?? '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '').slice(0, 60);
 
 const portableCases = {
+  'accounts/status': () => ({
+    enabled: true,
+    registrationEnabled: false,
+    mode: 'portable',
+  }),
   'cases/save': (b) => {
     const name = slug(b.name);
     if (!name) return { error: 'case name required' };

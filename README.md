@@ -34,7 +34,7 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-244 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+246 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries.
 
@@ -60,7 +60,7 @@ src/core/reserve/     gas-reserve (Pres solver, p/Z, SITHP march, gauge p/Z, res
                       tarner (oil forecast), walsh (generalized-MB forecast)
 src/core/solvers/     brent
 src/server/           server.js (built-in http), api.js (form -> core mapping),
-                      accounts.js (company case database: register/login, case CRUD)
+                      accounts.js (disabled-by-default legacy case-store compatibility)
 src/ui/               index.html, style.css, app.js, help.html (in-app manual)
 tests/                node:test suites
 scripts/              validation-sweep.mjs (43-case module-vs-workbook sweep)
@@ -70,15 +70,19 @@ docs/                 user-guide.md, equations.md, deploy.md
 ## The website
 
 The header bar carries the three well tabs (**Oil | Water | Gas**) plus
-**Save as · Open · Print report · Sign in · Help**:
+**Save as · Open · Print report · Help**. A server-case link appears only
+when a supported case store reports itself available:
 
 - **Save as / Open** — the whole case (every input, selection and production
   table across all tabs) to/from a JSON file.
 - **Print report** — results-only clean page (charts, tables, summaries);
   "Save as PDF" in the browser dialog makes the shareable report.
-- **Sign in** — the company case database: register a company account to save
-  cases server-side, shared by the company's users. **The free version stays**:
-  every calculation works without an account.
+- **Server cases** — the old JSON company store is disabled by default because
+  a typed company slug is not proof of membership. It can be enabled only as
+  an invite-gated migration aid; it is not the future tenant model. The
+  portable program still exposes its local case folder through this link.
+- **Visitor use stays complete** — every calculation, browser autosave, Save as,
+  Open and Print report workflow works without an account.
 - **Help** — the full in-app manual at `/help.html` (user guide + every
   equation, constant and workbook deviation).
 
@@ -92,6 +96,9 @@ The header bar carries the three well tabs (**Oil | Water | Gas**) plus
 - [docs/deploy.md](docs/deploy.md) — internet deployment (Render + custom domain
   DNS, or a VPS with nginx/certbot); `render.yaml` and `Dockerfile` are in the
   repo root.
+- [docs/architecture/README.md](docs/architecture/README.md) — the v2 platform
+  boundaries, shared domain model, module contract, tenant security and
+  incremental migration plan.
 
 A standalone portable build (`WellSim.exe` — no install, cases saved beside the
 exe) is built from THIS repo by `build.ps1` — see

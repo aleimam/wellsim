@@ -3,7 +3,7 @@
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
 **As of:** 30 August 2026 — commit `c6f1caa`, asset stamp `2026-08-30k`,
-244 tests passing, 43/43 validation sweep.
+246 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -35,7 +35,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 244 unit + regression tests
+node --test                       # 246 unit + regression tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -94,6 +94,13 @@ private; neither belongs in a repository. They **are** in the F: backup.
 
 ## 5. Operational knowledge that is not in the code
 
+- **The legacy company case store is disabled by default.** Its registration
+  flow accepted a company slug typed by the registrant, which cannot establish
+  company membership. `WELLSIM_ENABLE_LEGACY_CASE_STORE=1` is an explicit
+  compatibility switch only; even then registration also requires a non-empty
+  `WELLSIM_INVITE`. Do not enable it publicly as a substitute for the v2
+  organization/membership model. Visitor calculations and Save as / Open are
+  unaffected, and the portable build continues to use its local case folder.
 - **`data/` is the only stateful thing in the entire application.** It holds
   `users.json` and the company case store, lives at `/opt/wellsim/app/data`,
   and is not in git. The deploy does not touch it and nothing else will

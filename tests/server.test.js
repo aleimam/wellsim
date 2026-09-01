@@ -58,6 +58,10 @@ function startServer(port) {
       // a data dir that does not exist: backupData() returns immediately, so
       // running the tests never writes into the real case database
       WELLSIM_DATA_DIR: path.join(os.tmpdir(), 'wellsim-test-no-such-data-dir'),
+      // production-safe default: tests must not inherit an opt-in compatibility
+      // switch from the developer's shell
+      WELLSIM_ENABLE_LEGACY_CASE_STORE: '',
+      WELLSIM_INVITE: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -109,6 +113,24 @@ test('static serving stays inside src/ui, and every real asset still loads', asy
   }
 });
 
+test('the web legacy account and case store is disabled by default', async () => {
+  const port = await freePort();
+  const child = await startServer(port);
+  try {
+    const status = JSON.parse((await rawGet(port, '/api/accounts/status')).body);
+    assert.equal(status.enabled, false);
+    assert.equal(status.registrationEnabled, false);
+    assert.equal(status.mode, 'legacy-web');
+
+    const login = JSON.parse((await rawGet(port, '/api/auth/login')).body);
+    assert.equal(login.code, 'legacy_case_store_disabled');
+    const cases = JSON.parse((await rawGet(port, '/api/cases/list')).body);
+    assert.equal(cases.code, 'legacy_case_store_disabled');
+  } finally {
+    child.kill();
+  }
+});
+
 test('the portable build opens straight into its local case store', async () => {
   // The portable has no accounts, but it serves the WEBSITE's header panel,
   // and app.js only reaches a case store through its `acct` object — set
@@ -152,6 +174,9 @@ test('the portable build opens straight into its local case store', async () => 
     const list = JSON.parse((await rawGet(port, '/api/cases/list')).body);
     assert.equal(list.company, 'local');
     assert.ok(Array.isArray(list.cases), 'cases/list must return a list');
+    const status = JSON.parse((await rawGet(port, '/api/accounts/status')).body);
+    assert.equal(status.enabled, true);
+    assert.equal(status.mode, 'portable');
     // ...precisely because there is no auth in this build to get a token from
     const login = JSON.parse((await rawGet(port, '/api/auth/login')).body);
     assert.match(login.error ?? '', /unknown endpoint/, 'the portable deliberately has no auth');

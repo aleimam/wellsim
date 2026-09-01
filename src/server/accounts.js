@@ -17,6 +17,20 @@ const DATA_DIR = process.env.WELLSIM_DATA_DIR ?? path.join(process.cwd(), 'data'
 const usersFile = () => path.join(DATA_DIR, 'users.json');
 const casesRoot = () => path.join(DATA_DIR, 'cases');
 
+// This JSON store predates the v2 tenant model. It is deliberately OFF by
+// default: the company slug chosen during registration is not proof of
+// company membership, so exposing it publicly would let a new account join
+// an existing company namespace. Keep the code only as a short-lived,
+// explicitly enabled compatibility path while the PostgreSQL/RBAC store is
+// built. Visitor calculations and Save as / Open do not use this switch.
+export const legacyCaseStoreEnabled = () =>
+  process.env.WELLSIM_ENABLE_LEGACY_CASE_STORE === '1';
+
+const disabled = () => ({
+  error: 'server case storage is temporarily unavailable — use Save as / Open',
+  code: 'legacy_case_store_disabled',
+});
+
 const sessions = new Map(); // token -> { company, username }
 
 /** Path-safe slug: lowercase, [a-z0-9-_], spaces -> dashes, max 60. */
@@ -69,10 +83,12 @@ function noteFailure(u) {
 }
 
 export function register({ company, username, password, invite }) {
-  // optional registration gate: set WELLSIM_INVITE on the server to require
-  // an invite word for new accounts (open registration otherwise)
+  if (!legacyCaseStoreEnabled()) return disabled();
+  // Legacy registration is never open. Even when the compatibility store is
+  // explicitly enabled, an operator must also set a non-empty invite word.
+  // This is containment, not the replacement tenant-membership design.
   const required = process.env.WELLSIM_INVITE;
-  if (required && String(invite ?? '') !== required)
+  if (!required || String(invite ?? '') !== required)
     return { error: 'registration needs the invite word — ask the site owner' };
   const c = slug(company);
   const u = slug(username);
@@ -96,6 +112,7 @@ export function register({ company, username, password, invite }) {
 }
 
 export function login({ username, password }) {
+  if (!legacyCaseStoreEnabled()) return disabled();
   const u = slug(username);
   if (throttled(u))
     return { error: 'too many failed attempts — wait 15 minutes and try again' };
@@ -117,6 +134,7 @@ export function login({ username, password }) {
 }
 
 export function logout({ token }) {
+  if (!legacyCaseStoreEnabled()) return disabled();
   sessions.delete(token);
   return { ok: true };
 }
@@ -125,6 +143,7 @@ const auth = (body) => sessions.get(body?.token) ?? null;
 const companyDir = (company) => path.join(casesRoot(), company);
 
 export function caseSave(body) {
+  if (!legacyCaseStoreEnabled()) return disabled();
   const s = auth(body);
   if (!s) return { error: 'not signed in' };
   const name = slug(body.name);
@@ -143,6 +162,7 @@ export function caseSave(body) {
 }
 
 export function caseList(body) {
+  if (!legacyCaseStoreEnabled()) return disabled();
   const s = auth(body);
   if (!s) return { error: 'not signed in' };
   let files = [];
@@ -165,6 +185,7 @@ export function caseList(body) {
 }
 
 export function caseLoad(body) {
+  if (!legacyCaseStoreEnabled()) return disabled();
   const s = auth(body);
   if (!s) return { error: 'not signed in' };
   const name = slug(body.name);
@@ -179,6 +200,7 @@ export function caseLoad(body) {
 }
 
 export function caseDelete(body) {
+  if (!legacyCaseStoreEnabled()) return disabled();
   const s = auth(body);
   if (!s) return { error: 'not signed in' };
   const name = slug(body.name);
@@ -190,7 +212,17 @@ export function caseDelete(body) {
   }
 }
 
+export function accountStatus() {
+  const enabled = legacyCaseStoreEnabled();
+  return {
+    enabled,
+    registrationEnabled: enabled && Boolean(process.env.WELLSIM_INVITE),
+    mode: 'legacy-web',
+  };
+}
+
 export const accountHandlers = {
+  'accounts/status': accountStatus,
   'auth/register': register,
   'auth/login': login,
   'auth/logout': logout,

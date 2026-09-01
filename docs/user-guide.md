@@ -27,7 +27,8 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   (day > 31, month > 12) are rejected with the row number — nothing silently rolls over.
   Time-of-day is honoured (sporadic test timestamps work). `dt` is days from the first row.
 - **Header bar** (final layout): the **Oil Well | Water Well | Gas Well** tabs,
-  then **Save as · Open · Print report · Sign in · Help**. Help opens the full
+  then **Save as · Open · Print report · Help**. A server-case link is shown
+  only when the deployment reports a supported case store. Help opens the full
   in-app manual (`/help.html` — user guide + every equation and deviation).
 - **Print report** (header): prints the results only — charts, tables, summary
   cards and banners on a clean white page (inputs, navigation and buttons hide).
@@ -36,12 +37,13 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   selection and production table across all three tabs — saves to a JSON
   file and restores in one click; program-filled grey cells stay
   program-filled (they refill on the next run).
-- **Company case database** (Sign in, header): register a company account
-  (username + password, scrypt-hashed server-side) to save cases on the
-  server under data/cases/<company>/ — all users of a company share its
-  case list (save / load / delete). **The free version stays**: every
-  calculation works without an account. Sessions are in-memory (a server
-  restart signs everyone out); add TLS for internet deployment.
+- **Server cases:** the legacy JSON company store is disabled by default while
+  the secure organization/membership store is built. A company name or slug is
+  not proof that somebody belongs to that company. When explicitly enabled for
+  controlled migration, registration is invite-only. The portable program uses
+  the same panel for its local `cases/` folder and needs no account.
+- **Visitor use stays complete:** every calculation, browser autosave, Save as,
+  Open and Print report workflow works without an account.
 - **Mobile**: below 640 px the layout stacks, inputs grow to finger size, and the main
   action button stays pinned while you scroll.
 - **Your inputs survive a refresh.** Everything you type is saved in the

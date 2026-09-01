@@ -3130,11 +3130,59 @@ function openCaseFile(file) {
 let acct = null;
 try { acct = JSON.parse(localStorage.getItem('wellsimAcct') || 'null'); } catch { acct = null; }
 
+// The legacy web case store is disabled by default while the PostgreSQL/RBAC
+// replacement is built. The portable program reports its own local case-store
+// capability through the same endpoint, so the shared UI keeps working there.
+let acctCapabilities = { enabled: false, registrationEnabled: false, mode: 'web' };
+
 function acctUi() {
-  document.getElementById('acct-link').textContent = acct ? `${acct.username}@${acct.company}` : 'Sign in';
+  const link = document.getElementById('acct-link');
+  const panel = document.getElementById('acct-panel');
+  link.style.display = acctCapabilities.enabled ? '' : 'none';
+  if (!acctCapabilities.enabled) panel.style.display = 'none';
+
+  const portable = acctCapabilities.mode === 'portable';
+  link.textContent = portable ? 'Cases' : acct ? `${acct.username}@${acct.company}` : 'Sign in';
   document.getElementById('acct-out').style.display = acct ? 'none' : '';
   document.getElementById('acct-in').style.display = acct ? '' : 'none';
-  if (acct) document.getElementById('acct-who').textContent = `${acct.username} @ ${acct.company} — company cases`;
+  if (acct)
+    document.getElementById('acct-who').textContent = portable
+      ? 'Cases saved beside the program'
+      : `${acct.username} @ ${acct.company} — company cases`;
+
+  const registerButton = document.getElementById('acct-register');
+  const companyInput = document.getElementById('acct-company');
+  const inviteInput = document.getElementById('acct-invite');
+  const canRegister = acctCapabilities.registrationEnabled && !portable;
+  registerButton.style.display = canRegister ? '' : 'none';
+  companyInput.style.display = canRegister ? '' : 'none';
+  inviteInput.style.display = canRegister ? '' : 'none';
+  document.getElementById('acct-note').textContent = portable
+    ? 'Cases are stored in the cases folder beside the program.'
+    : canRegister
+      ? 'Registration is invite-only. Visitor calculations and Save as / Open need no account.'
+      : 'Registration is closed. Visitor calculations and Save as / Open need no account.';
+
+  const signout = document.getElementById('acct-signout');
+  if (signout) signout.style.display = portable ? 'none' : '';
+}
+
+async function acctLoadCapabilities() {
+  try {
+    const res = await fetch('/api/accounts/status', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    const status = await res.json();
+    if (!status.error) acctCapabilities = status;
+  } catch { /* old/offline server: leave the legacy store hidden */ }
+
+  if (!acctCapabilities.enabled && acct) {
+    acct = null;
+    try { localStorage.removeItem('wellsimAcct'); } catch { /* storage unavailable */ }
+  }
+  acctUi();
 }
 
 function acctSet(a) {
@@ -3151,6 +3199,7 @@ async function acctAuth(pathName) {
     company: val('acct-company'),
     username: val('acct-user'),
     password: document.getElementById('acct-pass').value,
+    invite: document.getElementById('acct-invite').value,
   });
   acctSet({ token: r.token, company: r.company, username: r.username });
   document.getElementById('acct-pass').value = '';
@@ -3479,6 +3528,7 @@ document.getElementById('open-case-file').onchange = (e) => {
 };
 document.getElementById('acct-link').onclick = (e) => {
   e.preventDefault();
+  if (!acctCapabilities.enabled) return;
   const p = document.getElementById('acct-panel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
   if (p.style.display !== 'none' && acct) acctRefresh();
@@ -3492,6 +3542,7 @@ document.getElementById('acct-signout').onclick = guard(async () => {
 document.getElementById('acct-save').onclick = guard(acctSaveCase);
 document.getElementById('acct-refresh').onclick = guard(acctRefresh);
 acctUi();
+acctLoadCapabilities();
 
 // CSV import for the production tables (same column order as paste:
 // Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf; header line auto-skipped)

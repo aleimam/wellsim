@@ -183,7 +183,7 @@ pre.eq code { background: none; padding: 0; }
   <h1>WellSim Manual</h1>
   <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a zero-dependency web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
   <div class="statusrow">
-    <span class="chip"><b>244</b> regression tests passing</span>
+    <span class="chip"><b>246</b> regression tests passing</span>
     <span class="chip"><b>43/43</b> sheet-parity sensitivities</span>
     <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
     <span class="chip">port 3355 &middot; zero npm dependencies</span>
@@ -208,7 +208,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-node --test                             # 244 tests
+node --test                             # 246 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is produced from this same source tree by <code>build.ps1</code>.</p>
 
@@ -226,10 +226,11 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
   <li><b>There is no current-rate input.</b> The well model SOLVES for the rate &mdash; the operating point is the IPR/VLP intersection &mdash; so a typed rate would either be ignored or quietly contradict the answer. Rates are entered only where they are genuine data: the calibration <b>test rate</b>, the prod-data table, and the ESP/gas-lift matches.</li>
   <li><b>Production tables</b> accept clipboard paste (button or Ctrl+V in a cell); column order <code>Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf</code>; header lines auto-skip; up to 200 rows.</li>
   <li><b>Dates</b>: <code>17-Nov-14</code>, <code>17-Nov-2014 13:00:00</code>, <code>05/03/2014 06:30</code>, ISO, or a day serial. Impossible dates are rejected with the row number &mdash; nothing silently rolls over. dt = days from the first row; time-of-day honoured.</li>
-  <li><b>Header bar</b> (final layout): the Oil Well | Water Well | Gas Well tabs, then <b>Save as</b> &middot; <b>Open</b> &middot; <b>Print report</b> &middot; <b>Sign in</b> &middot; <b>Help</b>.</li>
+  <li><b>Header bar</b>: the Oil Well | Water Well | Gas Well tabs, then <b>Save as</b> &middot; <b>Open</b> &middot; <b>Print report</b> &middot; <b>Help</b>. A server-case link appears only when the deployment reports a supported case store.</li>
   <li><b>Save as / Open</b>: the whole case &mdash; every input, selection and production table across all three tabs &mdash; saves to a JSON file and restores in one click; program-filled grey cells stay program-filled.</li>
   <li><b>Print report</b>: prints the results only &mdash; charts, tables, summary cards and banners on a clean white page (inputs, navigation and buttons hide); use the browser dialog&rsquo;s &ldquo;Save as PDF&rdquo; for a shareable report.</li>
-  <li><b>Company case database</b> (Sign in, header): register a company account (username + password, scrypt-hashed on the server) to save cases server-side under <code>data/cases/&lt;company&gt;/</code> &mdash; every user of a company shares its case list (save / load / delete). <b>The free version stays</b>: every calculation works without an account; only the server case store needs one. Sessions are in-memory (a server restart signs everyone out); put TLS in front for internet deployment.</li>
+  <li><b>Server cases:</b> the legacy JSON company store is disabled by default while the secure organization/membership store is built. A typed company name is not proof of membership. When explicitly enabled for controlled migration, registration is invite-only. The portable program uses the same panel for its local <code>cases/</code> folder.</li>
+  <li><b>Visitor use stays complete:</b> every calculation, browser autosave, Save as, Open and Print report workflow works without an account.</li>
   <li><b>Mobile</b>: below 640&nbsp;px the layout stacks and the action button stays pinned.</li>
 </ul>
 

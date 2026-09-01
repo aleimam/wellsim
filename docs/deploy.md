@@ -1,7 +1,7 @@
 # Deploying WellSim
 
 This documents the **live production setup**, not a hypothetical one. WellSim
-is a Node app (API + company case database), so a static host such as GitHub
+is a Node app (calculation API plus an explicitly gated legacy case store), so a static host such as GitHub
 Pages or Cloudflare Pages **cannot run it** — those serve files only.
 
 ```
@@ -103,6 +103,13 @@ Within an hour of switching this on it caught a live HTTP 500 on any root URL
 carrying a query string, which had been shipping unnoticed.
 
 ## Backing up `data/` off-box
+
+The legacy JSON account/case store is disabled unless the service explicitly
+sets `WELLSIM_ENABLE_LEGACY_CASE_STORE=1`. Do not set that flag on a public
+deployment merely to restore the old Sign in link: company slugs do not prove
+membership. If the store is temporarily enabled for controlled migration,
+also set a strong non-empty `WELLSIM_INVITE` and install/test an off-box backup
+first. Visitor calculations and Save as / Open do not require either setting.
 
 `data/` is the only stateful thing in the application — `users.json` and the
 company case store. The app already writes a rolling daily copy into

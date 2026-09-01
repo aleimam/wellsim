@@ -8,19 +8,23 @@ import path from 'node:path';
 
 // isolate the data dir BEFORE the module loads
 process.env.WELLSIM_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'wellsim-acct-'));
+process.env.WELLSIM_ENABLE_LEGACY_CASE_STORE = '1';
+process.env.WELLSIM_INVITE = 'test-invite';
 const {
-  register, login, logout, caseSave, caseList, caseLoad, caseDelete,
+  register, login, logout, caseSave, caseList, caseLoad, caseDelete, accountStatus,
 } = await import('../src/server/accounts.js');
+
+const registerInvited = (body) => register({ ...body, invite: process.env.WELLSIM_INVITE });
 
 const CASE = { app: 'WellSim', version: 1, inputs: { 'oil-thpPsi': '700' }, radios: {}, grids: {} };
 
 test('register + login + wrong password', () => {
-  const r = register({ company: 'Acme Oil', username: 'Ali', password: 'secret7' });
+  const r = registerInvited({ company: 'Acme Oil', username: 'Ali', password: 'secret7' });
   assert.ok(!r.error, r.error);
   assert.equal(r.company, 'acme-oil'); // slugged
   assert.equal(r.username, 'ali');
   assert.ok(r.token);
-  assert.ok(/already exists/.test(register({ company: 'acme-oil', username: 'ali', password: 'x1234' }).error));
+  assert.ok(/already exists/.test(registerInvited({ company: 'acme-oil', username: 'ali', password: 'x1234' }).error));
   assert.ok(/wrong username or password/.test(login({ username: 'ali', password: 'nope' }).error));
   const l = login({ username: 'ali', password: 'secret7' });
   assert.ok(l.token && l.token !== r.token);
@@ -44,7 +48,7 @@ test('save / list / load / delete a case; auth required', () => {
 });
 
 test('login throttle: 5 failures lock the username for the window', () => {
-  register({ company: 'Gamma Co', username: 'carol', password: 'goodpw1' });
+  registerInvited({ company: 'Gamma Co', username: 'carol', password: 'goodpw1' });
   for (let i = 0; i < 5; i++) {
     assert.ok(/wrong username or password/.test(login({ username: 'carol', password: 'bad' }).error));
   }
@@ -55,19 +59,34 @@ test('login throttle: 5 failures lock the username for the window', () => {
 });
 
 test('invite word gates registration when WELLSIM_INVITE is set', () => {
+  const previous = process.env.WELLSIM_INVITE;
   process.env.WELLSIM_INVITE = 'drillbit';
   try {
     assert.ok(/invite word/.test(register({ company: 'X', username: 'noinv', password: 'pass1' }).error));
     assert.ok(register({ company: 'X', username: 'withinv', password: 'pass1', invite: 'drillbit' }).token);
   } finally {
-    delete process.env.WELLSIM_INVITE;
+    process.env.WELLSIM_INVITE = previous;
+  }
+});
+
+test('legacy server case storage is disabled unless explicitly enabled', () => {
+  delete process.env.WELLSIM_ENABLE_LEGACY_CASE_STORE;
+  try {
+    const status = accountStatus();
+    assert.equal(status.enabled, false);
+    assert.equal(status.registrationEnabled, false);
+    assert.equal(registerInvited({ company: 'X', username: 'disabled', password: 'pass1' }).code, 'legacy_case_store_disabled');
+    assert.equal(login({ username: 'ali', password: 'secret7' }).code, 'legacy_case_store_disabled');
+    assert.equal(caseList({ token: 'anything' }).code, 'legacy_case_store_disabled');
+  } finally {
+    process.env.WELLSIM_ENABLE_LEGACY_CASE_STORE = '1';
   }
 });
 
 test('cases are isolated per company; logout kills the token', () => {
   const a = login({ username: 'ali', password: 'secret7' });
   caseSave({ token: a.token, name: 'acme-secret', case: CASE });
-  const b = register({ company: 'Beta Energy', username: 'bob', password: 'pass99' });
+  const b = registerInvited({ company: 'Beta Energy', username: 'bob', password: 'pass99' });
   const bl = caseList({ token: b.token });
   assert.equal(bl.company, 'beta-energy');
   assert.equal(bl.cases.length, 0, 'Beta must not see Acme cases');

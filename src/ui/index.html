@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-08-31i" />
+  <link rel="stylesheet" href="/style.css?v=2026-09-02a" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -30,7 +30,7 @@
       <a id="save-case" href="#" class="hdr-link">Save as</a>
       <a id="open-case" href="#" class="hdr-link">Open</a>
       <a id="print-report" href="#" class="hdr-link">Print report</a>
-      <a id="acct-link" href="#" class="hdr-link">Sign in</a>
+      <a id="acct-link" href="#" class="hdr-link" style="display:none">Sign in</a>
       <a id="help-link" href="/help.html" target="_blank" class="hdr-link">Help</a>
       <a id="reset-case" href="#" class="hdr-link" title="Forget saved inputs and reload the demo case">Reset</a>
       <a id="contact-link" href="mailto:muhamad.elashry@gmail.com?subject=WellSim" class="hdr-link">Contact me</a>
@@ -42,11 +42,12 @@
         <input id="acct-company" placeholder="company name" />
         <input id="acct-user" placeholder="username" />
         <input id="acct-pass" type="password" placeholder="password" />
+        <input id="acct-invite" type="password" placeholder="invite word" style="display:none" />
         <div class="acct-btns">
           <button id="acct-login" class="copybtn">Sign in</button>
           <button id="acct-register" class="copybtn">Register</button>
         </div>
-        <div class="acct-note">Free use needs no account — accounts only add saved cases on the server, shared per company.</div>
+        <div class="acct-note" id="acct-note">Free use needs no account. Save as / Open keeps cases under your control.</div>
       </div>
       <div id="acct-in" style="display:none">
         <div class="acct-title" id="acct-who"></div>
@@ -428,6 +429,6 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/app.js?v=2026-08-31i"></script>
+  <script src="/app.js?v=2026-09-02a"></script>
 </body>
 </html>
