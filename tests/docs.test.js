@@ -166,7 +166,11 @@ test('the portable build serves Plotly from the embedded copy, not the CDN', () 
 // source rather than a copy.
 test('every pressure axis is floored at zero, whatever the data does', () => {
   const src = fs.readFileSync(path.join(root, 'src/ui/app.js'), 'utf8');
-  const m = src.match(/function floorPressureAxes[\s\S]*?\n}\n/);
+  // CRLF-tolerant. A fresh clone gets CRLF under core.autocrlf, and a regex
+  // anchored on a bare-LF closing brace silently fails to match there. This
+  // test passed in a working tree whose app.js happened to be LF and FAILED
+  // on a clean clone — found by a restore drill on 1 Sep 2026.
+  const m = src.match(/function floorPressureAxes[\s\S]*?\r?\n\}\r?\n/);
   assert.ok(m, 'floorPressureAxes must exist in app.js');
   const floorPressureAxes = new Function(m[0] + '; return floorPressureAxes;')();
 
