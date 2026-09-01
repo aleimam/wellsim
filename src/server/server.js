@@ -94,7 +94,14 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, result);
     }
-    let p = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+    // Strip the query BEFORE testing for the root. Testing req.url === '/'
+    // against a still-queried URL means '/?utm_source=x' falls through to
+    // p = '/', which resolves to the DIRECTORY src/ui -> readFile EISDIR ->
+    // HTTP 500. Any shared link carrying a tracking parameter broke the site.
+    // The portable was fixed on 30 Aug 2026 (5349c2b); the website was not,
+    // and its own access log caught it the hour logging was switched on.
+    const q = req.url.split('?')[0];
+    let p = q === '/' || q === '' ? '/index.html' : q;
     const file = path.resolve(path.join(UI_DIR, p));
     // startsWith(UI_DIR) on its own is a STRING test, so it also passes for a
     // SIBLING whose name merely begins with "ui" (src/ui-old, src/uix) — and

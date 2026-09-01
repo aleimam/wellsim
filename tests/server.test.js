@@ -159,3 +159,27 @@ test('the portable build opens straight into its local case store', async () => 
     child.kill();
   }
 });
+
+test('a query string on the root serves the app, not a 500', async () => {
+  // Found in production on 1 Sep 2026, within the hour Caddy access logging
+  // was switched on: a bot hit /?rest_route=... and the log showed HTTP 500.
+  // Cause: req.url === '/' was tested against a URL that still carried its
+  // query, so '/?x=1' fell through to p = '/', which resolves to the
+  // DIRECTORY src/ui -- readFile raises EISDIR, not ENOENT, so the handler
+  // answered 500. Every shared link with a tracking parameter (utm_source,
+  // fbclid, gclid) was broken. The portable had been fixed on 30 Aug
+  // (5349c2b); the website carried the bug until now.
+  const port = await freePort();
+  const child = await startServer(port);
+  try {
+    for (const u of ['/?utm_source=linkedin', '/?x=1', '/?rest_route=/wp/v2/users', '/?']) {
+      const res = await rawGet(port, u);
+      assert.equal(res.status, 200, `${u} must serve the app, got ${res.status}`);
+      assert.match(res.body, /<title>WellSim/, `${u} must return index.html`);
+    }
+    // and the plain root still works
+    assert.equal((await rawGet(port, '/')).status, 200);
+  } finally {
+    child.kill();
+  }
+});

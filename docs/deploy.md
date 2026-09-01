@@ -78,6 +78,30 @@ revalidates, so `help.html` needs no stamp.
 ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 'tar -czf - -C /opt/wellsim/app data' > wellsim-data-backup.tar.gz
 ```
 
+**A nightly on-box snapshot now runs** (installed 1 Sep 2026): a systemd timer
+`wellsim-backup.timer` at 02:30 UTC writes `/var/backups/wellsim/wellsim-data-
+<date>.tar.gz` and keeps 30 days. It lives OUTSIDE `/opt/wellsim/app`, so
+re-extracting or wiping the app directory cannot take the backups with it.
+It is still the SAME DISK: it survives a bad write, a bad deploy or an
+accidental delete, not a lost server. The command above is still the off-box
+pull, and is the one that actually protects you.
+
+## Access logs
+
+Caddy logs requests per site (added 1 Sep 2026 — before that the site kept NO
+traffic record at all):
+
+```
+/var/log/caddy/wellsim.access.log   # 10 MB roll, 10 kept
+/var/log/caddy/thepwf.access.log
+```
+
+JSON, one object per request. The files must be owned by `caddy:caddy` — if
+they are pre-created as root the reload fails with `permission denied` and
+the OLD config keeps serving (no outage, but no new logging either).
+Within an hour of switching this on it caught a live HTTP 500 on any root URL
+carrying a query string, which had been shipping unnoticed.
+
 ## Backing up `data/` off-box
 
 `data/` is the only stateful thing in the application — `users.json` and the
