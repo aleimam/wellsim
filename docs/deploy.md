@@ -78,18 +78,15 @@ revalidates, so `help.html` needs no stamp.
 ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 'tar -czf - -C /opt/wellsim/app data' > wellsim-data-backup.tar.gz
 ```
 
-**A nightly on-box snapshot is documented as installed on 1 Sep 2026**: a
-systemd timer `wellsim-backup.timer` at 02:30 UTC writes
-`/var/backups/wellsim/wellsim-data-<date>.tar.gz` and keeps 30 days. The 2 Sep
-infrastructure audit could not independently verify the timer because the
-recovery SSH key was unavailable on that workstation; treat it as unverified
-until the checks in
-[infrastructure-audit-2026-09-02.md](architecture/infrastructure-audit-2026-09-02.md)
-are completed. It lives OUTSIDE `/opt/wellsim/app`, so re-extracting or wiping
-the app directory should not take the archives with it. It is still the SAME
-DISK: it can survive a bad write, bad deploy or accidental app-directory
-delete, not a lost server. The command above is still the off-box pull, and is
-the one that actually protects you.
+**A nightly on-box snapshot was verified on 2 Sep 2026**: enabled systemd timer
+`wellsim-backup.timer` runs at 02:30 UTC, writes
+`/var/backups/wellsim/wellsim-data-<date>.tar.gz`, and keeps 30 days. It lives
+OUTSIDE `/opt/wellsim/app`, so re-extracting or wiping the app directory should
+not take the archives with it. It is still the SAME DISK: it can survive a bad
+write, bad deploy or accidental app-directory delete, not a lost server. The
+command above is still the off-box pull, and is the one that actually protects
+you. Recovery and deployment evidence is recorded in
+[infrastructure-audit-2026-09-02.md](architecture/infrastructure-audit-2026-09-02.md).
 
 ## Access logs
 
@@ -117,10 +114,11 @@ also set a strong non-empty `WELLSIM_INVITE` and install/test an off-box backup
 first. Visitor calculations and Save as / Open do not require either setting.
 
 `data/` is the only stateful thing in the application — `users.json` and the
-company case store. The app already writes a rolling daily copy into
-`data-backups/`, but **that sits on the same disk as the thing it protects**:
-it survives a bad write or an accidental delete, not a lost server. Nothing
-else is scheduled — checked 30 Aug 2026: no root crontab, no systemd timer.
+company case store. The app writes a rolling daily copy into `data-backups/`
+and the verified systemd timer writes another archive under `/var/backups`, but
+**both sit on the same disk as the thing they protect**: they survive a bad
+write or accidental app-directory delete, not a lost server. As of 2 Sep 2026,
+off-box transfer is still manual rather than scheduled.
 
 **Do this before real client cases go in.** Two options; pick one.
 
@@ -209,11 +207,10 @@ is unaffected.
 
 ## Credentials
 
-API tokens live in files on the workstation and are **never** committed or
-printed: `d:\github_token.txt`, `d:\hetzner_token.txt`,
-`d:\wellsim_token.txt` (Cloudflare), `d:\render_token.txt` (unused). The
-server takes SSH keys only. Rotate anything that has ever been pasted into a
-chat, a terminal recording, or a shared document.
+API tokens and backup-recovery secrets live in the excluded, access-restricted
+workstation secrets area and are **never** committed or printed. The server
+takes SSH keys only. Rotate anything that has ever been pasted into a chat, a
+terminal recording, or a shared document.
 
 ## Alternatives (not in use)
 
