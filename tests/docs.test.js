@@ -234,3 +234,37 @@ test('the IPR/VLP rate axis is floored at zero', () => {
     "plotNodal's x axis must set rangemode 'nonnegative' so the rate axis starts at 0"
   );
 });
+
+// Proprietary vendor material must never reach the remote. github.com/aleimam/
+// wellsim is PUBLIC, and "ESP PUMPS DATA Base/" holds Borets, APC and Levare
+// catalogues -- the Borets one carries a notice on its first page forbidding
+// reproduction or distribution. .gitignore already excludes them, but an
+// ignore rule is a default, not a guarantee: `git add -f`, a new tool, or a
+// rule edited in good faith all bypass it silently. This asserts the actual
+// index, which is the thing that gets pushed. Added 2 Sep 2026.
+test('no proprietary vendor material is tracked by git', async () => {
+  const { execFileSync } = await import('node:child_process');
+  let tracked;
+  try {
+    tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/);
+  } catch {
+    return; // no git available (a tarball export) -- nothing to assert against
+  }
+
+  const forbiddenDir = /^(ESP PUMPS DATA Base|oil excel|gas excel|training slids)\//i;
+  const forbiddenExt = /\.(pdf|xls|xlsx|xlsm|pptx|docx)$/i;
+
+  const badDir = tracked.filter((f) => forbiddenDir.test(f));
+  assert.deepEqual(
+    badDir,
+    [],
+    `proprietary source directories must not be tracked: ${badDir.join(', ')}`
+  );
+
+  const badExt = tracked.filter((f) => forbiddenExt.test(f));
+  assert.deepEqual(
+    badExt,
+    [],
+    `vendor documents and workbooks must not be tracked: ${badExt.join(', ')}`
+  );
+});
