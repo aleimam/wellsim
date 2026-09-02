@@ -5,10 +5,15 @@
 Auth0 is the selected dedicated provider for **bldrz.net only**. The local
 comparison branch implements MFA step-up and migration `0006_administrator_mfa`.
 The user is signed into the US development tenant `dev-mfke2ibpyq53l133`.
-The `bldrz Comparison` Regular Web Application form is prepared, but Create has
-not been submitted: security-sensitive client creation/configuration awaits
-confirmation. No application/Action has been installed, no paid plan has been
-purchased, and no live MFA migration or authentication activation has occurred.
+Following explicit approval, the `bldrz Comparison` Regular Web Application was
+created and its confidential-client settings saved. The client-bound Post Login
+Action was created, tested and deployed, but **is not attached to the login
+flow yet**: the flow editor did not respond to automated drag-and-drop. The user
+has been asked to attach it and click Apply. Authenticator OTP and recovery-code
+factors are enabled in the development tenant. No paid plan has been purchased,
+and no live MFA migration or authentication activation has occurred. The client
+secret has not yet been supplied to the private local file or installed on the
+server. Provider configuration is therefore incomplete, not an operational login.
 The last verified live release is `d5187b4`, schema 0001–0005, with authentication,
 onboarding and legacy persistence disabled. `wellsim.app` is outside this work.
 
@@ -143,9 +148,81 @@ The disposable native database, private restore cluster, temporary plaintext
 dump copies on both machines and local preview process were removed/stopped.
 Encrypted source backups remain. Live migration history stayed 0001–0005;
 `bldrz.service` PID 19195 and `wellsim.service` PID 1887 remained unchanged.
-The implementation is committed locally, not pushed or deployed. Provider
-creation, MFA factors/recovery, real browser tests and activation gates above
-remain unfinished.
+The implementation is committed locally, not pushed or deployed. Real browser
+tests and the activation gates above remain unfinished. The subsequent provider
+configuration receipt below supersedes the earlier pending-creation status.
+
+## Provider configuration receipt — 2 September 2026
+
+Configured through the Auth0 dashboard in Chrome after the user's approval:
+
+- Tenant: `dev-mfke2ibpyq53l133` (US development).
+- Issuer, independently verified using public OIDC discovery:
+  `https://dev-mfke2ibpyq53l133.us.auth0.com/`.
+- Application: `bldrz Comparison`, Regular Web Application, first-party.
+  Public client ID: `hzntZyd10WXgb9gqiRQhq4obm8s9miVZ`.
+- Application Login URI: `https://bldrz.net/auth/login`; the only allowed
+  callback is `https://bldrz.net/auth/callback`. No logout URLs, browser origins,
+  CORS origins or cross-origin authentication were added.
+- Authorization Code is enabled; Implicit, Refresh Token and Client Credentials
+  grants were disabled. Password and MFA-API grants remain disabled. Universal
+  Login step-up uses the code flow, not the Resource Owner Password/MFA API flow.
+- Client authentication: Client Secret (Post); signing RS256; OIDC conformity
+  enabled; ID token lifetime 300 seconds. No secret was revealed in tool output,
+  screenshots, Git or documentation.
+- One-time Password (authenticator/TOTP) and Recovery Code factors are enabled.
+  Other factors remain disabled. No individual user has enrolled through this
+  work or generated recovery codes. Tenant-wide Require MFA remains Never:
+  the client-bound Action is intended to request MFA only for bldrz step-up.
+  **Until the Action is attached and a real challenge verified, this is not
+  evidence of enforced provider MFA.**
+- Action: `bldrz verified email and administrator MFA`, ID
+  `e0ca400a-3bc6-4d32-94e2-a72df6510380`, Post Login, Node 22. Its source was
+  compared exactly with `deploy/auth0/bldrz-post-login.cjs` before deployment.
+  Action secret `BLDRZ_CLIENT_ID` contains the public client ID above. The
+  dashboard reported Action is up to date after deployment.
+- Built-in Action tests with synthetic events returned the expected commands:
+  verified bldrz step-up required MFA with `allowRememberBrowser: false`;
+  unverified bldrz login was denied; verified ordinary bldrz login and an
+  unrelated client produced no commands. All four had an empty Error result.
+  These are provider Action-unit tests, **not** enrollment or signed-token
+  callback acceptance evidence.
+
+Connection inspection found both `Username-Password-Authentication` and
+`google-oauth2` enabled for bldrz by default. Disabling Google was blocked by
+the browser action review because that specific provider removal was not
+explicitly approved. No removal occurred; obtain the user's approval before
+retrying. The password connection has improved brute-force protection enabled,
+public signup enabled, and domain-level promotion disabled. Its password-policy
+editor did not display a populated minimum length, so effective password strength
+has not been qualified. Password history/dictionary/profile-data controls were
+unavailable behind a plan upgrade notice. No password-policy edits were saved.
+
+Tenant attack protection shows Suspicious IP Throttling and Brute-force
+Protection enabled; Bot Detection and Breached Password Detection disabled.
+Those tenant-wide settings were inspected only, not changed. Confirm the
+intended connection policy and any applicable plan entitlement before activation.
+The dashboard showed 22 trial days remaining and marked OTP/recovery as PRO MFA;
+this does not establish free-plan availability after the trial.
+
+User handoffs still pending:
+
+1. In the Post Login flow, drag the deployed bldrz Action between Start and
+   Complete and click Apply; then verify the persisted binding.
+2. Save only the application's Client Secret in the restricted, Git-excluded
+   local file `C:\Claude\WellSim\secrets\auth0\bldrz-client-secret.txt`.
+   The folder ACL is limited to the Windows account, SYSTEM and administrators.
+   At the last check the file did not exist. Do not paste it into chat.
+3. Approve whether to disable the default Google connection for the initial
+   password-plus-authenticator pilot, then qualify connection/attack policies.
+4. Complete real pilot-account email verification and authenticator enrollment
+   personally; store recovery codes securely. Do not enable public bldrz login
+   before the deployment, callback, isolation and recovery gates pass.
+
+A read-only server check after provider setup confirmed bldrz still points to
+`d5187b43cd298c0df21a83b7eec42e378eba2a23`; both services remained active with
+unchanged PIDs (bldrz 19195, wellsim 1887). No production service or database
+was changed during provider configuration.
 
 ## Primary references
 
