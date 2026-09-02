@@ -3,7 +3,7 @@
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
 **As of:** 1 September 2026 — commit `2d60c5e`, asset stamp `2026-08-31i`,
-246 tests passing, 43/43 validation sweep.
+247 tests passing, 43/43 validation sweep.
 
 ---
 
@@ -35,7 +35,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 246 unit + regression tests
+node --test                       # 247 unit + regression tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 

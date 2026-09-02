@@ -178,3 +178,29 @@ test('forecast FTHT tracks rate, not pressure', () => {
   const hi = gasMarch({ ...GAS_MARCH_CFG, qGasMMscfd: 18 }).whtF;
   assert.ok(hi > lo + 10, `WHT should rise with rate: ${lo} -> ${hi}`);
 });
+
+// The forecast chart draws the MEASURED wellhead pressure of each prod row
+// into the forecast FTHP as one line, so the history payload has to carry
+// thpPsi -- it is the only place the typed prod THP reaches the UI. Added
+// 2 Sep 2026, when the chart dropped its FTHT axis (FTHT stays in the table).
+test('forecast history carries the measured FTHP of every prod row', () => {
+  const r = handlers['gas/forecast']({
+    ...GAS_FORM,
+    prodRows: GAS_PROD_ROWS,
+    stepDays: '30', forecastFthpPsi: '300', minRateMMscfd: '1', maxSteps: '6',
+    plateauMMscfd: '', startDate: '', startGpBscf: '', startPresPsi: '',
+    giipBscf: '', pziPsi: '',
+  });
+  assert.ok(!r.error, r.error);
+  assert.equal(r.history.length, GAS_PROD_ROWS.length);
+  assert.deepEqual(
+    r.history.map((p) => p.thpPsi),
+    GAS_PROD_ROWS.map((p) => Number(p.thpPsi))
+  );
+  // and the rest of the chart's history series stay populated
+  for (const p of r.history) {
+    for (const k of ['tDays', 'qMMscfd', 'presPsi', 'gpBscf']) {
+      assert.ok(Number.isFinite(p[k]), `history ${k} is ${p[k]}`);
+    }
+  }
+});

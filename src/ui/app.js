@@ -2846,14 +2846,14 @@ async function gasForecastRun() {
     traces.push(
       { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.qMMscfd), name: 'Rate (history)', mode: 'lines+markers', line: { color: '#2C7048', width: 2 } },
       { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.presPsi), name: 'Pres (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#00636D', width: 2 } },
+      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.thpPsi), name: 'FTHP (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#7038b0', width: 2 } },
       { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.gpBscf), name: 'Gp (history)', mode: 'lines', line: { color: '#C2540B', width: 2 } }
     );
   }
   traces.push(
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.qMMscfd), name: 'F Rate', mode: 'lines', line: { color: '#2C7048', width: 3, dash: 'dash' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.fthpPsi), name: 'FTHP', yaxis: 'y2', mode: 'lines', line: { color: '#C2540B', width: 2 } },
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.fthtF), name: 'FTHT °F', yaxis: 'y3', mode: 'lines', line: { color: '#8A6D1A', width: 1.5, dash: 'dash' } },
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.fthpPsi), name: 'F FTHP', yaxis: 'y2', mode: 'lines', line: { color: '#7038b0', width: 2, dash: 'dash' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gpBscf), name: 'Cum gas', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
   );
   plot('gas-chart-fc', traces, {
@@ -2863,8 +2863,6 @@ async function gasForecastRun() {
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate MMscf/d · Gp Bscf', rangemode: 'tozero' },
     yaxis2: { title: 'Pres · FTHP, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
-    // FTHT gets its own axis: a temperature in F shares no scale with psi
-    yaxis3: { title: 'FTHT, °F', overlaying: 'y', side: 'right', position: 1, anchor: 'free', showgrid: false, titlefont: { color: '#8A6D1A' }, tickfont: { color: '#8A6D1A' } },
   });
   mobileShowResults();
   renderTables('gas-table-fc', [
