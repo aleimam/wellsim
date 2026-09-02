@@ -183,7 +183,7 @@ pre.eq code { background: none; padding: 0; }
   <h1>WellSim Manual</h1>
   <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a zero-dependency web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
   <div class="statusrow">
-    <span class="chip"><b>251</b> regression tests passing</span>
+    <span class="chip"><b>253</b> regression tests passing</span>
     <span class="chip"><b>43/43</b> sheet-parity sensitivities</span>
     <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
     <span class="chip">port 3355 &middot; zero npm dependencies</span>
@@ -208,7 +208,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-node --test                             # 251 tests
+node --test                             # 253 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is produced from this same source tree by <code>build.ps1</code>.</p>
 

@@ -29,7 +29,7 @@ module manifest must express the following concepts:
     "well-performance.review"
   ],
   "capabilities": ["case-versioning", "comparison", "report", "export"],
-  "exporters": ["case-json", "case-inputs-csv", "case-report-pdf"]
+  "exporters": ["case-json", "case-inputs-csv", "case-xlsx", "case-report-pdf"]
 }
 ```
 
@@ -127,7 +127,7 @@ No calculation module is releasable without:
 - a migration policy explaining whether old cases rerun or retain the old
   engine.
 
-The existing 251-test suite and 43-case sweep are the initial validation
+The existing 253-test suite and 43-case sweep are the initial validation
 package for the current WellSim engine. They remain mandatory throughout the
 platform migration.
 

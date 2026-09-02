@@ -3105,7 +3105,7 @@ function exportFieldMeta() {
     const unit = labelEl?.querySelector('.unit')?.textContent?.trim() ?? '';
     const label = labelEl?.firstChild?.textContent?.trim() || el.id;
     const panel = el.closest('.panel')?.id?.replace(/^panel-/, '') || 'case';
-    metadata[el.id] = { label, unit, section: panel };
+    metadata[el.id] = { label, unit, section: panel, valueType: unit ? 'number' : 'text' };
   });
   return metadata;
 }

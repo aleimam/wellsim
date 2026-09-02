@@ -69,6 +69,38 @@ Jobs contain workspace ownership, requester, scope, format, template/version,
 status, progress, expiry and failure details. Artifacts use the shared file
 object model rather than PostgreSQL binary columns.
 
+## Excel workbook contract
+
+`wellsim.case-workbook.v1` is the normalized model for the future
+`case-xlsx` capability. It is deliberately separate from the binary renderer:
+the browser and portable app can produce the same deterministic model, while
+an approved queued worker owns XLSX generation, template versioning and file
+inspection.
+
+The model contains only ordered worksheet definitions, columns, typed values
+and provenance. Its worksheet roles are:
+
+1. `Summary` — source and workbook schema versions, timestamps, active well
+   type, record counts and the non-round-trip warning.
+2. `Inputs` — section, stable field identifier, engineering label, value, unit
+   and source state.
+3. `Selections` — select/radio state with stable field identifiers.
+4. One worksheet per production or time-series grid, with safe unique names
+   and units embedded in column labels when known.
+5. `Manifest` — export/schema versions, deployment revision, source checksum
+   and security policy declarations.
+
+All case-provided strings are neutralized before entering a cell, worksheet
+names are limited to Excel's 31-character rules, and duplicate names are made
+deterministically unique. The default workbook policy is values only:
+`formula_policy=none`, `external_links=none` and `macros=none`.
+
+The registry exposes this queued capability as `workbookCapability` and the
+dependency-free normalized model as `createWorkbookModel(...)`. It is not
+returned by the browser download `formatsFor('case')`; the UI must not offer
+Excel until an authenticated job endpoint, approved renderer, artifact scan
+and signed download path are deployed.
+
 ## Authorization and lifecycle
 
 - Visitors may export only the case currently present in their browser.
@@ -101,7 +133,9 @@ object model rather than PostgreSQL binary columns.
 ## Delivery sequence
 
 1. Current browser case: round-trippable JSON and spreadsheet-ready CSV.
-2. Versioned Excel workbooks for case inputs, result tables and time series.
+2. Versioned Excel workbook model for case inputs and time series, followed by
+   the queued XLSX renderer and signed delivery path. Result tables join the
+   model when calculation-run persistence is available.
 3. Deterministic PDF reports and SVG/PNG chart export.
 4. Object-storage attachments, photo/document collections and ZIP manifests.
 5. Queued project and organization portability archives with signed delivery.
@@ -109,4 +143,3 @@ object model rather than PostgreSQL binary columns.
 The initial implementation is intentionally browser-only and does not create a
 new server-side data store. It establishes the registry and security rules that
 the PostgreSQL/object-storage platform will reuse.
-

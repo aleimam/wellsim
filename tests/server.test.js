@@ -169,7 +169,7 @@ test('the portable build opens straight into its local case store', async () => 
     assert.match(html, /\/vendor\/plotly\.min\.js/, 'portable must serve the embedded Plotly');
     assert.ok(!/cdn\.plot\.ly/.test(html), 'portable must not reference the CDN');
     assert.match(html, /serviceWorker\.register/, 'portable must neuter service-worker registration');
-    assert.match(html, /\/export\.js\?v=2026-09-02b/, 'portable must load the shared export registry');
+    assert.match(html, /\/export\.js\?v=2026-09-02c/, 'portable must load the shared export registry');
     assert.equal((await rawGet(port, '/export.js')).status, 200, 'portable must serve the export registry');
 
     // the store the panel talks to answers WITHOUT a token...
