@@ -35,7 +35,12 @@ import {
   espSolutionPoint,
 } from '../core/vlp/esp.js';
 import { createOilInflow, createGasInflow, applyInflowFluids } from '../core/ipr/inflow.js';
-import { multiLayerOilRates, multiLayerOilCurves, multiLayerGasRates } from '../core/ipr/multilayer.js';
+import {
+  multiLayerOilRates,
+  multiLayerOilCurves,
+  multiLayerGasRates,
+  multiLayerGasCurves,
+} from '../core/ipr/multilayer.js';
 import {
   createGasIpr,
   calibrateDarcyToTestGas,
@@ -870,6 +875,11 @@ export function gasNodal(f) {
           warnings: inflow.warnings,
           layersAtOp:
             op.status === 'ok' ? multiLayerGasRates(op.pwfPsi, inflow.layers) : null,
+          // same per-layer curves as oil. The gas collapse is exact, so here
+          // the summed curve and the equivalent should lie on top of each
+          // other everywhere -- which makes the chart a live check on that
+          // claim rather than a restatement of it.
+          curves: multiLayerGasCurves(inflow.layers, { allowCrossflow: inflow.allowCrossflow }),
         }
       : null,
   };

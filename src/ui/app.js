@@ -1203,12 +1203,17 @@ function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX, opts = {}) {
 // layers would otherwise appear not to add up to it.
 const LAYER_COLORS = ['#4292c6', '#2C7048', '#8A6D1A', '#7038b0', '#00636D', '#93400A'];
 
+// Crossflow is judged on the layer's PRIMARY rate (gross liquid, or gas),
+// never on the plotted x quantity: a 100%-water oil layer has qOil = 0 and
+// would hide its own crossflow behind a lost sign.
+const mlRateOf = (p) => p.qGrossStbD ?? p.qMMscfd;
+
 function mlLayerTraces(r, xOf) {
   const ml = r.multiLayer;
   if (!ml?.curves?.layers?.length) return [];
   const atOp = ml.layersAtOp?.layers ?? [];
   const traces = ml.curves.layers.map((L, i) => {
-    const xflow = atOp[i] ? atOp[i].qGrossStbD < 0 : false;
+    const xflow = atOp[i] ? mlRateOf(atOp[i]) < 0 : false;
     return {
       x: L.curve.map(xOf),
       y: L.curve.map((p) => p.pwfPsi),
@@ -2970,7 +2975,8 @@ async function gasSolve() {
   ]);
   plotNodal('gas-chart-nodal', 'Gas rate, MMscf/d', r.iprCurve, r.vlpCurve,
     r.op ? { q: r.op.qMMscfd, pwfPsi: r.op.pwfPsi } : null,
-    (p) => p.qMMscfd, (p) => p.q);
+    (p) => p.qMMscfd, (p) => p.q,
+    { extra: mlLayerTraces(r, (p) => p.qMMscfd) });
   plotWhp('gas-chart-whp', 'Gas rate, MMscf/d', r.whpCurve, Number(val('gas-thpPsi')));
   setComputed('gas-prPsi', r.computed.prPsi, 1);
   const gasNodalTables = [
@@ -2984,12 +2990,29 @@ async function gasSolve() {
     },
   ];
   if (r.multiLayer?.layersAtOp) {
+    const lay = r.multiLayer.layersAtOp.layers;
+    const props = r.multiLayer.curves?.layers ?? [];
+    const tot = r.multiLayer.layersAtOp.totals;
+    // signed share, exactly as the oil table: a thief zone takes a negative
+    // percentage so the column still sums to 100%
     gasNodalTables.unshift({
-      title: 'Layers @ operating Pwf',
-      headers: ['layer', 'q MMscf/d', 'cond stb/d', 'water stb/d'],
-      rows: r.multiLayer.layersAtOp.layers.map((l) => [
-        l.name, fmt(l.qMMscfd, 3), fmt(l.qCondStbD, 0), fmt(l.qWaterStbD, 0),
-      ]),
+      title: `Layers @ operating Pwf ${r.op ? fmt(r.op.pwfPsi, 0) + ' psi' : ''}`,
+      headers: ['layer', 'Pr psi', 'J', 'q MMscf/d', 'cond stb/d', 'water stb/d', '% of gas', 'state'],
+      rows: lay.map((l, i) => {
+        const xflow = l.qMMscfd < 0;
+        const share = tot.qMMscfd !== 0 ? (l.qMMscfd / tot.qMMscfd) * 100 : null;
+        return [
+          l.name,
+          fmt(props[i]?.prPsi, 0),
+          fmt(props[i]?.j, 6),
+          fmt(l.qMMscfd, 3),
+          fmt(l.qCondStbD, 0),
+          fmt(l.qWaterStbD, 0),
+          share == null ? '—' : fmt(share, 1),
+          xflow ? 'CROSSFLOW — taking gas in' : 'producing',
+        ];
+      }),
+      rowClass: (row, i) => (lay[i].qMMscfd < 0 ? 'crossflow' : ''),
     });
   }
   renderTables('gas-table-nodal', gasNodalTables);

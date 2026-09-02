@@ -11,6 +11,7 @@ import {
   prAvgOil,
   equivalentOilIpr,
   multiLayerGasRates,
+  multiLayerGasCurves,
   equivalentGasIpr,
 } from '../src/core/ipr/multilayer.js';
 
@@ -180,4 +181,58 @@ test('curve carries what the layer table prints', () => {
     assert.ok(Number.isFinite(L.j) && L.j > 0, `j ${L.j}`);
     assert.ok(L.name, "layer needs a name for the legend");
   }
+});
+
+// ---- gas per-layer curves ----
+// Same construction as oil, but with one extra property worth pinning: the gas
+// collapse is EXACT (J_t = sum J_i), so unlike oil the summed layer curve and
+// the equivalent single record must agree at EVERY Pwf, not just at a solution
+// point. That is the claim the chart now draws, so it is tested here.
+test('gas per-layer curves sum to the total, and match the exact equivalent everywhere', () => {
+  const G1 = { name: 'G1', ipr: createGasIpr({ j: 2e-3, priPsi: 3800 }), cgrStbMMscf: 60, wgrStbMMscf: 4 };
+  const G2 = { name: 'G2', ipr: createGasIpr({ j: 1e-3, priPsi: 3200 }), cgrStbMMscf: 10, wgrStbMMscf: 20 };
+  const layers = [G1, G2];
+
+  for (const allowCrossflow of [true, false]) {
+    const { layers: per, total } = multiLayerGasCurves(layers, { points: 10, allowCrossflow });
+    assert.equal(per.length, 2);
+    for (let i = 0; i < total.length; i++) {
+      for (const k of ['qMMscfd', 'qCondStbD', 'qWaterStbD']) {
+        const summed = per.reduce((a, L) => a + L.curve[i][k], 0);
+        assert.ok(
+          Math.abs(summed - total[i][k]) < 1e-12,
+          `${k} at Pwf ${total[i].pwfPsi}: layers ${summed} vs total ${total[i][k]}`
+        );
+      }
+      for (const L of per) assert.equal(L.curve[i].pwfPsi, total[i].pwfPsi);
+    }
+  }
+
+  // exactness of the collapse, measured against the curve the chart draws.
+  // Only where no layer is injecting: above G2's Pr the equivalent record and
+  // the crossflowing sum legitimately differ in what they represent.
+  const eq = equivalentGasIpr(layers);
+  const { total } = multiLayerGasCurves(layers, { points: 10 });
+  for (const p of total.filter((x) => x.pwfPsi <= 3200)) {
+    // eq.ipr is the equivalent record itself -- no fallback, or a regression
+    // that stopped returning it would quietly rebuild one and still pass
+    close(qGasAtPwfJ(p.pwfPsi, eq.ipr), p.qMMscfd, 1e-9);
+  }
+});
+
+test('gas: a depleted layer takes gas IN above its own Pr', () => {
+  const G1 = { name: 'G1', ipr: createGasIpr({ j: 2e-3, priPsi: 3800 }), cgrStbMMscf: 60, wgrStbMMscf: 4 };
+  const G2 = { name: 'G2', ipr: createGasIpr({ j: 1e-3, priPsi: 3200 }), cgrStbMMscf: 10, wgrStbMMscf: 20 };
+  const { layers: per } = multiLayerGasCurves([G1, G2], { points: 20, allowCrossflow: true });
+  const weak = per.find((L) => L.prPsi === 3200);
+  const above = weak.curve.filter((p) => p.pwfPsi > 3200);
+  assert.ok(above.length > 0, 'grid must reach above the weak layer Pr');
+  assert.ok(above.every((p) => p.qMMscfd < 0), 'gas must flow INTO the depleted layer');
+
+  const clamped = multiLayerGasCurves([G1, G2], { points: 20, allowCrossflow: false });
+  const weakC = clamped.layers.find((L) => L.prPsi === 3200);
+  assert.ok(
+    weakC.curve.filter((p) => p.pwfPsi > 3200).every((p) => p.qMMscfd === 0),
+    'with crossflow disallowed the injecting layer sits at zero'
+  );
 });

@@ -206,6 +206,38 @@ export function multiLayerGasRates(pwfPsi, layers, { allowCrossflow = true } = {
  * PrAvg = sqrt(sum(J_i Pr_i^2)/sum(J_i)) — the collapse is exact at every
  * Pwf, not just a match point. Throws for C&n layers (no exact collapse).
  */
+/**
+ * Per-layer gas IPR curves on a shared Pwf grid — the oil function's twin, and
+ * for the same reason: one multiLayerGasRates call per grid point, so the
+ * layers sum to the total by construction rather than by a second pass that
+ * could drift from it.
+ *
+ * Note the gas collapse IS exact (J_t = ΣJᵢ, PrAvg = √(ΣJᵢPrᵢ²/ΣJᵢ)), so
+ * unlike oil the summed curve and the equivalent record agree everywhere, not
+ * only at a solution point. The summed curve is still returned: it costs
+ * nothing, it keeps the two modules reading the same, and it turns that
+ * exactness into something visible on the chart instead of a claim in a doc.
+ */
+export function multiLayerGasCurves(layers, { points = 25, allowCrossflow = true } = {}) {
+  const top = Math.max(...layers.map((l) => l.ipr.prPsi));
+  const per = layers.map((l) => ({
+    name: l.name,
+    prPsi: l.ipr.prPsi,
+    j: l.ipr.j,
+    cgrStbMMscf: l.cgrStbMMscf,
+    wgrStbMMscf: l.wgrStbMMscf,
+    curve: [],
+  }));
+  const total = [];
+  for (let i = 0; i <= points; i++) {
+    const pwfPsi = top * (1 - i / points);
+    const r = multiLayerGasRates(pwfPsi, layers, { allowCrossflow });
+    r.layers.forEach((lr, k) => per[k].curve.push({ pwfPsi, ...lr }));
+    total.push({ pwfPsi, ...r.totals });
+  }
+  return { layers: per, total };
+}
+
 export function equivalentGasIpr(layers) {
   if (layers.some((l) => l.ipr.c != null))
     throw new Error('equivalentGasIpr: exact collapse needs J-form layers (C&n layers have no closed-form equivalent)');

@@ -190,3 +190,43 @@ test('a depleted layer below the operating Pwf is reported as taking fluid in', 
     'producing layer must exceed the well total when another layer is thieving'
   );
 });
+
+test('gas nodal ships per-layer curves, and its exact collapse shows on the chart', () => {
+  const r = gasNodal({
+    ...GAS_BASE,
+    mlMode: 'multi',
+    mlLayers: [
+      { permMd: 5, thicknessFt: 80, skin: 0, prPsi: 3800, cgrStbMMscf: 60, wgrStbMMscf: 4 },
+      { permMd: 3, thicknessFt: 40, skin: 0, prPsi: 3200, cgrStbMMscf: 10, wgrStbMMscf: 20 },
+    ],
+  });
+  assert.ok(!r.error, r.error);
+  const c = r.multiLayer.curves;
+  assert.ok(c, 'curves block expected');
+  assert.equal(c.layers.length, 2);
+  for (let i = 0; i < c.total.length; i++) {
+    const summed = c.layers.reduce((a, L) => a + L.curve[i].qMMscfd, 0);
+    assert.ok(
+      Math.abs(summed - c.total[i].qMMscfd) < 1e-12,
+      `at Pwf ${c.total[i].pwfPsi}: layers ${summed} vs total ${c.total[i].qMMscfd}`
+    );
+  }
+  for (const L of c.layers) assert.ok(L.name && L.prPsi > 0 && L.j > 0, JSON.stringify(L.name));
+  assert.equal(c.total[0].pwfPsi, 3800);
+});
+
+test('gas: a depleted layer below the operating Pwf is reported as taking gas in', () => {
+  const r = gasNodal({
+    ...GAS_BASE,
+    mlMode: 'multi',
+    mlLayers: [
+      { permMd: 5, thicknessFt: 80, skin: 0, prPsi: 3800, cgrStbMMscf: 60, wgrStbMMscf: 4 },
+      { permMd: 3, thicknessFt: 40, skin: 0, prPsi: 1500, cgrStbMMscf: 10, wgrStbMMscf: 20 },
+    ],
+  });
+  assert.ok(!r.error, r.error);
+  assert.equal(r.opStatus, 'ok');
+  const weak = r.multiLayer.layersAtOp.layers[1];
+  assert.ok(weak.qMMscfd < 0, `depleted layer should take gas in, got ${weak.qMMscfd}`);
+  assert.ok(r.multiLayer.layersAtOp.warnings.some((w) => /crossflow/i.test(w)), 'crossflow warning');
+});

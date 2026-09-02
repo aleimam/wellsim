@@ -348,6 +348,15 @@ how much of the producing layers’ output is being pushed back downhole. On
 the shipped demo, dropping layer 2 to Pr 1800 psi against a ~2700 psi
 operating Pwf gives L1 132% and L2 −32%.
 
+**The gas well model does the same**, with `% of gas` in place of `% of gross`
+and *taking gas in* on a thief layer — the gas demo with layer 2 at Pr 1500
+reads L1 147.1% and L2 −47.1%. One difference is worth knowing: the gas
+collapse is **exact** (J_t = ΣJᵢ), so there the summed curve and the solid
+equivalent IPR coincide at *every* pressure rather than only at a solution
+point, and any visible daylight between them means something is wrong. Oil's
+two curves are expected to separate away from the solution point; gas's are
+not.
+
 **Fitting the total J to the test (K is the solver):** with Multi-layer
 active, *Calibrate from test* also fits the commingled system — the Jones/test
 J is computed against the theoretical average pressure, and **every layer
