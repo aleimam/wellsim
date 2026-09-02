@@ -4,7 +4,10 @@
 
 Auth0 is the selected dedicated provider for **bldrz.net only**. The local
 comparison branch implements MFA step-up and migration `0006_administrator_mfa`.
-No Auth0 tenant/application/Action has been configured, no paid plan has been
+The user is signed into the US development tenant `dev-mfke2ibpyq53l133`.
+The `bldrz Comparison` Regular Web Application form is prepared, but Create has
+not been submitted: security-sensitive client creation/configuration awaits
+confirmation. No application/Action has been installed, no paid plan has been
 purchased, and no live MFA migration or authentication activation has occurred.
 The last verified live release is `d5187b4`, schema 0001–0005, with authentication,
 onboarding and legacy persistence disabled. `wellsim.app` is outside this work.
@@ -113,6 +116,36 @@ unchanged. The real recovery identity stays off-server.
   sessions automatically; local logout, expiry or local disablement does.
 - Independent scheduled backups, retention, failure alerts and a second durable
   recovery-key copy before real customer persistence. Capacity remains unproven.
+
+## Qualification receipt — 2 September 2026
+
+Candidate `6a013dd8a6d9e67d9b312c06920020ec46d1819c` passed:
+
+- 318/318 automated tests across 36 files and 43/43 engineering sweep checks.
+- `npm audit --omit=dev` reported zero vulnerabilities at qualification time.
+- `NATIVE_ONBOARDING_VERIFICATION_OK (14 groups)` on native PostgreSQL with
+  two independent application pools, including actual observed lock waits for
+  session revocation during step-up and MFA expiry during company management.
+- `BLDRZ_RESTORE_DRILL_OK`, catalog checks, both-direction company isolation,
+  identity/onboarding and MFA after an encrypted synthetic round trip.
+- Visual inspection of the MFA panel in the synthetic, loopback-only preview.
+  This is not real-provider enrollment or browser-MFA acceptance evidence.
+
+Source archive SHA-256:
+`4d634707bd938f5f975f6a2e697a79d00b649d5057de0f1b453f0a2ac712acef`.
+The staged source is `/opt/bldrz/staging/mfa-6a013dd`; it is not the active app.
+Recovery source: retained off-server bundle
+`bldrz-20260902T164102.168037194Z`. All four transfer checksums and local dump
+decryption passed. Restored source-data fingerprint matched the release:
+`85f0b979d29a0e6367226bb68640a649036ca3bdd8a4b8ce73648b5a26ec0a88`.
+
+The disposable native database, private restore cluster, temporary plaintext
+dump copies on both machines and local preview process were removed/stopped.
+Encrypted source backups remain. Live migration history stayed 0001–0005;
+`bldrz.service` PID 19195 and `wellsim.service` PID 1887 remained unchanged.
+The implementation is committed locally, not pushed or deployed. Provider
+creation, MFA factors/recovery, real browser tests and activation gates above
+remain unfinished.
 
 ## Primary references
 
