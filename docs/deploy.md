@@ -128,6 +128,17 @@ systemctl is-active postgresql bldrz wellsim caddy
 ufw status numbered
 ```
 
+### bldrz database recovery
+
+An encrypted manual off-server PostgreSQL backup and fresh-cluster restore
+drill passed on 2 September 2026, including reconstructed least-privilege
+roles, ownership/ACLs, data checksums and two-company isolation after restore.
+See [bldrz recovery](architecture/bldrz-recovery.md) for evidence and the
+repeatable scripts. Its timer remains disabled pending an approved independent
+destination, upload verification, retention, alerts and redundant key custody.
+This work does not replace or modify the separate WellSim backup described
+below. Customer persistence remains gated.
+
 Deploy only a committed branch revision using `git archive`; never copy the
 working tree or secrets. Before switching DNS, verify the comparison service
 locally through `127.0.0.1:3356`, validate the complete Caddy configuration,
