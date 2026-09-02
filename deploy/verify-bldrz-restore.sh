@@ -6,6 +6,8 @@ umask 077
 test "$(id -u)" = 0
 APP_DIR=${1:?absolute qualified source directory required}
 DUMP=${2:?absolute decrypted dump path required}
+MODE=${3:-restored-schema}
+case "$MODE" in restored-schema|qualify-onboarding) ;; *) echo 'Invalid drill mode' >&2; exit 1 ;; esac
 test -f "$DUMP"
 PG_BIN=/usr/lib/postgresql/16/bin
 AGE_DIR=/opt/bldrz/tools/age-v1.3.2/age
@@ -60,8 +62,19 @@ admin "$PG_BIN/pg_dump" -h "$DRILL" -p 55432 --schema-only bldrz_restore_probe |
 admin "$PG_BIN/pg_dump" -h "$DRILL" -p 55432 --data-only --table=app.schema_migration \
   --table=app.permission_definition --table=app.role_definition --table=app.role_permission bldrz_restore_probe |
   psql_drill -d bldrz_pool_probe
+if [ "$MODE" = qualify-onboarding ]; then
+  # Candidate migrations touch only the empty synthetic clone, not the live
+  # database or the recovered source copy. Qualify their encrypted round trip
+  # before the same guarded transaction is applied to the live bldrz database.
+  bash "$APP_DIR/deploy/render-bldrz-onboarding.sh" "$APP_DIR" | psql_drill -d bldrz_pool_probe
+  psql_drill -d bldrz_pool_probe < "$APP_DIR/db/ops/verify-bldrz-catalog.sql"
+fi
 psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/pool-probe.sql"
 psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/recovery-probe.sql"
+IDENTITY=$(psql_drill -At -d bldrz_pool_probe -c "SELECT EXISTS (SELECT FROM app.schema_migration WHERE version='0005_controlled_onboarding')")
+if [ "$IDENTITY" = t ]; then
+  psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/recovery-identity.sql"
+fi
 BEFORE=$(fingerprint bldrz_pool_probe)
 # This disposable key protects SYNTHETIC test data only, and is removed with
 # the temporary cluster. It is unrelated to the off-server recovery identity.
@@ -77,4 +90,7 @@ test "$BEFORE" = "$AFTER"
 printf 'RECOVERY_SYNTHETIC_DATA_MATCH_OK\n'
 psql_drill -d bldrz_restore_security < "$APP_DIR/db/ops/verify-bldrz-catalog.sql"
 psql_drill -d bldrz_restore_security < "$APP_DIR/db/ops/verify-bldrz-recovery.sql"
+if [ "$IDENTITY" = t ]; then
+  psql_drill -d bldrz_restore_security < "$APP_DIR/db/ops/verify-bldrz-identity-recovery.sql"
+fi
 printf 'BLDRZ_RESTORE_DRILL_OK\n'

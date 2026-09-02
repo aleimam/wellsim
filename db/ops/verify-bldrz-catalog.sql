@@ -3,10 +3,23 @@
 DO $verify$
 DECLARE
   found_count integer;
+  versions text[];
+  identity_enabled boolean;
 BEGIN
   IF current_database() NOT IN ('bldrz', 'bldrz_restore_probe',
       'bldrz_pool_probe', 'bldrz_restore_security') THEN
     RAISE EXCEPTION 'unexpected recovery database';
+  END IF;
+  SELECT array_agg(version ORDER BY version) INTO versions FROM app.schema_migration;
+  IF versions IS NOT DISTINCT FROM ARRAY['0001_platform_foundation', '0002_tenant_isolation',
+      '0003_personal_workspace_integrity']::text[] THEN
+    identity_enabled := false;
+  ELSIF versions IS NOT DISTINCT FROM ARRAY['0001_platform_foundation', '0002_tenant_isolation',
+      '0003_personal_workspace_integrity', '0004_verified_sessions',
+      '0005_controlled_onboarding']::text[] THEN
+    identity_enabled := true;
+  ELSE
+    RAISE EXCEPTION 'unexpected migration history';
   END IF;
   SELECT count(*) INTO found_count FROM pg_roles WHERE rolname IN
     ('bldrz_app', 'bldrz_runtime', 'bldrz_migration_owner');
@@ -59,14 +72,14 @@ BEGIN
   SELECT count(*) INTO found_count FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'app' AND c.relrowsecurity;
-  IF found_count <> 22 OR (SELECT count(*) FROM pg_policy p
+  IF found_count <> CASE WHEN identity_enabled THEN 25 ELSE 22 END OR (SELECT count(*) FROM pg_policy p
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'app') <> 54
     OR EXISTS (SELECT FROM pg_policy p
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'app'
         AND p.polroles <> ARRAY['bldrz_runtime'::regrole::oid]) THEN
-    RAISE EXCEPTION 'RLS policy set does not match migrations 0001-0003';
+    RAISE EXCEPTION 'RLS policy set does not match the qualified migration history';
   END IF;
   IF has_table_privilege('bldrz_runtime', 'app.engineering_case', 'DELETE') OR
     has_column_privilege('bldrz_runtime', 'app.engineering_case', 'workspace_id', 'UPDATE') OR
@@ -74,10 +87,29 @@ BEGIN
     has_table_privilege('bldrz_runtime', 'app.export_item', 'UPDATE') THEN
     RAISE EXCEPTION 'protected records or ownership are mutable';
   END IF;
-  IF (SELECT array_agg(version ORDER BY version) FROM app.schema_migration)
-      IS DISTINCT FROM ARRAY['0001_platform_foundation', '0002_tenant_isolation',
-        '0003_personal_workspace_integrity']::text[] THEN
-    RAISE EXCEPTION 'migration history was not preserved';
+  IF identity_enabled THEN
+    IF EXISTS (SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='app' AND c.relname IN ('login_transaction','web_session','authentication_event')
+          AND has_table_privilege('bldrz_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE')) OR
+      has_table_privilege('bldrz_runtime','app.membership','INSERT') OR
+      has_any_column_privilege('bldrz_runtime','app.membership','UPDATE') OR
+      has_table_privilege('bldrz_runtime','app.workspace_invitation','INSERT') OR
+      has_any_column_privilege('bldrz_runtime','app.workspace_invitation','UPDATE') THEN
+      RAISE EXCEPTION 'identity or membership tables bypass the guarded function boundary';
+    END IF;
+    SELECT count(*) INTO found_count FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='app' AND p.proname IN ('auth_create_flow','auth_consume_flow',
+        'auth_revoke_session','auth_create_session','auth_read_session','auth_list_workspaces',
+        'onboarding_sign_in','onboarding_command');
+    IF found_count <> 8 OR EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='app' AND (p.proname LIKE 'auth\_%' ESCAPE '\' OR p.proname LIKE 'onboarding\_%' ESCAPE '\')
+          AND (NOT p.prosecdef OR p.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog']::text[]
+            OR NOT has_function_privilege('bldrz_runtime',p.oid,'EXECUTE')
+            OR has_function_privilege('bldrz_app',p.oid,'EXECUTE')
+            OR EXISTS (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+              WHERE a.grantee=0))) THEN
+      RAISE EXCEPTION 'identity function privileges or fixed search path were not preserved';
+    END IF;
   END IF;
 END
 $verify$;
