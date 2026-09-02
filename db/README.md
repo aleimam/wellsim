@@ -6,6 +6,12 @@ isolated `bldrz` comparison database. The web process verifies its least-
 privilege connection at startup, but no authenticated v2 data route is exposed
 and the database contains no customer data.
 
+Local migration `0004_verified_sessions.sql` adds provisioned OIDC identity
+mapping and shared server-side sessions. It is **not applied to live bldrz**.
+Authentication is off by default; provider approval, backup qualification and
+controlled activation are documented in
+[verified authentication](../docs/architecture/identity-authentication.md).
+
 ## Migration order
 
 Apply `db/migrations/*.sql` once, in lexical order, with a dedicated migration

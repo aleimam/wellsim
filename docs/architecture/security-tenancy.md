@@ -107,6 +107,12 @@ connection reuse and error recovery in a disposable schema clone.
   owners.
 - Never store bearer tokens in browser local storage.
 
+The local provisioned-access implementation uses verified OIDC code flow,
+shared opaque PostgreSQL sessions and read-only workspace discovery. It does
+not auto-link emails, register accounts or accept invitations. Public
+authentication remains disabled; see [verified authentication](identity-authentication.md)
+for the tests, exact scope and remaining provider/activation decisions.
+
 The final identity product/provider decision is an ADR because deployment,
 cost and customer federation requirements affect it. Authorization and tenant
 ownership stay inside WellSim regardless of that choice.

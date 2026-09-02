@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { handlers as apiHandlers } from './api.js';
 import { accountHandlers } from './accounts.js';
 import { initializeDatabase } from './database.js';
+import { initializeAuthentication } from './auth-http.js';
 
 let database;
 try {
@@ -17,8 +18,14 @@ try {
   console.error(`Database startup failed: ${error.message}`);
   process.exit(1);
 }
-// No v2 data handler is exposed yet. Future authenticated handlers must use
-// database.withTenantTransaction with server-verified identity and workspace.
+let authentication;
+try {
+  authentication = await initializeAuthentication(database);
+} catch {
+  console.error('Verified authentication startup failed');
+  await database.close();
+  process.exit(1);
+}
 
 // free version stays: every calculation endpoint is open; accounts only add
 // the per-company server case database
@@ -92,6 +99,7 @@ const SEC_HEADERS = {
 const server = http.createServer(async (req, res) => {
   for (const [k, v] of Object.entries(SEC_HEADERS)) res.setHeader(k, v);
   try {
+    if (await authentication(req, res)) return;
     if (req.url.startsWith('/api/')) {
       const key = req.url.slice(5).split('?')[0];
       const h = handlers[key];

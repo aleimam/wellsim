@@ -277,6 +277,7 @@ test('PostgreSQL migrations enable RLS and a non-bypass runtime role', async () 
     '0001_platform_foundation',
     '0002_tenant_isolation',
     '0003_personal_workspace_integrity',
+    '0004_verified_sessions',
   ]);
 
   const role = await db.query(

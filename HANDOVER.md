@@ -3,7 +3,7 @@
 **Reference production:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
 **Repo:** https://github.com/aleimam/wellsim
 **Live production revision:** 30 August 2026 — commit `c6f1caa`, asset stamp
-`2026-08-30k`. **Current working tree:** 267 tests passing and 43/43 validation
+`2026-08-30k`. **Current working tree:** 282 tests passing and 43/43 validation
 sweep. The separate `bldrz` database has migrations `0001`–`0003`, with
 least-privilege roles and an opt-in, bounded PostgreSQL connection pool.
 
@@ -25,7 +25,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 33 test files.
+`nodal`, `reserve`, `solvers`), 35 test files.
 
 ## 2. Running it
 
@@ -38,7 +38,7 @@ The web server uses Node built-ins plus `pg` for opt-in PostgreSQL. The UI is
 plain HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 267 unit, regression and security tests
+node --test                       # 282 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -83,7 +83,7 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               33 files — workbook cell pins, physics regressions, and
+tests/               35 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)
@@ -138,6 +138,12 @@ private; neither belongs in a repository. They **are** in the F: backup.
   off-server retention/alerts/key redundancy remain gates. The new bldrz
   backup timer is deliberately not enabled yet. See
   **docs/architecture/bldrz-recovery.md**.
+- **Provisioned OIDC authentication is implemented locally, not activated.**
+  Migration `0004_verified_sessions`, server-side sessions and read-only
+  company/private-workspace discovery are feature-gated. No provider has been
+  selected/configured, no live migration applied, and public signup/invitations
+  remain off. See **docs/architecture/identity-authentication.md** for the
+  verified boundary and activation checklist.
 - **Charts are drawn by Plotly at their container's width**, and that width is
   often wrong at draw time — the container is hidden, or its flex layout has
   not settled, or the web font has not loaded. This caused a long tail of

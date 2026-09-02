@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createAuthRepository, runAuthStatement } from '../src/server/auth-repository.js';
 import {
   databaseConfigFromEnv, initializeDatabase, runTenantTransaction, TenantAccessError,
 } from '../src/server/database.js';
@@ -157,4 +158,37 @@ test('startup checks privileges, limits admission, closes pools and sanitizes fa
     PoolClass: class { constructor() { return unsafe; } },
   }), /^Error: PostgreSQL startup boundary check failed$/);
   assert.equal(unsafe.ended, true);
+});
+
+test('identity SQL resets tenant context, binds arguments and discards failed rollback connections', async () => {
+  const pool = fakePool();
+  const repository = createAuthRepository((text, values) => runAuthStatement(pool, config, text, values));
+  await repository.readSession('a'.repeat(64));
+  assert.ok(pool.calls[2].text.includes("set_config('app.user_id', '', true)"));
+  assert.equal(pool.calls[3].query.queryMode, 'extended');
+  assert.deepEqual(pool.calls[3].values, ['a'.repeat(64)]);
+  assert.equal(pool.calls.at(-1).text, 'COMMIT');
+  for (const brokenRollback of [false, true]) {
+    const failing = fakePool((text) => {
+      if (text.startsWith('SELECT * FROM app.auth_') || (brokenRollback && text === 'ROLLBACK')) throw new Error('failure');
+    });
+    await assert.rejects(runAuthStatement(failing, config, 'SELECT * FROM app.auth_read_session($1)', ['a'.repeat(64)]));
+    assert.deepEqual(failing.releases, [brokenRollback]);
+  }
+  await assert.rejects(runAuthStatement(pool, { ...config, runtimeRole: 'role;RESET ROLE' }, 'SELECT 1', []));
+});
+
+test('identity operations share pool admission and reject unsafe identity-function privileges', async () => {
+  const pool = fakePool();
+  const runtime = await initializeDatabase({ ...env, WELLSIM_DB_MAX_PENDING: '1' }, {
+    PoolClass: class { constructor() { return pool; } },
+  });
+  let finish;
+  const running = runtime.withTenantTransaction(context, () => new Promise((resolve) => { finish = resolve; }));
+  await assert.rejects(runtime.auth.readSession('a'.repeat(64)), { code: 'database_busy' });
+  while (!finish) await new Promise(setImmediate);
+  finish(); await running;
+  await assert.rejects(runtime.auth.ready(), /Unsafe identity repository/);
+  await runtime.close();
+  await assert.rejects(runtime.auth.readSession('a'.repeat(64)), /shutting down/);
 });

@@ -1,6 +1,7 @@
 // The only database boundary for future authenticated v2 handlers. Identity
 // must come from the server's verified session, never directly from a body.
 import pg from 'pg';
+import { createAuthRepository, runAuthStatement } from './auth-repository.js';
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -195,18 +196,23 @@ export async function initializeDatabase(env = process.env, {
   }
   let pending = 0;
   let closed = false;
+  async function admit(operation) {
+    if (closed) throw new Error('Database is shutting down');
+    if (pending >= config.maxPending) {
+      const error = new Error('Database is busy; retry later');
+      error.code = 'database_busy';
+      throw error;
+    }
+    pending += 1;
+    try { return await operation(); }
+    finally { pending -= 1; }
+  }
   return Object.freeze({
     enabled: true,
+    auth: createAuthRepository((text, values) =>
+      admit(() => runAuthStatement(pool, config, text, values))),
     async withTenantTransaction(context, operation) {
-      if (closed) throw new Error('Database is shutting down');
-      if (pending >= config.maxPending) {
-        const error = new Error('Database is busy; retry later');
-        error.code = 'database_busy';
-        throw error;
-      }
-      pending += 1;
-      try { return await runTenantTransaction(pool, config, context, operation); }
-      finally { pending -= 1; }
+      return admit(() => runTenantTransaction(pool, config, context, operation));
     },
     async close() {
       closed = true;
