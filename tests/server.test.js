@@ -100,7 +100,7 @@ test('static serving stays inside src/ui, and every real asset still loads', asy
 
     // and the guard must not have cost us the app: every asset index.html
     // actually asks for has to come back
-    for (const asset of ['/', '/app.js', '/style.css', '/help.html', '/favicon.svg', '/sw.js', '/manifest.webmanifest']) {
+    for (const asset of ['/', '/app.js', '/export.js', '/style.css', '/help.html', '/favicon.svg', '/sw.js', '/manifest.webmanifest']) {
       const res = await rawGet(port, asset);
       assert.equal(res.status, 200, `${asset} must be served, got ${res.status}`);
       assert.ok(res.body.length > 0, `${asset} came back empty`);
@@ -169,6 +169,8 @@ test('the portable build opens straight into its local case store', async () => 
     assert.match(html, /\/vendor\/plotly\.min\.js/, 'portable must serve the embedded Plotly');
     assert.ok(!/cdn\.plot\.ly/.test(html), 'portable must not reference the CDN');
     assert.match(html, /serviceWorker\.register/, 'portable must neuter service-worker registration');
+    assert.match(html, /\/export\.js\?v=2026-09-02b/, 'portable must load the shared export registry');
+    assert.equal((await rawGet(port, '/export.js')).status, 200, 'portable must serve the export registry');
 
     // the store the panel talks to answers WITHOUT a token...
     const list = JSON.parse((await rawGet(port, '/api/cases/list')).body);

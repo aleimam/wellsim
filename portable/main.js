@@ -31,7 +31,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
-const ASSETS = ['index.html', 'app.js', 'style.css', 'help.html', 'favicon.svg', 'vendor/plotly.min.js'];
+const ASSETS = ['index.html', 'app.js', 'export.js', 'style.css', 'help.html', 'favicon.svg', 'vendor/plotly.min.js'];
 
 // The web app installs a service worker so it works offline. The portable is
 // already offline — everything it serves is inside the exe — and a worker here

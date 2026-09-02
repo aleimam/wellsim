@@ -3097,18 +3097,87 @@ function applyCase(c) {
   switchGasIpr();
 }
 
+function exportFieldMeta() {
+  const metadata = {};
+  document.querySelectorAll('main input[id], main select[id]').forEach((el) => {
+    const row = el.closest('.frow');
+    const labelEl = row?.querySelector('label');
+    const unit = labelEl?.querySelector('.unit')?.textContent?.trim() ?? '';
+    const label = labelEl?.firstChild?.textContent?.trim() || el.id;
+    const panel = el.closest('.panel')?.id?.replace(/^panel-/, '') || 'case';
+    metadata[el.id] = { label, unit, section: panel };
+  });
+  return metadata;
+}
+
+function caseExportArtifact(formatId, baseName) {
+  if (!globalThis.WellSimExport) throw new Error('export service did not load');
+  return globalThis.WellSimExport.createArtifact(collectCase(), formatId, {
+    baseName,
+    fieldMeta: exportFieldMeta(),
+  });
+}
+
+function downloadArtifact(artifact) {
+  const blob = new Blob([artifact.content], { type: artifact.mediaType });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = artifact.filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
 function saveCaseAs() {
   let name;
   try { name = prompt('Save case as', 'wellsim-case.json'); } catch { name = 'wellsim-case.json'; }
   if (name === null) return; // cancelled
   if (!name) name = 'wellsim-case.json';
-  if (!name.endsWith('.json')) name += '.json';
-  const blob = new Blob([JSON.stringify(collectCase(), null, 1)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  try {
+    const artifact = caseExportArtifact('case-json', name);
+    downloadArtifact(artifact);
+    showOk(`Downloaded ${artifact.filename}`);
+  } catch (e) {
+    showError(`could not export case: ${e.message}`);
+  }
+}
+
+function syncExportFormat() {
+  const format = globalThis.WellSimExport?.formats.find(
+    (candidate) => candidate.id === document.getElementById('export-format').value
+  );
+  document.getElementById('export-note').textContent = format?.description ?? '';
+}
+
+function initExportPanel() {
+  const select = document.getElementById('export-format');
+  const formats = globalThis.WellSimExport?.formatsFor('case') ?? [];
+  select.innerHTML = formats.map((format) => `<option value="${format.id}">${format.label}</option>`).join('');
+  syncExportFormat();
+}
+
+function toggleExportPanel(force) {
+  const panel = document.getElementById('export-panel');
+  const show = force ?? panel.style.display === 'none';
+  panel.style.display = show ? '' : 'none';
+  if (show) {
+    document.getElementById('acct-panel').style.display = 'none';
+    const name = document.getElementById('export-name');
+    if (!name.value.trim() || name.value === 'wellsim-case') name.value = `wellsim-${collectCase().activeTab}-case`;
+  }
+}
+
+function exportCurrentCase() {
+  try {
+    const artifact = caseExportArtifact(
+      document.getElementById('export-format').value,
+      document.getElementById('export-name').value
+    );
+    downloadArtifact(artifact);
+    toggleExportPanel(false);
+    showOk(`Downloaded ${artifact.filename}`);
+  } catch (e) {
+    showError(`could not export case: ${e.message}`);
+  }
 }
 
 function openCaseFile(file) {
@@ -3522,6 +3591,11 @@ document.getElementById('mb-inputs').onclick = () => setMobileView('inputs');
 document.getElementById('mb-results').onclick = () => setMobileView('results');
 document.getElementById('save-case').onclick = (e) => { e.preventDefault(); saveCaseAs(); };
 document.getElementById('open-case').onclick = (e) => { e.preventDefault(); document.getElementById('open-case-file').click(); };
+document.getElementById('export-link').onclick = (e) => { e.preventDefault(); toggleExportPanel(); };
+document.getElementById('export-format').onchange = syncExportFormat;
+document.getElementById('export-download').onclick = exportCurrentCase;
+document.getElementById('export-close').onclick = () => toggleExportPanel(false);
+initExportPanel();
 document.getElementById('open-case-file').onchange = (e) => {
   if (e.target.files?.[0]) openCaseFile(e.target.files[0]);
   e.target.value = '';
@@ -3529,6 +3603,7 @@ document.getElementById('open-case-file').onchange = (e) => {
 document.getElementById('acct-link').onclick = (e) => {
   e.preventDefault();
   if (!acctCapabilities.enabled) return;
+  toggleExportPanel(false);
   const p = document.getElementById('acct-panel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
   if (p.style.display !== 'none' && acct) acctRefresh();

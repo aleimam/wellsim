@@ -34,7 +34,7 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-246 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+251 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries.
 
@@ -61,7 +61,7 @@ src/core/reserve/     gas-reserve (Pres solver, p/Z, SITHP march, gauge p/Z, res
 src/core/solvers/     brent
 src/server/           server.js (built-in http), api.js (form -> core mapping),
                       accounts.js (disabled-by-default legacy case-store compatibility)
-src/ui/               index.html, style.css, app.js, help.html (in-app manual)
+src/ui/               index.html, style.css, app.js, export.js, help.html (in-app manual)
 tests/                node:test suites
 scripts/              validation-sweep.mjs (43-case module-vs-workbook sweep)
 docs/                 user-guide.md, equations.md, deploy.md
@@ -70,19 +70,22 @@ docs/                 user-guide.md, equations.md, deploy.md
 ## The website
 
 The header bar carries the three well tabs (**Oil | Water | Gas**) plus
-**Save as · Open · Print report · Help**. A server-case link appears only
+**Save as · Open · Export · Print / PDF · Help**. A server-case link appears only
 when a supported case store reports itself available:
 
 - **Save as / Open** — the whole case (every input, selection and production
   table across all tabs) to/from a JSON file.
-- **Print report** — results-only clean page (charts, tables, summaries);
+- **Export** — download the current case as restorable WellSim JSON or its
+  inputs and production rows as spreadsheet-ready CSV. The CSV is
+  human-readable and is not a restorable case.
+- **Print / PDF** — results-only clean page (charts, tables, summaries);
   "Save as PDF" in the browser dialog makes the shareable report.
 - **Server cases** — the old JSON company store is disabled by default because
   a typed company slug is not proof of membership. It can be enabled only as
   an invite-gated migration aid; it is not the future tenant model. The
   portable program still exposes its local case folder through this link.
 - **Visitor use stays complete** — every calculation, browser autosave, Save as,
-  Open and Print report workflow works without an account.
+  Open, Export and Print/PDF workflow works without an account.
 - **Help** — the full in-app manual at `/help.html` (user guide + every
   equation, constant and workbook deviation).
 

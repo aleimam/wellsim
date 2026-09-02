@@ -32,6 +32,7 @@ to combine four capabilities:
 | UI composition | Shared application shell plus registered engineering modules |
 | Heavy/safety-critical simulation | Integrate and catalogue before considering reimplementation |
 | Existing physics | Preserve behind adapters; do not rewrite during platform migration |
+| Export/data portability | Registered formats over canonical data; background jobs for large artifacts |
 
 Microservices are not the starting point. The expected scale—tens to hundreds
 of concurrent users—does not justify distributed transactions and operational
@@ -163,5 +164,6 @@ A platform milestone is not complete until all applicable gates pass:
 
 - [Domain model](domain-model.md)
 - [Module contract](module-contract.md)
+- [Export, reporting and data portability](export-service.md)
 - [Security and tenancy](security-tenancy.md)
 - [Migration plan](migration-plan.md)

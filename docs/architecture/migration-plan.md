@@ -8,7 +8,7 @@ reference until each vertical slice passes its replacement gates.
 Deliverables:
 
 - clean source revision recorded;
-- 246/246 tests and 43/43 validation sweep passing;
+- 251/251 tests and 43/43 validation sweep passing;
 - legacy web account/case store disabled by default;
 - visitor calculation and Save as / Open behavior preserved;
 - portable local case store preserved; and
@@ -143,4 +143,3 @@ fracture propagation or autonomous field control.
   v2 evidence.
 - Database migrations have tested forward and recovery procedures; rollback is
   not assumed possible after destructive schema changes.
-

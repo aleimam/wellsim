@@ -124,6 +124,20 @@ checksum, encryption state, source, owner, retention class and scan status.
 Reservoir decks, spreadsheets, logs and reports are referenced through this
 record.
 
+### Export job and artifact
+
+An export job is a workspace-owned, auditable request to render a fixed source
+snapshot into one registered format. It records requester, exact resource
+scope, exporter/template version, lifecycle status, timestamps, progress,
+expiry and sanitized failure information. Authorization is checked against
+every included resource when the snapshot is created and before delivery.
+
+An export artifact is a file object produced by a completed job. It records the
+source manifest, media type, byte size and checksum. Large artifacts are kept
+in object storage and delivered through short-lived signed links. Browser-only
+visitor exports use the same format/schema contract without creating a server
+record.
+
 ## Engineering work model
 
 ```text
@@ -192,4 +206,3 @@ the workflow explicitly defines a narrower change policy.
 7. Destructive deletion of governed engineering records is exceptional,
    authorized and audited; ordinary removal is archival or supersession.
 8. Large binary files are not stored directly in transactional rows.
-

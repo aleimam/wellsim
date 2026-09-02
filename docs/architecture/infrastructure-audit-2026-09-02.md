@@ -29,7 +29,7 @@ No credential value was copied into the repository or audit output.
   recorded GitHub deployments or webhooks.
 - GitHub secret scanning and push protection are enabled. Dependabot security
   updates are disabled.
-- The branch passed 246/246 Node tests, the 43/43 physics validation sweep,
+- The branch passed 251/251 Node tests, the 43/43 physics validation sweep,
   JavaScript syntax checks and `git diff --check` before push.
 
 ### DNS and public edge

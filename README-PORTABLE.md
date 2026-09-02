@@ -1,7 +1,7 @@
 # WellSim — standalone portable program
 
 **Build 1.3 — 31 August 2026**, from commit `6a12ea9` of the main project.
-Identical physics to https://wellsim.app at that commit — 246 tests and the
+Identical physics to https://wellsim.app; the current source is guarded by 251 tests and the
 43/43 validation sweep both passing there. Changes since build 1.2 (30 Aug):
 
 - **Your saved cases are reachable again.** Builds 1.0–1.2 showed the website’s
@@ -43,6 +43,8 @@ all embedded in the executable.
   thing travels together. The header's case panel lists/saves/loads/deletes
   them (no accounts in the portable build); the local *Save as / Open* file
   dialogs also work as in the website version.
+- The shared **Export** panel downloads a restorable JSON case or
+  spreadsheet-ready CSV inputs. **Print / PDF** uses the browser print dialog.
 - The console window that appears IS the program — close it to stop WellSim.
 - Port: starts at 3355 and automatically picks the next free one if busy
   (`PORT` env overrides the start).
@@ -59,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 (First time: `npm install --save-dev esbuild postject` with Node on PATH.)
 The physics is identical to the main project — `node --test` runs the same
-246 tests against this copy.
+251 tests against this copy.
 
 ## Code signing
 

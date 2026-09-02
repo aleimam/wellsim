@@ -27,23 +27,29 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   (day > 31, month > 12) are rejected with the row number — nothing silently rolls over.
   Time-of-day is honoured (sporadic test timestamps work). `dt` is days from the first row.
 - **Header bar** (final layout): the **Oil Well | Water Well | Gas Well** tabs,
-  then **Save as · Open · Print report · Help**. A server-case link is shown
+  then **Save as · Open · Export · Print / PDF · Help**. A server-case link is shown
   only when the deployment reports a supported case store. Help opens the full
   in-app manual (`/help.html` — user guide + every equation and deviation).
-- **Print report** (header): prints the results only — charts, tables, summary
+- **Print / PDF** (header): prints the results only — charts, tables, summary
   cards and banners on a clean white page (inputs, navigation and buttons hide).
   Use the browser dialog's "Save as PDF" for a shareable report.
 - **Save as / Open** (header buttons): the whole case — every input,
   selection and production table across all three tabs — saves to a JSON
   file and restores in one click; program-filled grey cells stay
   program-filled (they refill on the next run).
+- **Export** (header): downloads the current case through the shared export
+  service. **WellSim case (JSON)** is complete and can be opened again.
+  **Case inputs (CSV)** contains metadata, labelled inputs, units, selections,
+  calculated-field markers and imported production rows for spreadsheet use;
+  it is not a restorable case. Formula-like text is neutralized for spreadsheet
+  safety while real negative numbers remain numeric.
 - **Server cases:** the legacy JSON company store is disabled by default while
   the secure organization/membership store is built. A company name or slug is
   not proof that somebody belongs to that company. When explicitly enabled for
   controlled migration, registration is invite-only. The portable program uses
   the same panel for its local `cases/` folder and needs no account.
 - **Visitor use stays complete:** every calculation, browser autosave, Save as,
-  Open and Print report workflow works without an account.
+  Open, Export and Print/PDF workflow works without an account.
 - **Mobile**: below 640 px the layout stacks, inputs grow to finger size, and the main
   action button stays pinned while you scroll.
 - **Your inputs survive a refresh.** Everything you type is saved in the

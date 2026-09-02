@@ -28,7 +28,8 @@ module manifest must express the following concepts:
     "well-performance.run",
     "well-performance.review"
   ],
-  "capabilities": ["case-versioning", "comparison", "report"]
+  "capabilities": ["case-versioning", "comparison", "report", "export"],
+  "exporters": ["case-json", "case-inputs-csv", "case-report-pdf"]
 }
 ```
 
@@ -72,6 +73,22 @@ formula implementation is not rewritten as part of this boundary change.
 - Supports a stable machine-readable form independent of chart presentation.
 - Allows reports to name the engine version and referenced data.
 
+### Export contribution
+
+- References only platform-registered exporter identifiers and approved,
+  versioned templates.
+- Declares supported source data types, media type, extension, whether the
+  artifact is round-trippable, and whether execution is browser or queued.
+- Exports canonical values with units, schema/module/engine versions,
+  provenance, warnings and source checksums.
+- Uses shared authorization, audit, object storage, signed delivery, retention
+  and filename/package safety controls.
+- Never treats a PDF, chart image or spreadsheet as the sole canonical result.
+- Never ships tenant-authored executable exporter code.
+
+The detailed platform rules and delivery sequence are in
+[export-service.md](export-service.md).
+
 ### UI contribution
 
 A module may provide routes, forms, results, comparisons and documentation. It
@@ -110,7 +127,7 @@ No calculation module is releasable without:
 - a migration policy explaining whether old cases rerun or retain the old
   engine.
 
-The existing 246-test suite and 43-case sweep are the initial validation
+The existing 251-test suite and 43-case sweep are the initial validation
 package for the current WellSim engine. They remain mandatory throughout the
 platform migration.
 
@@ -124,4 +141,3 @@ proposed -> researched -> specified -> implemented -> validated
 A retired engine remains available to render historical results. Rerunning an
 old case with a newer engine is a new calculation run and must never overwrite
 the old result.
-
