@@ -1,4 +1,4 @@
-# Company and user onboarding — local stage 2b
+# Company and user onboarding — qualified stage 2b, not live
 
 ## Status and boundaries
 
@@ -6,6 +6,8 @@ Implemented on `codex/v2-foundation`, 2 September 2026. No deployment, live
 migration, provider registration, email delivery or production restart was
 performed for this slice. `wellsim.app` is untouched. The last verified live
 `bldrz` schema remains 0001–0003; source now includes 0004 and 0005.
+Native PostgreSQL qualification subsequently passed on 2 September 2026 in
+an isolated disposable database. This is qualification, not pilot activation.
 
 `WELLSIM_ONBOARDING_ENABLED=1` is a **separate, default-off** flag requiring
 verified authentication and PostgreSQL. With the flag off, management routes
@@ -120,7 +122,7 @@ all `/auth/`, `/api/` and `/workspace.*` requests; its cache stamp was advanced
 to evict older caches. Workspace UI has a self-only CSP, no third-party assets,
 text-only DOM insertion, and clears private UI on logout/page exit.
 
-## Verification performed locally
+## Verification
 
 - 309 tests across 36 files, including 23 dedicated onboarding tests and a new
   real OIDC-client signed-email-claim test. Existing two-company read, modify,
@@ -137,10 +139,71 @@ text-only DOM insertion, and clears private UI on logout/page exit.
   and does not load credentials or persistent data. It is **not** a real IdP
   acceptance test. Start manually with `node scripts/preview-onboarding.mjs`.
 - PGlite queues database operations; its simultaneous-call tests do **not**
-  prove multi-connection PostgreSQL race behavior. Before migration, qualify
-  0005 using two real login pools in a new isolated native database: race last-
-  owner removal, invitation accept vs revoke/demotion, duplicate acceptance,
-  concurrent first sign-in, rollback and company-isolation checks.
+  prove multi-connection PostgreSQL race behavior. The separate native
+  qualification below closes that specific gate for the qualified source.
+
+### Native PostgreSQL qualification — 2 September 2026
+
+**Passed:** `NATIVE_ONBOARDING_VERIFICATION_OK (10 groups)` against PostgreSQL
+16.15. Qualified source: `d9a51f9f0bbf3e751f3b3ad757c1ca342f88d69c`
+(application onboarding implementation remains `e2da7a2`). The source archive
+SHA-256 is `3f5d55795807b0a573f98504ab76f769b1858403148b5e122dfcc49541d521ab`.
+The root-owned candidate and sanitized log are retained separately at
+`/opt/bldrz/staging/onboarding-d9a51f9-DkYXDHCt/native-onboarding.log`.
+
+`deploy/verify-bldrz-onboarding.sh` refuses an existing probe or an unexpected
+live migration baseline, holds an exclusive qualification lock, and clones
+only schema/permission-reference definitions. It applies 0004+0005 under the
+existing migration owner **only to `bldrz_onboarding_probe`**. Application
+operations use `bldrz_app` → transaction-local `bldrz_runtime`, through two
+independent pools of at most two connections each. No elevated role membership
+or cluster-role edits were needed, and no HTTP server was started.
+
+`scripts/verify-postgres-onboarding.mjs` waits until PostgreSQL actually reports
+the competing backend blocked by the first transaction. It then explicitly
+orders commits, rather than depending on timing alone. Checks passed for:
+
+1. Distinct connections, role separation and onboarding startup privilege checks.
+2. Concurrent first sign-in: one identity/private workspace; conflicting email
+   cannot link a different identity. Same-identity races repeated three times.
+3. Bootstrap rollback, including private workspace/session creation and
+   restoration of the prior session when its replacement transaction rolls back.
+4. Duplicate invitation acceptance: exactly one membership, repeated three times.
+5. Acceptance versus invitation revocation, with each operation committing first.
+6. Acceptance versus inviter demotion, with both commit orders. An acceptance
+   committed before demotion remains valid; demotion committed first blocks it.
+7. Queued management after administrator demotion or session revocation is
+   denied. Unrelated company B remains usable while company A is locked.
+8. Concurrent owner departures: last active owner retained, repeated three times.
+9. Both-direction company reads, changes, direct membership escalation,
+   cross-company asset links and export scope are denied by the real runtime.
+10. Personal privacy, next-request downgrade/removal enforcement, and sessions
+    surviving closure of the other application pool.
+
+The first harness run could not observe `wait_event_type` under the restricted
+runtime role. This was a **test observation issue**, not an application failure.
+The observer now uses the public blocking-PID relationship without requesting
+`pg_read_all_stats`. PostgreSQL documents the relevant
+[statistics visibility](https://www.postgresql.org/docs/16/monitoring-stats.html)
+and [blocking-PID function](https://www.postgresql.org/docs/16/functions-info.html).
+Malformed/wrong-target connection URLs are tested to fail before opening pools,
+with no credential echo. The finalized candidate was requalified from a fresh,
+checksum-verified archive after these harness corrections.
+
+After qualification:
+
+- `ONBOARDING_PROBE_REMOVED`: all synthetic database contents removed; the
+  harness can recreate them. No existing database or customer record was deleted.
+- `LIVE_MIGRATION_BASELINE_UNCHANGED`: live bldrz still 0001–0003 and counts
+  for users/workspaces/cases/exports still `0/0/0/0`.
+- `QUALIFICATION_AND_LIVE_NONINTERFERENCE_OK`: wellsim PID 1887, bldrz PID
+  13337 and PostgreSQL PID 9686 remained active and unchanged throughout.
+- PostgreSQL still listens only at `127.0.0.1:5432`; live bldrz web revision
+  remains `9c35c04`, and public `/auth/login` still returns 404.
+
+This does not certify a real identity-provider browser flow, backups of the
+new schema, high availability, penetration-test completeness or 50/100/200-user
+capacity. Requalify when onboarding/authorization/migration code changes.
 
 ## Gates before activation on bldrz.net
 
@@ -149,8 +212,8 @@ text-only DOM insertion, and clears private UI on logout/page exit.
 2. Complete independent scheduled backups, retention, alerts and key redundancy.
    Requalify 0004+0005 backup/catalog/restore before accepting customer state.
    Existing recovery assertions intentionally still target the live schema.
-3. Perform the native concurrency/security qualification above. Do not reuse
-   old 0004 probe evidence as certification of 0005.
+3. Native concurrency/security qualification is complete for `d9a51f9`; rerun
+   it for changed candidate code. Do not substitute older 0004-only evidence.
 4. Review proxy callback/query/body log redaction, IdP/public abuse throttling,
    session/invitation/audit retention, privacy/terms and operational recovery.
 5. Back up bldrz, render/apply 0004+0005 under its migration owner (portable

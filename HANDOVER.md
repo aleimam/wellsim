@@ -173,8 +173,11 @@ private; neither belongs in a repository. They **are** in the F: backup.
   registration, private workspace bootstrap, explicit company creation,
   invitations and owner-controlled membership changes. `/workspace.html`
   provides the opt-in management UI. Direct runtime membership writes are
-  revoked. Native multi-connection qualification of 0005 is still required;
-  earlier native auth evidence applies to 0004 only. See
+  revoked. Native multi-connection qualification of 0005 passed ten groups
+  on PostgreSQL 16.15 against `d9a51f9`, including observed-lock invitation,
+  demotion/revocation, first-sign-in and last-owner races. The disposable probe
+  was removed; live bldrz remains at 0001–0003 with sign-in off. No live service
+  was restarted. Real IdP setup, MFA policy and backup/restore gates remain. See
   **docs/architecture/identity-authentication.md** and
   **docs/architecture/company-onboarding.md** for boundaries and activation gates.
 - **Charts are drawn by Plotly at their container's width**, and that width is
