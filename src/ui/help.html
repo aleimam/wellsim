@@ -336,6 +336,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 
 <h2 id="gas-forecast"><span class="sect">Gas</span> &mdash; Forecast</h2>
 <p>p/Z tank coupled to the nodal model, <b>chained off the end of history</b>: start date / start Gp / start Pres are grey input-or-calculated (last prod date, cumulative, minimum solved Pres). Defaults: step 30 d &middot; FTHP 300 psi &middot; plateau 12 MMscf/d &middot; abandonment 1 MMscf/d &middot; max 60 steps &middot; GIIP &amp; p&#7522;/Z&#7522; grey = from the reserve fit.</p>
+<div class="note"><b>Where GIIP comes from</b> &mdash; blank GIIP and pi/Zi chain off Reserve <b>selection 1 (prod data)</b>, the workbook&rsquo;s own chain. It does NOT follow the reserve selection currently shown: on the demo that is 182.26&nbsp;Bscf from prod data vs ~120&nbsp;Bscf from SITHP or the gauges. The field label and the result line both say so; type a value to override.</div>
 <p>Each step: Pr from the p/Z line (first step anchors on start Pres) &rarr; Darcy IPR at Pr &rarr; nodal operating point at forecast FTHP &rarr; q = min(op, plateau) &rarr; Gp advances. Terminates on abandonment / depletion / dead well / max steps, reporting EUR and recovery %. The chart overlays history + forecast on a calendar-date axis; the results table sits below it.</p>
 
 <hr class="sect">

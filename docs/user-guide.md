@@ -588,6 +588,15 @@ input uncertainty.
 
 ## 6. Gas — Forecast (Module 3)
 
+**Where GIIP comes from.** Left blank, GIIP and pi/Zi chain off the Reserve
+module’s **selection 1 (prod data & macro)** p/Z straight-line fit — the same
+chain the workbook’s Forecast sheet uses, and it does NOT follow whichever
+reserve selection is on screen. On the demo that is 182.26 Bscf from prod
+data against ~120 Bscf from SITHP or the memory gauges, so the two views can
+legitimately disagree by half. Both the field label and the result line now
+say so. Type a GIIP (or pi/Zi) to override the chain; grey means the program
+filled it, and typing reclaims the cell.
+
 p/Z tank coupled to the nodal model, chained off the end of history (the workbook's
 Production Forecast block):
 

@@ -402,8 +402,8 @@ const GAS_FC_FIELDS = [
   ['plateauMMscfd', 'Plateau (constraint)', 'MMscf/d', 12],
   ['minRateMMscfd', 'Abandonment rate', 'MMscf/d', 1],
   ['maxSteps', 'Max steps', '-', 60],
-  ['giipBscf', 'GIIP (blank = fit)', 'Bscf', ''],
-  ['pziPsi', 'pi/Zi (blank = fit)', 'psi', ''],
+  ['giipBscf', 'GIIP (blank = prod-data p/Z fit)', 'Bscf', ''],
+  ['pziPsi', 'pi/Zi (blank = prod-data fit)', 'psi', ''],
 ];
 
 const GAS_SENS_COLS = ['thpPsi', 'cgrStbMMscf', 'wgrStbMMscf', 'tubingIdIn'];
@@ -2817,7 +2817,12 @@ async function gasForecastRun() {
   document.getElementById('gas-fc-result').textContent =
     `EUR = ${fmt(r.eurBscf, 2)} Bscf (${fmt(r.recoveryPct, 1)}% of GIIP ${fmt(r.giipBscf, 1)}), status: ${r.status}\n` +
     `Plateau held ${r.rows.filter((p) => p.onPlateau).length} of ${r.rows.length} steps. ` +
-    `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf, Pres ${fmt(r.startPresPsi, 0)} psi.`;
+    `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf, Pres ${fmt(r.startPresPsi, 0)} psi.\n` +
+    // the workbook's Forecast sheet derives its start state from the
+    // PROD-DATA sheet, so this chain ignores whichever reserve selection is
+    // on screen. On the demo that is 182 Bscf vs ~120 from SITHP/gauges —
+    // worth saying out loud rather than leaving two numbers to disagree.
+    `GIIP and pi/Zi are the prod-data p/Z fit (Reserve selection 1), not the selection currently shown. Type a GIIP to override.`;
   setComputed('gas-giipBscf', r.giipBscf, 2);
   setComputed('gas-pziPsi', r.pziPsi, 1);
   setComputed('gas-startGpBscf', r.startGpBscf, 3);
