@@ -75,15 +75,24 @@ printf 'age1...\n' > /etc/wellsim/backup-recipient.txt
 chmod 600 /etc/wellsim/backup-recipient.txt
 ```
 
-Then the unit:
+Then the unit. Both scripts arrive with the deploy tar at
+`/opt/wellsim/app/deploy/` and `git archive` carries their mode bits, so
+nothing needs copying — but check the forced-command one is executable, because
+sshd runs it directly rather than through `bash`:
 
 ```bash
-install -m 755 /opt/wellsim/app/deploy/backup-wellsim-data.sh /opt/wellsim/app/deploy/
-install -m 644 /opt/wellsim/app/deploy/wellsim-data-backup.{service,timer} /etc/systemd/system/
+test -x /opt/wellsim/app/deploy/serve-wellsim-backup.sh || \
+  chmod 755 /opt/wellsim/app/deploy/serve-wellsim-backup.sh
+install -m 644 /opt/wellsim/app/deploy/wellsim-data-backup.service \
+               /opt/wellsim/app/deploy/wellsim-data-backup.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl start wellsim-data-backup.service   # run once by hand FIRST
+systemctl status wellsim-data-backup.service  # confirm it wrote a backup
 systemctl enable --now wellsim-data-backup.timer
 ```
+
+Run it by hand before enabling the timer. A first run that fails at 01:45 is a
+failure nobody sees until the pull is also stale.
 
 ## Install (pull key)
 
