@@ -188,11 +188,13 @@ Configured through the Auth0 dashboard in Chrome after the user's approval:
   These are provider Action-unit tests, **not** enrollment or signed-token
   callback acceptance evidence.
 
-Connection inspection found both `Username-Password-Authentication` and
-`google-oauth2` enabled for bldrz by default. Disabling Google was blocked by
-the browser action review because that specific provider removal was not
-explicitly approved. No removal occurred; obtain the user's approval before
-retrying. The password connection has improved brute-force protection enabled,
+Connection inspection initially found both `Username-Password-Authentication`
+and `google-oauth2` enabled for bldrz by default. After the user approved the
+specific removal, Google login was disabled **for the bldrz application only**
+through Chrome. A page reload confirmed the Google toggle remained off and
+the password connection remained on. The shared Google connection was not
+deleted and other applications' connection settings were not changed.
+The password connection has improved brute-force protection enabled,
 public signup enabled, and domain-level promotion disabled. Its password-policy
 editor did not display a populated minimum length, so effective password strength
 has not been qualified. Password history/dictionary/profile-data controls were
@@ -213,11 +215,15 @@ User handoffs still pending:
    local file `C:\Claude\WellSim\secrets\auth0\bldrz-client-secret.txt`.
    The folder ACL is limited to the Windows account, SYSTEM and administrators.
    At the last check the file did not exist. Do not paste it into chat.
-3. Approve whether to disable the default Google connection for the initial
-   password-plus-authenticator pilot, then qualify connection/attack policies.
-4. Complete real pilot-account email verification and authenticator enrollment
+3. Complete real pilot-account email verification and authenticator enrollment
    personally; store recovery codes securely. Do not enable public bldrz login
    before the deployment, callback, isolation and recovery gates pass.
+
+On the follow-up after Google removal, the Post Login flow still contained only
+Start and Complete, and the local client-secret file was still absent. Those
+two handoffs remain blockers; the removal did not activate authentication or
+change any bldrz/wellsim deployment. Connection/attack policies still require
+qualification before pilot activation.
 
 A read-only server check after provider setup confirmed bldrz still points to
 `d5187b43cd298c0df21a83b7eec42e378eba2a23`; both services remained active with
