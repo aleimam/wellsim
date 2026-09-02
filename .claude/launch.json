@@ -4,7 +4,7 @@
     {
       "name": "wellsim",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
-      "runtimeArgs": ["src/server/server.js"],
+      "runtimeArgs": ["--env-file-if-exists=.env.local", "src/server/server.js"],
       "port": 3355
     }
   ]
