@@ -5,6 +5,7 @@
   "assets": {
     "index.html": "src/ui/index.html",
     "app.js": "src/ui/app.js",
+    "export.js": "src/ui/export.js",
     "style.css": "src/ui/style.css",
     "help.html": "src/ui/help.html",
     "favicon.svg": "src/ui/favicon.svg",

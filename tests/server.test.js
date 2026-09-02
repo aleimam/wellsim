@@ -12,7 +12,7 @@
 // the day one of those lands in src/ as `ui-old` the whole folder goes on the
 // internet. Fixed 31 Aug 2026 by comparing against UI_DIR + path.sep.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -219,5 +219,35 @@ test('a query string on the root serves the app, not a 500', async () => {
     assert.equal((await rawGet(port, '/')).status, 200);
   } finally {
     child.kill();
+  }
+});
+
+// The portable exe serves assets from the SEA blob, so anything portable/main.js
+// is willing to SERVE must also be EMBEDDED by sea-config.json. When they drift,
+// sea.getAsset() throws for the missing key, the request handler turns that into
+// a 500, and index.html gets a 500 on a <script> tag -- while every test here
+// keeps passing, because running main.js under plain node reads from src/ui on
+// disk instead of the blob. Found on 2 Sep 2026: export.js had been added to
+// ASSETS and never to sea-config.json.
+test('every servable portable asset is embedded in the SEA config', () => {
+  const root = new URL('..', import.meta.url);
+  const main = readFileSync(new URL('portable/main.js', root), 'utf8');
+  const sea = JSON.parse(readFileSync(new URL('sea-config.json', root), 'utf8'));
+
+  const listed = main.match(/const ASSETS = \[([^\]]*)\]/);
+  assert.ok(listed, 'could not find the ASSETS list in portable/main.js');
+  const assets = [...listed[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  assert.ok(assets.length > 3, `parsed only ${assets.length} assets`);
+
+  for (const name of assets) {
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(sea.assets, name),
+      `portable/main.js serves "${name}" but sea-config.json does not embed it: the packaged exe would answer 500 for it`
+    );
+    const src = sea.assets[name];
+    assert.ok(
+      existsSync(new URL(src, root)),
+      `sea-config.json embeds "${name}" from ${src}, which does not exist`
+    );
   }
 });
