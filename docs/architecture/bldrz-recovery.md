@@ -10,10 +10,35 @@ The next decision is an always-available backup destination. No storage service
 has been purchased or provisioned. Authentication and the end-to-end case
 workflow remain subsequent steps, followed by measured 50/100/200-user tests.
 
-The source-server web process is still revision `9c35c04`. Recovery tools were
-qualified separately in `/opt/bldrz/operations/recovery-20260902`; neither web
-service was restarted. `wellsim.app` and its existing backup timer were not
-modified.
+The original recovery tools were qualified separately from web revision
+`9c35c04`. The comparison release now includes these tools plus schema-0005
+recovery qualification; use `/opt/bldrz/DEPLOYED_REVISION` for active revision
+tracking. `wellsim.app` and its existing backup timer are outside this workflow.
+
+### Onboarding-schema release qualification
+
+Fresh pre-deployment bundle `bldrz-20260902T163434.994067160Z` was copied to
+the restricted workstation backup folder. All four checksums and both age
+decryptions passed. Its recovered full-data fingerprint matched the source:
+`51ff76c2aed12f7bdd7e98e8ab2c1af8e2bb0b83410920c668777e7f358a297f`.
+
+Candidate `9c4964b` passed a native PostgreSQL 16.15 restore drill. The source
+copy remained at 0001–0003; migrations 0004+0005 were applied together only to
+its empty synthetic clone. Nonempty identities, sessions, login flows,
+personal workspaces, invitations and authentication events were added before
+an encrypted dump/restore round trip. All app-table fingerprints matched.
+Both-direction company isolation, identity-table access denial, workspace
+discovery, management boundaries, last-owner protection, email-bound single-use
+invitations, single-use login flows and session revocation passed after restore.
+The catalog now strictly recognizes either the original three-migration
+history or the complete five-migration history, not unknown/partial versions.
+Schema 0005 requires 25 RLS-bearing tables, 54 policies, eight restricted
+identity/onboarding functions and revoked direct membership writes.
+
+Use the optional third argument `qualify-onboarding` with the restore runner
+only for a 0001–0003 source dump when qualifying the upgrade before deployment.
+Omit it for a dump already at 0005. Synthetic fixtures and the private socket-
+only cluster are always isolated from the live database.
 
 ## What the backup contains
 
@@ -106,12 +131,11 @@ Bundle: `bldrz-20260902T143848.882634680Z`.
 
 ## Repeat a manual backup and drill
 
-Use the qualified source directory until these tools are included in a later
-web-source release:
+Use the active qualified comparison release (the original operations copy
+only recognizes 0001–0003 and must not back up the upgraded schema):
 
 ```bash
-sudo bash /opt/bldrz/operations/recovery-20260902/deploy/backup-bldrz-db.sh \
-  /opt/bldrz/operations/recovery-20260902
+sudo bash /opt/bldrz/app/deploy/backup-bldrz-db.sh /opt/bldrz/app
 ```
 
 Copy the resulting whole bundle over verified SSH/SFTP to the approved
@@ -124,8 +148,8 @@ Transfer only the decrypted dump into a root-only temporary input directory
 on the recovery host. Then run:
 
 ```bash
-sudo bash /opt/bldrz/operations/recovery-20260902/deploy/verify-bldrz-restore.sh \
-  /opt/bldrz/operations/recovery-20260902 /absolute/private/path/database.dump
+sudo bash /opt/bldrz/app/deploy/verify-bldrz-restore.sh \
+  /opt/bldrz/app /absolute/private/path/database.dump
 ```
 
 The runner creates and removes its own `bldrz-restore-drill.*` cluster. It uses

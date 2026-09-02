@@ -201,24 +201,30 @@ After qualification:
 - PostgreSQL still listens only at `127.0.0.1:5432`; live bldrz web revision
   remains `9c35c04`, and public `/auth/login` still returns 404.
 
-This does not certify a real identity-provider browser flow, backups of the
-new schema, high availability, penetration-test completeness or 50/100/200-user
-capacity. Requalify when onboarding/authorization/migration code changes.
+This historical qualification did not change the live schema. The later
+bldrz-only comparison release also qualifies encrypted backup/restore of the
+new schema; see [recovery evidence](bldrz-recovery.md). Neither qualification
+certifies a real identity-provider browser flow, high availability,
+penetration-test completeness or 50/100/200-user capacity. Requalify when
+onboarding/authorization/migration code changes. The baseline-specific native
+runner is a pre-upgrade test; do not rerun it blindly on the upgraded database.
 
 ## Gates before activation on bldrz.net
 
 1. Select a dedicated IdP/client; prove signed verified-email claims, correct
    exact issuer/callback, account recovery, and approved owner/admin MFA policy.
 2. Complete independent scheduled backups, retention, alerts and key redundancy.
-   Requalify 0004+0005 backup/catalog/restore before accepting customer state.
-   Existing recovery assertions intentionally still target the live schema.
+   Manual 0004+0005 backup/catalog/restore qualification passed for the release;
+   scheduled independent recovery remains unconfigured.
 3. Native concurrency/security qualification is complete for `d9a51f9`; rerun
    it for changed candidate code. Do not substitute older 0004-only evidence.
 4. Review proxy callback/query/body log redaction, IdP/public abuse throttling,
    session/invitation/audit retention, privacy/terms and operational recovery.
-5. Back up bldrz, render/apply 0004+0005 under its migration owner (portable
+5. Verify the deployed migration marker. For a pre-upgrade database, back up
+   bldrz and render/apply 0004+0005 under its migration owner (portable
    `wellsim_runtime` → `bldrz_runtime`), with no owner credentials in the app.
-   Recheck role startup and cache upgrade; test real browser sessions in two
+   Do not reapply completed migrations. Recheck role startup and cache upgrade;
+   test real browser sessions in two
    pilot companies before exposing the onboarding link.
 6. Activate only on bldrz, then build the well → case → calculation → immutable
    revision → reopen → export workflow. Load-test 50/100/200 users afterward.

@@ -160,12 +160,14 @@ or a user-capacity benchmark.
    exact redirect `https://bldrz.net/auth/callback`; use a concrete issuer (for
    Entra, a specific approved tenant, not an unrestricted common endpoint).
 2. Resolve independent backup destination/retention, failure alerts and key
-   redundancy before accepting real customer state. Requalify backup/restore
-   for migrations `0004` and `0005`: existing recovery catalog assertions deliberately
-   still require the live `0001`–`0003` schema and must be updated/tested first.
+   redundancy before accepting real customer state. Manual encrypted recovery
+   of migrations `0004` and `0005` passed for the comparison release; see
+   [recovery evidence](bldrz-recovery.md). This does not complete scheduled DR.
 3. Review provider policy (including owner/admin MFA), callback log redaction,
    abuse controls and operational session-maintenance/alerting requirements.
-4. Render/apply the reviewed migration under `bldrz_migration_owner`, replacing
+4. Check `/opt/bldrz/DEPLOYED_REVISION` and the database migration history;
+   do not reapply completed migrations. For a pre-upgrade environment,
+   render/apply the reviewed migration under `bldrz_migration_owner`, replacing
    portable `wellsim_runtime` with `bldrz_runtime`, only to bldrz. Never use the
    owner credential from the web process. Back up before migration.
 5. Provision a small approved pilot identity and memberships from verified

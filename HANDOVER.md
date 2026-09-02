@@ -10,10 +10,14 @@ account/case store is DISABLED there: `/api/accounts/status` reports
 Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
-**Current working tree:** `main` merged into `codex/v2-foundation`,
-309 tests passing and 43/43 validation sweep. The separate `bldrz`
-database has migrations `0001`–`0003`, with least-privilege roles and an
-opt-in, bounded PostgreSQL connection pool.
+**Comparison release:** `codex/v2-foundation`, 309 tests passing and 43/43
+validation sweep. Earlier `main` work was merged; subsequent `main` commits
+remain the other developer's separate line of work. This release includes
+migrations `0001`–`0005`, least-privilege roles and a bounded PostgreSQL pool.
+Sign-in and onboarding remain explicitly disabled pending operational gates.
+Check `/opt/bldrz/DEPLOYED_REVISION` for the active commit; follow
+[the bldrz-only release procedure](docs/architecture/bldrz-release.md), not
+the WellSim production deployment commands below.
 
 ---
 
@@ -147,12 +151,12 @@ private; neither belongs in a repository. They **are** in the F: backup.
   full manual snapshot was taken on 1 Sep 2026 into
   `D:WellSim-FullBackup-2026-09-01server-data`. See also
   **docs/architecture/infrastructure-audit-2026-09-02.md**.
-- **Sessions are in-memory.** Any restart signs users out. Cases on disk are
+- **Legacy sessions are in-memory.** Any restart signs legacy users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
 - **PostgreSQL 16.15 is installed for the `bldrz.net` comparison environment.**
   It listens only on `127.0.0.1:5432`; IPv6, wildcard/public listeners and a
   UFW rule for 5432 are absent. The separate `bldrz` database has migrations
-  `0001` through `0003`, non-login owner `bldrz_migration_owner`, login
+  `0001` through `0005` in this release, non-login owner `bldrz_migration_owner`, login
   `bldrz_app`, and non-login least-privilege role `bldrz_runtime`. Native tests
   proved cross-company read, modify, link and export isolation. The credential
   is only in `/etc/bldrz/postgresql.env` (`root:bldrz`, `0640`). The bldrz service
@@ -165,10 +169,10 @@ private; neither belongs in a repository. They **are** in the F: backup.
   off-server retention/alerts/key redundancy remain gates. The new bldrz
   backup timer is deliberately not enabled yet. See
   **docs/architecture/bldrz-recovery.md**.
-- **OIDC authentication and controlled onboarding are implemented locally, not activated.**
+- **OIDC authentication and controlled onboarding are release-qualified, not activated.**
   Migration `0004_verified_sessions`, server-side sessions and read-only
   company/private-workspace discovery are feature-gated. No provider has been
-  selected/configured, no live migration applied, and public signup/invitations
+  selected/configured, and public signup/invitations
   remain off. Migration `0005_controlled_onboarding` adds verified-email
   registration, private workspace bootstrap, explicit company creation,
   invitations and owner-controlled membership changes. `/workspace.html`
@@ -176,8 +180,10 @@ private; neither belongs in a repository. They **are** in the F: backup.
   revoked. Native multi-connection qualification of 0005 passed ten groups
   on PostgreSQL 16.15 against `d9a51f9`, including observed-lock invitation,
   demotion/revocation, first-sign-in and last-owner races. The disposable probe
-  was removed; live bldrz remains at 0001–0003 with sign-in off. No live service
-  was restarted. Real IdP setup, MFA policy and backup/restore gates remain. See
+  was removed. The bldrz-only release also qualifies encrypted recovery of
+  0004+0005, including nonempty identity records and invitation/session behavior.
+  Code/schema deployment does not enable sign-in. Real IdP setup, MFA policy
+  and automated off-server backup gates remain. See
   **docs/architecture/identity-authentication.md** and
   **docs/architecture/company-onboarding.md** for boundaries and activation gates.
 - **Charts are drawn by Plotly at their container's width**, and that width is
