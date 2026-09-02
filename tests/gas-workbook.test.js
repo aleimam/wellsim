@@ -17,6 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { handlers } from '../src/server/api.js';
+import { gasMarch } from '../src/core/vlp/gas-march.js';
 
 function close(actual, expected, rel = 1e-9) {
   assert.ok(
@@ -41,6 +42,22 @@ const GAS_WB = {
     { thpPsi: '2000', qMMscfd: '10.002', pwfPsi: '' },
     { thpPsi: '1625', qMMscfd: '14.137', pwfPsi: '' },
   ],
+};
+
+// fixtures for the forecast wellhead tests below
+const GAS_FORM = GAS_WB;
+const GAS_PROD_ROWS = [
+  { date: '17-Nov-14', thpPsi: '1625', qMMscfd: '18.56', cgrStbMMscf: '57', wgrStbMMscf: '3.8' },
+  { date: '17-Nov-19', thpPsi: '1000', qMMscfd: '17', cgrStbMMscf: '40', wgrStbMMscf: '2.1' },
+  { date: '26-Nov-24', thpPsi: '500', qMMscfd: '11', cgrStbMMscf: '20', wgrStbMMscf: '2.7' },
+];
+// the same well in core units, for marching directly
+const GAS_MARCH_CFG = {
+  thpPsi: 1625, qGasMMscfd: 14.137, cgrStbMMscf: 57.4358974359, wgrStbMMscf: 3.84615384615,
+  tubingIdIn: 2.992, roughnessBase: 0.0021, perfTvdM: 2817.74337301, devStartM: 690,
+  devAngleDeg: 23.65, topPerfAhM: 3013, condApi: 48.7, gasSg: 0.763,
+  n2: 0.012, co2: 0.03, h2s: 0.000002, tresF: 232, oilViscCp: 2, sigmaDyneCm: 30,
+  soilTempF: 90, htcBtu: 3, tubingOdIn: 3.5, cpBtu: 0.51, matchHead: 1, matchFriction: 1,
 };
 
 test('gas workbook: the Darcy J_2 reproduces to the cell (B38)', () => {
@@ -93,4 +110,97 @@ test('gas workbook: the operating point sits on both of its own curves', () => {
   // IPR identity at the op: Pwf = sqrt(Pr² − 1000·q/J)
   const pwfIpr = Math.sqrt(3800 ** 2 - (1000 * r.op.qMMscfd) / r.ipr.j);
   close(r.op.pwfPsi, pwfIpr, 1e-3);
+});
+
+// ---- forecast wellhead state: FTHP / FTHT per step ----
+// Off plateau the produced rate IS the nodal intersection at the forecast
+// FTHP, so the wellhead pressure is that input. ON PLATEAU the well is choked:
+// Pwf comes from the IPR at the constrained rate, so the real wellhead
+// pressure is HIGHER than the input and is back-solved through the same
+// downward march (Brent), never by a second upward march -- the march is an
+// explicit Euler integration and an upward pass would not reproduce the Pwf
+// printed beside it. Added 2 Sep 2026.
+test('forecast reports the flowing wellhead state, back-solved when choked', () => {
+  const base = {
+    ...GAS_FORM,
+    prodRows: GAS_PROD_ROWS,
+    stepDays: '30', forecastFthpPsi: '300', minRateMMscfd: '1', maxSteps: '6',
+    startDate: '', startGpBscf: '', startPresPsi: '', giipBscf: '', pziPsi: '',
+  };
+
+  // a plateau well below the natural rate forces the choked branch
+  const choked = handlers['gas/forecast']({ ...base, plateauMMscfd: '6' });
+  assert.ok(!choked.error, choked.error);
+  const onPlateau = choked.rows.filter((p) => p.onPlateau);
+  assert.ok(onPlateau.length > 0, 'this case must actually hit the plateau');
+  for (const p of onPlateau) {
+    assert.equal(p.fthpSource, 'solved');
+    assert.ok(
+      p.fthpPsi > 300,
+      `choked back to ${p.qMMscfd} MMscf/d, so FTHP must EXCEED the 300 psi input, got ${p.fthpPsi}`
+    );
+    assert.ok(p.fthtF > 0 && p.fthtF < 300, `FTHT out of range: ${p.fthtF}`);
+  }
+
+  // THE PROPERTY THAT JUSTIFIES ROOT-FINDING over a separate upward march:
+  // marching DOWN from the reported FTHP at the reported rate must land back
+  // on the reported Pwf. An upward Euler pass would not close this loop.
+  for (const p of onPlateau) {
+    const m = gasMarch({ ...GAS_MARCH_CFG, thpPsi: p.fthpPsi, qGasMMscfd: p.qMMscfd });
+    assert.ok(
+      Math.abs(m.pwfPsi - p.pwfPsi) < 1e-3,
+      `FTHP ${p.fthpPsi} should reproduce Pwf ${p.pwfPsi}, marched to ${m.pwfPsi}`
+    );
+  }
+
+  // unconstrained: the wellhead pressure IS the input, no solving involved
+  const free = handlers['gas/forecast']({ ...base, plateauMMscfd: '' });
+  assert.ok(!free.error, free.error);
+  for (const p of free.rows) {
+    assert.equal(p.onPlateau, false);
+    assert.equal(p.fthpSource, 'input');
+    assert.equal(p.fthpPsi, 300);
+  }
+});
+
+test('forecast FTHT tracks rate, not pressure', () => {
+  // the march temperature is the geothermal shelf with Ramey relaxation: a
+  // function of rate and depth, independent of pressure. Verified directly --
+  // one rate at THP 1000/1625/2200/2800 gives an identical WHT -- which is why
+  // FTHT needs no inversion even when FTHP does.
+  const at = (thp) => gasMarch({ ...GAS_MARCH_CFG, thpPsi: thp, qGasMMscfd: 14.137 }).whtF;
+  const t0 = at(1000);
+  for (const thp of [1625, 2200, 2800]) {
+    assert.ok(Math.abs(at(thp) - t0) < 1e-9, `WHT moved with pressure: ${at(thp)} vs ${t0}`);
+  }
+  // but it must move with rate
+  const lo = gasMarch({ ...GAS_MARCH_CFG, qGasMMscfd: 5 }).whtF;
+  const hi = gasMarch({ ...GAS_MARCH_CFG, qGasMMscfd: 18 }).whtF;
+  assert.ok(hi > lo + 10, `WHT should rise with rate: ${lo} -> ${hi}`);
+});
+
+// The forecast chart draws the MEASURED wellhead pressure of each prod row
+// into the forecast FTHP as one line, so the history payload has to carry
+// thpPsi -- it is the only place the typed prod THP reaches the UI. Added
+// 2 Sep 2026, when the chart dropped its FTHT axis (FTHT stays in the table).
+test('forecast history carries the measured FTHP of every prod row', () => {
+  const r = handlers['gas/forecast']({
+    ...GAS_FORM,
+    prodRows: GAS_PROD_ROWS,
+    stepDays: '30', forecastFthpPsi: '300', minRateMMscfd: '1', maxSteps: '6',
+    plateauMMscfd: '', startDate: '', startGpBscf: '', startPresPsi: '',
+    giipBscf: '', pziPsi: '',
+  });
+  assert.ok(!r.error, r.error);
+  assert.equal(r.history.length, GAS_PROD_ROWS.length);
+  assert.deepEqual(
+    r.history.map((p) => p.thpPsi),
+    GAS_PROD_ROWS.map((p) => Number(p.thpPsi))
+  );
+  // and the rest of the chart's history series stay populated
+  for (const p of r.history) {
+    for (const k of ['tDays', 'qMMscfd', 'presPsi', 'gpBscf']) {
+      assert.ok(Number.isFinite(p[k]), `history ${k} is ${p[k]}`);
+    }
+  }
 });

@@ -596,6 +596,31 @@ input uncertainty.
 
 ## 6. Gas — Forecast (Module 3)
 
+**FTHP and FTHT per step.** The forecast **table** carries the flowing
+wellhead pressure and temperature; the **chart** plots FTHP only, running
+the measured FTHP of each prod-data row straight into the forecast FTHP as
+one wellhead-pressure line (a temperature in °F shares no scale with psi,
+so FTHT would need a third axis to say what the table already says). Off
+plateau the produced rate IS the nodal intersection at your forecast FTHP,
+so FTHP is that input. **On plateau the well is choked**: Pwf comes from
+the IPR at the constrained rate, so the real wellhead pressure is HIGHER
+than the input and is back-solved (Brent) through the same downward gas
+march — those rows are marked with `*`. The solved FTHP reproduces the Pwf
+printed beside it to ~1e-7 psi, which a separate upward march could not
+guarantee (the march is an explicit Euler integration, so an upward pass
+does not invert the downward one exactly). FTHT needs no inversion: the
+march temperature is the geothermal shelf with Ramey relaxation — a
+function of RATE and depth, independent of pressure.
+
+**Where GIIP comes from.** Left blank, GIIP and pi/Zi chain off the Reserve
+module’s **selection 1 (prod data & macro)** p/Z straight-line fit — the same
+chain the workbook’s Forecast sheet uses, and it does NOT follow whichever
+reserve selection is on screen. On the demo that is 182.26 Bscf from prod
+data against ~120 Bscf from SITHP or the memory gauges, so the two views can
+legitimately disagree by half. Both the field label and the result line now
+say so. Type a GIIP (or pi/Zi) to override the chain; grey means the program
+filled it, and typing reclaims the cell.
+
 p/Z tank coupled to the nodal model, chained off the end of history (the workbook's
 Production Forecast block):
 

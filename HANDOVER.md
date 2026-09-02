@@ -1,11 +1,19 @@
 # WellSim — handover
 
-**Reference production:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
-**Repo:** https://github.com/aleimam/wellsim
-**Live production revision:** 30 August 2026 — commit `c6f1caa`, asset stamp
-`2026-08-30k`. **Current working tree:** 267 tests passing and 43/43 validation
-sweep. The separate `bldrz` database has migrations `0001`–`0003`, with
-least-privilege roles and an opt-in, bounded PostgreSQL connection pool.
+**Live:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
+**Repo:** https://github.com/aleimam/wellsim · **Manual:** https://wellsim.app/help.html
+
+**Live production revision:** 2 September 2026 — the containment release
+`6807e73` from `codex/v2-foundation`, deployed 00:14:57 UTC. The legacy web
+account/case store is DISABLED there: `/api/accounts/status` reports
+`{"enabled":false,"registrationEnabled":false,"mode":"legacy-web"}` and the
+Sign in entry is hidden. **Production does not track `main`** — check before
+you deploy, or you will roll that containment back.
+
+**Current working tree:** `main` merged into `codex/v2-foundation`,
+270 tests passing and 43/43 validation sweep. The separate `bldrz`
+database has migrations `0001`–`0003`, with least-privilege roles and an
+opt-in, bounded PostgreSQL connection pool.
 
 ---
 
@@ -38,7 +46,7 @@ The web server uses Node built-ins plus `pg` for opt-in PostgreSQL. The UI is
 plain HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 267 unit, regression and security tests
+node --test                       # 270 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -109,16 +117,34 @@ private; neither belongs in a repository. They **are** in the F: backup.
   and is not in git. The deploy does not touch it and nothing else will
   recreate it.
 
-  On 30 Aug 2026 there was no root crontab or systemd backup timer. The deploy
-  runbook records that an on-box `wellsim-backup.timer` was installed on 1 Sep,
-  but the 2 Sep infrastructure audit could not independently verify it because
-  the recovery SSH key and its documented `F:` backup were unavailable on the
-  audit workstation and TCP/22 was closed or filtered from that network. Treat
-  the timer as **unverified**, and remember that it is on the same server disk
-  even if it is healthy. No current off-box backup or restore test was confirmed.
-  Before deploying data-bearing features, restore controlled access, verify the
-  timer and latest archive, pull a fresh backup off-box, and restore it into a
-  scratch directory. See **docs/deploy.md → “Backing up `data/` off-box”** and
+  **A nightly backup runs, and the case store is NOT empty.** Both were the
+  other way round until 1 Sep 2026, and this entry said so — it justified
+  having no off-box copy on the grounds that there was nothing to lose.
+  There is now: **4 accounts across 2 companies (bapetco, bap) and 8 saved
+  client cases**, growing daily.
+
+  What is installed on the box: `wellsim-backup.timer` (systemd, 02:30 UTC,
+  30 days kept) running `/usr/local/bin/wellsim-backup`, which tars `data/`
+  into **`/var/backups/wellsim/`** — deliberately outside `/opt/wellsim/app`
+  so re-extracting or wiping the app directory cannot take the backups with
+  it. The app also still writes its own rolling copy into `data-backups/`
+  when a case is saved.
+
+  **The 2 Sep infrastructure audit could not independently verify that
+  timer** — the recovery SSH key and its documented `F:` backup were
+  unavailable on the audit workstation and TCP/22 was closed or filtered
+  from that network. It was verified on 1 Sep from the deploy workstation,
+  so treat it as installed-and-once-verified rather than continuously
+  monitored, and re-check it from the box when access allows.
+
+  **Neither copy is off-box.** Both sit on the same disk as the thing they
+  protect: they survive a bad write, a bad deploy or an accidental delete —
+  NOT a lost server. The 2 Sep audit did pull one fresh encrypted archive
+  off the VPS and recovery-tested it, but that was manual and is not
+  scheduled. The off-box pull in **docs/deploy.md → “Backing up `data/`
+  off-box”** is still the one that actually protects the client cases. A
+  full manual snapshot was taken on 1 Sep 2026 into
+  `D:WellSim-FullBackup-2026-09-01server-data`. See also
   **docs/architecture/infrastructure-audit-2026-09-02.md**.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
