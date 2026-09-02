@@ -1,0 +1,20 @@
+# Safe to enable on its own: unlike the bldrz timer this one has a defined
+# off-box destination (deploy/serve-wellsim-backup.sh plus the workstation
+# pull). Enabling it WITHOUT the pull just gives you another encrypted copy on
+# the same disk -- no worse than today, but no better either, which has been
+# this system's whole problem.
+#
+# 01:45 UTC: an hour before the plaintext wellsim-backup.timer at 02:30, so a
+# failure here is visible in the morning while the older snapshot is untouched.
+
+[Unit]
+Description=Daily encrypted WellSim case-store backup
+
+[Timer]
+OnCalendar=*-*-* 01:45:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+Unit=wellsim-data-backup.service
+
+[Install]
+WantedBy=timers.target
