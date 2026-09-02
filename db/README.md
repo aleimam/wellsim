@@ -126,8 +126,10 @@ real SQL migrations, seeds two companies plus a private personal workspace and
 executes adversarial reads, writes, links and exports through
 `wellsim_runtime`. PGlite is the disposable local test harness. The same
 read/write/link/export boundary has also passed a disposable native PostgreSQL
-16 clone of the bldrz database through `bldrz_runtime`. A backup and restore
-drill and production migration review remain deployment gates.
+16 clone of the bldrz database through `bldrz_runtime`. A manual encrypted
+backup and fresh-cluster restore drill has also passed. Scheduled off-server
+transfer, retention and recovery-key redundancy remain deployment gates; see
+[bldrz recovery](../docs/architecture/bldrz-recovery.md).
 
 The native pool test is a separate, explicit operational check:
 
@@ -140,5 +142,5 @@ It restores schema and non-customer reference definitions into
 application helper with a maximum-one connection pool. It verifies sequential
 and interleaved tenant isolation, rollback, SQL errors, timeouts and context
 reset. It refuses to overwrite an existing probe database and drops only the
-probe it created. Full data backup/recovery and load testing remain separate
-gates.
+probe it created. Full backup/recovery is exercised separately by
+`deploy/verify-bldrz-restore.sh`; neither drill establishes load capacity.

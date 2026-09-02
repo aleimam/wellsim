@@ -69,7 +69,10 @@ least-privilege runtime role, RLS policies, composite tenant foreign keys,
 two-company adversarial suite and private personal-workspace integrity rules
 are implemented. Company-to-company and personal-to-company isolation pass in
 a disposable PostgreSQL engine, including links and export scope. Identity-
-provider integration, object storage and full backup/restore remain open.
+provider integration and object storage remain open. A manual encrypted
+database backup and fresh-cluster restore passed, including data equality and
+post-restore tenant isolation. Automated independent storage, retention and
+redundant recovery-key custody remain open; see [bldrz recovery](bldrz-recovery.md).
 Migrations `0001`–`0003` are applied to the isolated `bldrz` database. The
 bounded pool and transaction helper are wired at application startup; no
 authenticated data handler is exposed until the verified identity boundary is

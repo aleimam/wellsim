@@ -1,0 +1,19 @@
+[Unit]
+Description=Encrypted PostgreSQL backup for bldrz only
+Requires=postgresql.service
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/bin/bash /opt/bldrz/app/deploy/backup-bldrz-db.sh
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/backups/bldrz /run/lock
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX
+NoNewPrivileges=true

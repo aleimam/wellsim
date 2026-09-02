@@ -132,7 +132,12 @@ private; neither belongs in a repository. They **are** in the F: backup.
   loads it into a maximum-10 connection pool, with a 50-request admission cap,
   5-second acquisition timeout and 15-second statement timeout. Startup checks
   fail closed on unsafe role privileges. No authenticated v2 data route is
-  exposed yet; identity integration and PostgreSQL backup/restore remain gates.
+  exposed yet. A manual encrypted off-server PostgreSQL backup and fresh-
+  cluster restore drill passed, including data equality, ownership, ACLs and
+  two-company isolation after recovery. Identity integration and automated
+  off-server retention/alerts/key redundancy remain gates. The new bldrz
+  backup timer is deliberately not enabled yet. See
+  **docs/architecture/bldrz-recovery.md**.
 - **Charts are drawn by Plotly at their container's width**, and that width is
   often wrong at draw time — the container is hidden, or its flex layout has
   not settled, or the web font has not loaded. This caused a long tail of

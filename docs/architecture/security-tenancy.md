@@ -64,8 +64,8 @@ control.
 ### Implemented foundation
 
 The first database implementation is isolated to `codex/v2-foundation`.
-Its SQL is deployed to `bldrz.net` as inactive source and has not been applied
-to a live database. `db/migrations/0001_platform_foundation.sql` defines identities,
+Migrations `0001` through `0003` are applied to the isolated `bldrz` database;
+no authenticated v2 data route is enabled. `db/migrations/0001_platform_foundation.sql` defines identities,
 workspaces, memberships, assets, cases, immutable revisions and calculation
 evidence, datasets, file metadata, exports and audit events.
 
@@ -88,9 +88,11 @@ memberships or invitations.
 
 This is the authorization/storage foundation, not a claim that authentication,
 object delivery or production operations are finished. The identity-provider
-ADR, API composition root, signed file delivery, native PostgreSQL verification,
-backup/restore and authenticated data routes remain required before customer
-data. The bldrz pool/transaction boundary is implemented in
+ADR, authenticated API composition, signed file delivery and automated
+off-server recovery remain required before customer data. Native isolation,
+pool reuse and a manual encrypted backup/restore drill have passed; see
+[bldrz recovery](bldrz-recovery.md) for the remaining storage/key-custody gate.
+The bldrz pool/transaction boundary is implemented in
 `src/server/database.js`; `deploy/verify-bldrz-pool.sh` exercises native
 connection reuse and error recovery in a disposable schema clone.
 
