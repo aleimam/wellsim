@@ -1,10 +1,11 @@
 # WellSim — handover
 
-**Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
-**Manual:** https://wellsim.app/help.html
+**Reference production:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
+**Repo:** https://github.com/aleimam/wellsim
 **Live production revision:** 30 August 2026 — commit `c6f1caa`, asset stamp
-`2026-08-30k`. **Current working tree:** 260 tests passing and 43/43 validation
-sweep; the v2 database foundation is local only and has not been deployed.
+`2026-08-30k`. **Current working tree:** 261 tests passing and 43/43 validation
+sweep. The v2 SQL is deployed to `bldrz.net` as inactive source only; no v2
+migration has been applied to a live database.
 
 ---
 
@@ -36,7 +37,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 260 unit, regression and security tests
+node --test                       # 261 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 

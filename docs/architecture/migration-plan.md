@@ -8,7 +8,7 @@ reference until each vertical slice passes its replacement gates.
 Deliverables:
 
 - clean source revision recorded;
-- 260/260 tests and 43/43 validation sweep passing;
+- 261/261 tests and 43/43 validation sweep passing;
 - legacy web account/case store disabled by default;
 - visitor calculation and Save as / Open behavior preserved;
 - portable local case store preserved; and
@@ -64,13 +64,15 @@ imported.
 Exit gate: two test organizations and a personal workspace cannot cross-read,
 cross-write, cross-export or cross-link any resources.
 
-Local progress on `codex/v2-foundation`: the initial PostgreSQL schema,
-least-privilege runtime role, RLS policies, composite tenant foreign keys and
-two-company adversarial suite are implemented. The company-to-company portion
-of the exit gate passes in a disposable PostgreSQL engine. Personal-workspace
-coverage, identity-provider integration, object storage, native PostgreSQL
-qualification, backup/restore and connection-pool tests remain open. Nothing
-from this phase has been applied to production.
+Progress on `codex/v2-foundation`: the initial PostgreSQL schema,
+least-privilege runtime role, RLS policies, composite tenant foreign keys,
+two-company adversarial suite and private personal-workspace integrity rules
+are implemented. Company-to-company and personal-to-company isolation pass in
+a disposable PostgreSQL engine, including links and export scope. Identity-
+provider integration, object storage, native PostgreSQL qualification,
+backup/restore and connection-pool tests remain open. The SQL is present on the
+isolated `bldrz.net` comparison deployment as source only; no v2 migration has
+been applied to a live database.
 
 ## Phase 4 — Modular shell and first vertical slice
 

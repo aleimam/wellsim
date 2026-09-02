@@ -61,10 +61,11 @@ control.
 - Resource lookup returns the same not-found behavior for unauthorized and
   nonexistent identifiers where disclosure would be harmful.
 
-### Implemented local foundation
+### Implemented foundation
 
-The first database implementation is isolated to `codex/v2-foundation` and is
-not deployed. `db/migrations/0001_platform_foundation.sql` defines identities,
+The first database implementation is isolated to `codex/v2-foundation`.
+Its SQL is deployed to `bldrz.net` as inactive source and has not been applied
+to a live database. `db/migrations/0001_platform_foundation.sql` defines identities,
 workspaces, memberships, assets, cases, immutable revisions and calculation
 evidence, datasets, file metadata, exports and audit events.
 
@@ -77,10 +78,13 @@ record in another company.
 
 The request transaction contract and local test procedure are documented in
 `db/README.md`. The adversarial suite in `tests/tenancy.postgres.test.js`
-creates two companies and proves application-role isolation for reads, writes,
-typed links and export scope. It also proves missing/malformed context fails
-closed, membership suspension is immediate, and transaction context does not
-survive connection reuse.
+creates two companies and a private personal workspace, then proves
+application-role isolation for reads, writes, typed links and export scope. It
+also proves missing/malformed context fails closed, membership suspension is
+immediate, and transaction context does not survive connection reuse.
+`db/migrations/0003_personal_workspace_integrity.sql` makes personal ownership
+one-to-one and prevents personal workspaces from being shared through
+memberships or invitations.
 
 This is the authorization/storage foundation, not a claim that authentication,
 object delivery or production operations are finished. The identity-provider

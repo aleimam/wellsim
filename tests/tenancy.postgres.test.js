@@ -52,30 +52,42 @@ const MEMBERSHIP_BOUND_ACTORS = Object.freeze([
 const ID = Object.freeze({
   userA: '00000000-0000-4000-8000-0000000000a1',
   userB: '00000000-0000-4000-8000-0000000000b1',
+  userPersonal: '00000000-0000-4000-8000-0000000000c1',
   identityB: '00000000-0000-4000-8000-0000000001b1',
   workspaceA: '00000000-0000-4000-8000-0000000010a1',
   workspaceB: '00000000-0000-4000-8000-0000000010b1',
+  workspacePersonal: '00000000-0000-4000-8000-0000000010c1',
+  workspacePersonalOther: '00000000-0000-4000-8000-0000000010c2',
   invitationB: '00000000-0000-4000-8000-0000000011b1',
   fieldA: '00000000-0000-4000-8000-0000000020a1',
   fieldB: '00000000-0000-4000-8000-0000000020b1',
+  fieldPersonal: '00000000-0000-4000-8000-0000000020c1',
   reservoirB: '00000000-0000-4000-8000-0000000021b1',
   wellA: '00000000-0000-4000-8000-0000000030a1',
   wellB: '00000000-0000-4000-8000-0000000030b1',
+  wellPersonal: '00000000-0000-4000-8000-0000000030c1',
   wellboreB: '00000000-0000-4000-8000-0000000031b1',
   projectA: '00000000-0000-4000-8000-0000000040a1',
   projectB: '00000000-0000-4000-8000-0000000040b1',
+  projectPersonal: '00000000-0000-4000-8000-0000000040c1',
   caseA: '00000000-0000-4000-8000-0000000050a1',
   caseB: '00000000-0000-4000-8000-0000000050b1',
+  casePersonal: '00000000-0000-4000-8000-0000000050c1',
   revisionA: '00000000-0000-4000-8000-0000000060a1',
   revisionB: '00000000-0000-4000-8000-0000000060b1',
+  revisionPersonal: '00000000-0000-4000-8000-0000000060c1',
   runB: '00000000-0000-4000-8000-0000000061b1',
   datasetB: '00000000-0000-4000-8000-0000000062b1',
   exportA: '00000000-0000-4000-8000-0000000070a1',
   exportB: '00000000-0000-4000-8000-0000000070b1',
+  exportPersonal: '00000000-0000-4000-8000-0000000070c1',
   exportItemA: '00000000-0000-4000-8000-0000000071a1',
   exportItemCross: '00000000-0000-4000-8000-0000000071a2',
+  exportItemPersonal: '00000000-0000-4000-8000-0000000071c1',
+  exportItemPersonalCross: '00000000-0000-4000-8000-0000000071c2',
   fileA: '00000000-0000-4000-8000-0000000080a1',
   fileB: '00000000-0000-4000-8000-0000000080b1',
+  filePersonal: '00000000-0000-4000-8000-0000000080c1',
   auditB: '00000000-0000-4000-8000-0000000090b1',
   correlationB: '00000000-0000-4000-8000-0000000091b1',
 });
@@ -123,14 +135,17 @@ before(async () => {
   await db.exec(`
     INSERT INTO app.app_user (id, email, display_name) VALUES
       ('${ID.userA}', 'owner-a@example.test', 'Owner A'),
-      ('${ID.userB}', 'owner-b@example.test', 'Owner B');
+      ('${ID.userB}', 'owner-b@example.test', 'Owner B'),
+      ('${ID.userPersonal}', 'individual@example.test', 'Individual User');
 
     INSERT INTO app.auth_identity (id, user_id, provider, provider_subject) VALUES
       ('${ID.identityB}', '${ID.userB}', 'test', 'company-b-owner');
 
-    INSERT INTO app.workspace (id, kind, name, slug) VALUES
-      ('${ID.workspaceA}', 'organization', 'Company A', 'company-a'),
-      ('${ID.workspaceB}', 'organization', 'Company B', 'company-b');
+    INSERT INTO app.workspace (id, kind, name, slug, owner_user_id) VALUES
+      ('${ID.workspaceA}', 'organization', 'Company A', 'company-a', NULL),
+      ('${ID.workspaceB}', 'organization', 'Company B', 'company-b', NULL),
+      ('${ID.workspacePersonal}', 'personal', 'Individual Workspace',
+       'individual-workspace', '${ID.userPersonal}');
 
     INSERT INTO app.organization (workspace_id, legal_name) VALUES
       ('${ID.workspaceA}', 'Company A Petroleum Ltd'),
@@ -138,7 +153,8 @@ before(async () => {
 
     INSERT INTO app.membership (workspace_id, user_id, role_key, status, joined_at) VALUES
       ('${ID.workspaceA}', '${ID.userA}', 'owner', 'active', statement_timestamp()),
-      ('${ID.workspaceB}', '${ID.userB}', 'owner', 'active', statement_timestamp());
+      ('${ID.workspaceB}', '${ID.userB}', 'owner', 'active', statement_timestamp()),
+      ('${ID.workspacePersonal}', '${ID.userPersonal}', 'owner', 'active', statement_timestamp());
 
     INSERT INTO app.workspace_invitation
       (workspace_id, id, email, role_key, token_hash, invited_by, expires_at)
@@ -148,37 +164,49 @@ before(async () => {
 
     INSERT INTO app.field_asset (workspace_id, id, name, created_by) VALUES
       ('${ID.workspaceA}', '${ID.fieldA}', 'A Field', '${ID.userA}'),
-      ('${ID.workspaceB}', '${ID.fieldB}', 'B Field', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.fieldB}', 'B Field', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.fieldPersonal}', 'Private Field', '${ID.userPersonal}');
 
     INSERT INTO app.reservoir (workspace_id, id, field_id, name, created_by) VALUES
       ('${ID.workspaceB}', '${ID.reservoirB}', '${ID.fieldB}', 'B Reservoir', '${ID.userB}');
 
     INSERT INTO app.well (workspace_id, id, field_id, name, created_by) VALUES
       ('${ID.workspaceA}', '${ID.wellA}', '${ID.fieldA}', 'A-01', '${ID.userA}'),
-      ('${ID.workspaceB}', '${ID.wellB}', '${ID.fieldB}', 'B-01', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.wellB}', '${ID.fieldB}', 'B-01', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.wellPersonal}', '${ID.fieldPersonal}',
+       'Private-01', '${ID.userPersonal}');
 
     INSERT INTO app.wellbore (workspace_id, id, well_id, name, created_by) VALUES
       ('${ID.workspaceB}', '${ID.wellboreB}', '${ID.wellB}', 'B-01 Main', '${ID.userB}');
 
     INSERT INTO app.project (workspace_id, id, name, status, created_by) VALUES
       ('${ID.workspaceA}', '${ID.projectA}', 'A Well Performance', 'active', '${ID.userA}'),
-      ('${ID.workspaceB}', '${ID.projectB}', 'B Well Performance', 'active', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.projectB}', 'B Well Performance', 'active', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.projectPersonal}', 'Private Study', 'active',
+       '${ID.userPersonal}');
 
     INSERT INTO app.project_well (workspace_id, project_id, well_id, linked_by) VALUES
       ('${ID.workspaceA}', '${ID.projectA}', '${ID.wellA}', '${ID.userA}'),
-      ('${ID.workspaceB}', '${ID.projectB}', '${ID.wellB}', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.projectB}', '${ID.wellB}', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.projectPersonal}', '${ID.wellPersonal}',
+       '${ID.userPersonal}');
 
     INSERT INTO app.engineering_case
       (workspace_id, id, project_id, well_id, module_id, title, created_by)
     VALUES
       ('${ID.workspaceA}', '${ID.caseA}', '${ID.projectA}', '${ID.wellA}', 'production.well-performance', 'A confidential case', '${ID.userA}'),
-      ('${ID.workspaceB}', '${ID.caseB}', '${ID.projectB}', '${ID.wellB}', 'production.well-performance', 'B confidential case', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.caseB}', '${ID.projectB}', '${ID.wellB}', 'production.well-performance', 'B confidential case', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.casePersonal}', '${ID.projectPersonal}',
+       '${ID.wellPersonal}', 'production.well-performance', 'Private personal case',
+       '${ID.userPersonal}');
 
     INSERT INTO app.case_revision
       (workspace_id, id, case_id, revision_number, input_schema_id, input_document, created_by)
     VALUES
       ('${ID.workspaceA}', '${ID.revisionA}', '${ID.caseA}', 1, 'wellsim.case.v1', '{"company":"A"}', '${ID.userA}'),
-      ('${ID.workspaceB}', '${ID.revisionB}', '${ID.caseB}', 1, 'wellsim.case.v1', '{"company":"B"}', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.revisionB}', '${ID.caseB}', 1, 'wellsim.case.v1', '{"company":"B"}', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.revisionPersonal}', '${ID.casePersonal}', 1,
+       'wellsim.case.v1', '{"personal":true}', '${ID.userPersonal}');
 
     INSERT INTO app.calculation_run
       (workspace_id, id, case_revision_id, module_id, engine_id, engine_version,
@@ -200,20 +228,29 @@ before(async () => {
       (workspace_id, id, object_key, original_name, media_type, byte_size, checksum_sha256, scan_status, created_by)
     VALUES
       ('${ID.workspaceA}', '${ID.fileA}', 'workspace-a/case-a.json', 'case-a.json', 'application/json', 10, repeat('a', 64), 'clean', '${ID.userA}'),
-      ('${ID.workspaceB}', '${ID.fileB}', 'workspace-b/case-b.json', 'case-b.json', 'application/json', 10, repeat('b', 64), 'clean', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.fileB}', 'workspace-b/case-b.json', 'case-b.json', 'application/json', 10, repeat('b', 64), 'clean', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.filePersonal}', 'workspace-personal/case.json',
+       'private-case.json', 'application/json', 10, repeat('c', 64), 'clean',
+       '${ID.userPersonal}');
 
     INSERT INTO app.case_file_link (workspace_id, case_id, file_object_id, purpose, linked_by)
     VALUES
-      ('${ID.workspaceB}', '${ID.caseB}', '${ID.fileB}', 'confidential evidence', '${ID.userB}');
+      ('${ID.workspaceB}', '${ID.caseB}', '${ID.fileB}', 'confidential evidence', '${ID.userB}'),
+      ('${ID.workspacePersonal}', '${ID.casePersonal}', '${ID.filePersonal}',
+       'private evidence', '${ID.userPersonal}');
 
     INSERT INTO app.export_job
       (workspace_id, id, requested_by, exporter_id, exporter_version, status, source_snapshot)
     VALUES
-      ('${ID.workspaceB}', '${ID.exportB}', '${ID.userB}', 'case-xlsx', 1, 'queued', '{"case":"B"}');
+      ('${ID.workspaceB}', '${ID.exportB}', '${ID.userB}', 'case-xlsx', 1, 'queued', '{"case":"B"}'),
+      ('${ID.workspacePersonal}', '${ID.exportPersonal}', '${ID.userPersonal}',
+       'case-xlsx', 1, 'queued', '{"personal":true}');
 
     INSERT INTO app.export_item (workspace_id, id, export_job_id, case_id)
     VALUES
-      ('${ID.workspaceB}', '00000000-0000-4000-8000-0000000071b1', '${ID.exportB}', '${ID.caseB}');
+      ('${ID.workspaceB}', '00000000-0000-4000-8000-0000000071b1', '${ID.exportB}', '${ID.caseB}'),
+      ('${ID.workspacePersonal}', '${ID.exportItemPersonal}', '${ID.exportPersonal}',
+       '${ID.casePersonal}');
 
     INSERT INTO app.export_artifact
       (workspace_id, export_job_id, file_object_id, source_manifest)
@@ -239,6 +276,7 @@ test('PostgreSQL migrations enable RLS and a non-bypass runtime role', async () 
   assert.deepEqual(versions.rows.map((row) => row.version), [
     '0001_platform_foundation',
     '0002_tenant_isolation',
+    '0003_personal_workspace_integrity',
   ]);
 
   const role = await db.query(
@@ -545,6 +583,125 @@ test('Company A cannot read, create or scope an export over Company B data', asy
       [ID.workspaceB, ID.userA],
     )),
     '42501',
+  );
+});
+
+test('personal workspaces stay private, unshareable and tenant-bound', async () => {
+  const ownWorkspace = await runAs(
+    ID.userPersonal,
+    ID.workspacePersonal,
+    () => db.query('SELECT id, kind, owner_user_id FROM app.workspace'),
+  );
+  assert.deepEqual(ownWorkspace.rows, [{
+    id: ID.workspacePersonal,
+    kind: 'personal',
+    owner_user_id: ID.userPersonal,
+  }]);
+
+  const ownCases = await runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+    'SELECT id, title FROM app.engineering_case ORDER BY id',
+  ));
+  assert.deepEqual(ownCases.rows, [{
+    id: ID.casePersonal,
+    title: 'Private personal case',
+  }]);
+
+  const ownExports = await runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+    'SELECT id, source_snapshot FROM app.export_job ORDER BY id',
+  ));
+  assert.deepEqual(ownExports.rows, [{
+    id: ID.exportPersonal,
+    source_snapshot: { personal: true },
+  }]);
+
+  for (const [userId, workspaceId] of [
+    [ID.userA, ID.workspaceA],
+    [ID.userB, ID.workspaceB],
+  ]) {
+    const hiddenPersonalCase = await runAs(userId, workspaceId, () => db.query(
+      'SELECT id FROM app.engineering_case WHERE id = $1',
+      [ID.casePersonal],
+    ));
+    assert.deepEqual(hiddenPersonalCase.rows, []);
+
+    const hiddenPersonalFile = await runAs(userId, workspaceId, () => db.query(
+      'SELECT id FROM app.file_object WHERE id = $1',
+      [ID.filePersonal],
+    ));
+    assert.deepEqual(hiddenPersonalFile.rows, []);
+  }
+
+  for (const foreignCaseId of [ID.caseA, ID.caseB]) {
+    const hiddenCompanyCase = await runAs(
+      ID.userPersonal,
+      ID.workspacePersonal,
+      () => db.query('SELECT id FROM app.engineering_case WHERE id = $1', [foreignCaseId]),
+    );
+    assert.deepEqual(hiddenCompanyCase.rows, []);
+  }
+
+  await expectDatabaseError(
+    runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+      `INSERT INTO app.export_item (workspace_id, id, export_job_id, case_id)
+       VALUES ($1, $2, $3, $4)`,
+      [
+        ID.workspacePersonal,
+        ID.exportItemPersonalCross,
+        ID.exportPersonal,
+        ID.caseA,
+      ],
+    )),
+    '23503',
+  );
+
+  await expectDatabaseError(
+    runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+      `INSERT INTO app.case_file_link
+         (workspace_id, case_id, file_object_id, purpose, linked_by)
+       VALUES ($1, $2, $3, 'cross-tenant evidence', $4)`,
+      [ID.workspacePersonal, ID.casePersonal, ID.fileA, ID.userPersonal],
+    )),
+    '23503',
+  );
+
+  await expectDatabaseError(
+    runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+      `INSERT INTO app.membership
+         (workspace_id, user_id, role_key, status, invited_by)
+       VALUES ($1, $2, 'viewer', 'active', $3)`,
+      [ID.workspacePersonal, ID.userA, ID.userPersonal],
+    )),
+    '23514',
+  );
+
+  await expectDatabaseError(
+    runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+      `INSERT INTO app.workspace_invitation
+         (workspace_id, id, email, role_key, token_hash, invited_by, expires_at)
+       VALUES ($1, '00000000-0000-4000-8000-0000000011c1',
+               'share@example.test', 'viewer', repeat('c', 64), $2,
+               statement_timestamp() + interval '1 day')`,
+      [ID.workspacePersonal, ID.userPersonal],
+    )),
+    '23514',
+  );
+
+  await expectDatabaseError(
+    db.query(
+      `INSERT INTO app.workspace (id, kind, name, slug, owner_user_id)
+       VALUES ($1, 'personal', 'Duplicate Personal Workspace', 'duplicate-personal', $2)`,
+      [ID.workspacePersonalOther, ID.userPersonal],
+    ),
+    '23505',
+  );
+
+  await expectDatabaseError(
+    db.query(
+      `INSERT INTO app.workspace (id, kind, name, slug, owner_user_id)
+       VALUES ($1, 'organization', 'Invalid Organization', 'invalid-organization', $2)`,
+      [ID.workspacePersonalOther, ID.userPersonal],
+    ),
+    '23514',
   );
 });
 

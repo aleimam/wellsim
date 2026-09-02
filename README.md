@@ -34,10 +34,10 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-260 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+261 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries, plus
-PostgreSQL two-company isolation for reads, writes, links and exports. Run
+PostgreSQL company and personal-workspace isolation for reads, writes, links and exports. Run
 `npm install` once to install the development-only PostgreSQL test harness.
 
 ```bash

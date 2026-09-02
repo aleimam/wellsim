@@ -1,14 +1,19 @@
 # Database foundation
 
-This directory contains the PostgreSQL foundation for WellSim v2. It is local
-development work on `codex/v2-foundation`; no migration in this directory has
-been applied to production.
+This directory contains the PostgreSQL foundation for WellSim v2 on
+`codex/v2-foundation`. The SQL is deployed to the isolated `bldrz.net`
+comparison environment as source only; no migration in this directory has been
+applied to a live database.
 
 ## Migration order
 
 Apply `db/migrations/*.sql` once, in lexical order, with a dedicated migration
 owner. Each migration records its version in `app.schema_migration` and runs in
 a transaction.
+
+`0003_personal_workspace_integrity.sql` enforces one private personal workspace
+per owner. A personal workspace cannot add another member or issue an
+invitation; collaboration belongs in an organization workspace.
 
 The web/API process must never connect as the migration owner, a superuser, or
 a role with `BYPASSRLS`. Application queries run as the non-login
@@ -58,6 +63,8 @@ export workers.
   append-only.
 - Export scope references tenant-bound cases, datasets or file metadata; it
   cannot point at another workspace's resource.
+- Personal workspaces are owner-only, cannot be shared, and remain isolated
+  from every organization workspace.
 
 Arbitrary UUID-like values inside JSON documents are payload, not relational
 links. Module/API schema validation must reject undeclared references before
@@ -74,8 +81,9 @@ node scripts/validation-sweep.mjs
 ```
 
 The tenancy suite boots a fresh in-memory PGlite PostgreSQL engine, applies the
-real SQL migrations, seeds two companies and executes adversarial reads,
-writes, links and exports through `wellsim_runtime`. PGlite is only the
+real SQL migrations, seeds two companies plus a private personal workspace and
+executes adversarial reads, writes, links and exports through
+`wellsim_runtime`. PGlite is only the
 disposable local test harness. A native supported PostgreSQL instance, backup
 and restore drill, connection-pool integration test and production migration
 review remain deployment gates.
