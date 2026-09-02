@@ -41,9 +41,9 @@ directory, service, port, logs or case data.
 
 The checked-in service and Caddy definitions are
 `deploy/bldrz.service` and `deploy/bldrz.Caddyfile`. The legacy JSON account
-store is explicitly disabled. PostgreSQL migration files may be present in the
-deployed source tree, but they are not applied until the v2 API transaction
-boundary and native-PostgreSQL deployment gate are complete.
+store is explicitly disabled. PostgreSQL migrations `0001` through `0003` are
+applied to the separate `bldrz` comparison database, but the current web
+service does not load its database credential or use PostgreSQL yet.
 
 The comparison source tree is owned by root and is read-only to the `bldrz`
 service user. Only `/opt/bldrz/app/data` and
@@ -64,16 +64,45 @@ the package-default peer authentication. The bind override is held in
 from immediately before the change is preserved at
 `/var/lib/postgresql/16/main/postgresql.auto.conf.before-local-only-20260902`.
 
-No WellSim database, application login, migration owner or password has been
-created yet, and no migration has been applied. Do not expose port 5432 or use
-the `postgres` operating-system/database account from an application service.
-Future application access must use separate migration and login roles, with
-the runtime transaction switching to the non-login `wellsim_runtime` role.
+The comparison environment has these separate identities:
+
+| Identity | Login | Purpose |
+|---|---:|---|
+| `bldrz_migration_owner` | No | Owns the `bldrz` database, schema, tables, functions and policies |
+| `bldrz_app` | Yes | Password-authenticated connection identity; has `CONNECT` and may only switch to `bldrz_runtime` |
+| `bldrz_runtime` | No | Least-privilege grants and RLS policy target; no DDL, delete, ownership or bypass privileges |
+
+`PUBLIC` has no database, application-schema or application-table grant. The
+login is `NOINHERIT`, so it has no direct schema access before a trusted
+transaction executes `SET LOCAL ROLE bldrz_runtime`. All three roles are
+non-superuser, cannot create databases or roles, and cannot bypass RLS. The
+login has a 40-connection safety limit; normal concurrency must be handled by a
+bounded application pool rather than one database connection per user.
+
+The credential is stored only in `/etc/bldrz/postgresql.env`, owned
+`root:bldrz` with mode `0640`. It is not committed, printed in deployment
+records or loaded by `bldrz.service` yet. Do not expose port 5432 or use the
+`postgres` operating-system/database account from an application service.
+
+The portable migration names `wellsim_runtime`, but PostgreSQL roles are
+cluster-global and this server also hosts WellSim production. For bldrz,
+cluster role management was performed separately by the PostgreSQL
+administrator and the schema portion of migration `0002` was rendered with
+the isolated `bldrz_runtime` identifier. All application objects are owned by
+`bldrz_migration_owner`. `app.schema_migration` records `0001`, `0002` and
+`0003`.
+
+Native PostgreSQL verification used a disposable clone of `bldrz`. Company A
+saw one own case and zero Company B cases, changed zero cross-company rows, and
+cross-company project/well links and export/case references were rejected by
+composite foreign keys. The clone was removed after the test. The persistent
+`bldrz` database remains empty of user and customer data.
 
 Verify the boundary with:
 
 ```bash
 sudo -u postgres psql -Atc "SHOW server_version; SHOW listen_addresses; SHOW port;"
+sudo -u postgres psql -d bldrz -Atc "TABLE app.schema_migration;"
 ss -ltnp | grep ':5432 '
 pg_isready -h 127.0.0.1 -p 5432
 systemctl is-active postgresql bldrz wellsim caddy

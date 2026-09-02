@@ -1,9 +1,9 @@
 # Database foundation
 
 This directory contains the PostgreSQL foundation for WellSim v2 on
-`codex/v2-foundation`. The SQL is deployed to the isolated `bldrz.net`
-comparison environment as source only; no migration in this directory has been
-applied to a live database.
+`codex/v2-foundation`. Migrations `0001` through `0003` are applied to the
+isolated `bldrz` comparison database. That database is not yet connected to the
+web process and contains no customer data.
 
 ## Migration order
 
@@ -18,6 +18,13 @@ invitation; collaboration belongs in an organization workspace.
 The web/API process must never connect as the migration owner, a superuser, or
 a role with `BYPASSRLS`. Application queries run as the non-login
 `wellsim_runtime` role so PostgreSQL row-level security is always enforced.
+
+The role name in the portable source migration is `wellsim_runtime`. PostgreSQL
+roles are cluster-global, so the shared Hetzner cluster uses the
+environment-specific name `bldrz_runtime` instead. The cluster administrator
+creates and hardens that role; the bldrz rendering of migration `0002` omits
+its role-management preamble and replaces only that role identifier. Schema
+objects remain owned by the non-login `bldrz_migration_owner` role.
 
 ## Trusted request transaction
 
@@ -83,7 +90,8 @@ node scripts/validation-sweep.mjs
 The tenancy suite boots a fresh in-memory PGlite PostgreSQL engine, applies the
 real SQL migrations, seeds two companies plus a private personal workspace and
 executes adversarial reads, writes, links and exports through
-`wellsim_runtime`. PGlite is only the
-disposable local test harness. A native supported PostgreSQL instance, backup
-and restore drill, connection-pool integration test and production migration
-review remain deployment gates.
+`wellsim_runtime`. PGlite is the disposable local test harness. The same
+read/write/link/export boundary has also passed a disposable native PostgreSQL
+16 clone of the bldrz database through `bldrz_runtime`. A backup and restore
+drill, connection-pool integration test and production migration review remain
+deployment gates.

@@ -123,9 +123,13 @@ private; neither belongs in a repository. They **are** in the F: backup.
   unaffected. This is fine and expected; do not treat it as a bug report.
 - **PostgreSQL 16.15 is installed for the `bldrz.net` comparison environment.**
   It listens only on `127.0.0.1:5432`; IPv6, wildcard/public listeners and a
-  UFW rule for 5432 are absent. No WellSim database or application role exists
-  yet and no migration has been applied. The next gate is separated database
-  roles plus native migration and connection-pool isolation testing.
+  UFW rule for 5432 are absent. The separate `bldrz` database has migrations
+  `0001` through `0003`, non-login owner `bldrz_migration_owner`, login
+  `bldrz_app`, and non-login least-privilege role `bldrz_runtime`. Native tests
+  proved cross-company read, modify, link and export isolation. The credential
+  is only in `/etc/bldrz/postgresql.env` (`root:bldrz`, `0640`) and is not yet
+  loaded by the web service. Connection-pool isolation, API transaction wiring,
+  and PostgreSQL backup/restore are the next gates.
 - **Charts are drawn by Plotly at their container's width**, and that width is
   often wrong at draw time — the container is hidden, or its flex layout has
   not settled, or the web font has not loaded. This caused a long tail of
