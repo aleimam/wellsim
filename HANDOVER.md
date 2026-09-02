@@ -256,6 +256,18 @@ private; neither belongs in a repository. They **are** in the F: backup.
   `Permission denied (publickey)` to a password-only attempt. The original
   file is backed up at `/root/sshd_config.bak-2026-08-29`.
 
+  **SUPERSEDED 2 Sep 2026: `wellsim-deploy` no longer works.** Key-only
+  administrative access was restored through the Hetzner console that day and
+  a new Ed25519 recovery identity was installed (`wellsim-ops-2026-09-02` in
+  the Hetzner project). The server now answers `Permission denied (publickey)`
+  to `wellsim_hetzner` — verified from this workstation on 2 Sep, with no
+  `Server accepts key` line. The recovery key is NOT on this machine, so
+  deploys cannot run from here. Everything below describes the retired key and
+  is kept only because its lessons about ACLs, passphrases and F: paths still
+  apply to whatever key replaces it.
+
+  See **docs/architecture/infrastructure-audit-2026-09-02.md** for why.
+
   **The consequence to respect: this host is now reachable only with the
   private key `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
   Hetzner console, not SSH. A passphrase-protected copy is kept on the F:
