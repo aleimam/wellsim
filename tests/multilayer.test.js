@@ -7,6 +7,7 @@ import { createGasIpr, qGasAtPwfJ } from '../src/core/ipr/gas-ipr.js';
 import {
   multiLayerOilRates,
   multiLayerOilCurve,
+  multiLayerOilCurves,
   prAvgOil,
   equivalentOilIpr,
   multiLayerGasRates,
@@ -118,5 +119,65 @@ test('gas multi-layer: summation, CGR/WGR blend, exact closed-form equivalent', 
   // exact collapse: equivalent equals the sum at EVERY pwf
   for (const pwf of [3000, 2000, 1000, 0]) {
     close(qGasAtPwfJ(pwf, eq.ipr), qGasAtPwfJ(pwf, G1.ipr) + qGasAtPwfJ(pwf, G2.ipr), 1e-9);
+  }
+});
+
+// ---- per-layer curves for plotting each layer beside the total ----
+// The chart is only honest if the layers add up. They are generated from the
+// same multiLayerOilRates call as the total rather than a second pass, so
+// this test pins the property that construction is meant to guarantee --
+// including under the no-crossflow clamp, where a second implementation
+// would be most likely to drift.
+test('per-layer curves sum to the total at every point', () => {
+  const layers = [L1, L2];
+  for (const allowCrossflow of [true, false]) {
+    const { layers: per, total } = multiLayerOilCurves(layers, { points: 12, allowCrossflow });
+    assert.equal(per.length, layers.length);
+    assert.equal(per[0].curve.length, 13);
+    for (let i = 0; i < total.length; i++) {
+      for (const k of ["qGrossStbD", "qOilStbD", "qWaterStbD"]) {
+        const summed = per.reduce((a, L) => a + L.curve[i][k], 0);
+        assert.ok(
+          Math.abs(summed - total[i][k]) < 1e-9,
+          `${k} at Pwf ${total[i].pwfPsi}: layers sum ${summed} vs total ${total[i][k]} ` +
+            `(allowCrossflow ${allowCrossflow})`
+        );
+      }
+      // every layer shares the composite grid, which is what makes them
+      // comparable on one chart
+      for (const L of per) assert.equal(L.curve[i].pwfPsi, total[i].pwfPsi);
+    }
+  }
+});
+
+test('a layer below the flowing pressure shows NEGATIVE rate, not a clipped one', () => {
+  // crossflow is the thing the plot and the table exist to expose, so the
+  // curve must actually cross into the negative half rather than flatten at 0
+  const layers = [L1, L2];
+  const lowPr = Math.min(...layers.map((l) => l.ipr.prPsi));
+  const { layers: per } = multiLayerOilCurves(layers, { points: 20, allowCrossflow: true });
+  const weak = per.find((L) => L.prPsi === lowPr);
+  const above = weak.curve.filter((p) => p.pwfPsi > lowPr);
+  assert.ok(above.length > 0, "grid must reach above the weak layer Pr");
+  assert.ok(
+    above.every((p) => p.qGrossStbD < 0),
+    "every point above that layer Pr must be negative (fluid entering the layer)"
+  );
+
+  // and the clamp really clamps
+  const clamped = multiLayerOilCurves(layers, { points: 20, allowCrossflow: false });
+  const weakC = clamped.layers.find((L) => L.prPsi === lowPr);
+  assert.ok(
+    weakC.curve.filter((p) => p.pwfPsi > lowPr).every((p) => p.qGrossStbD === 0),
+    "with crossflow disallowed the injecting layer must sit at zero"
+  );
+});
+
+test('curve carries what the layer table prints', () => {
+  const { layers: per } = multiLayerOilCurves([L1, L2], { points: 4 });
+  for (const L of per) {
+    assert.ok(Number.isFinite(L.prPsi), `prPsi ${L.prPsi}`);
+    assert.ok(Number.isFinite(L.j) && L.j > 0, `j ${L.j}`);
+    assert.ok(L.name, "layer needs a name for the legend");
   }
 });

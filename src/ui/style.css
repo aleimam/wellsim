@@ -348,3 +348,10 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); }
 
 /* charts that have not been drawn yet render nothing, not an empty box */
 .results .chart:empty { display: none; }
+
+/* multi-layer IPR: a layer whose Pr sits below the flowing pressure takes
+   fluid IN. It is the one row in that table a reader must not skim past, so
+   it gets the warning tint and its own left rule rather than relying on a
+   minus sign in one column. */
+tbody tr.crossflow td { background: #FBE9E7; color: #7a1f14; font-weight: 600; }
+tbody tr.crossflow td:first-child { box-shadow: inset 3px 0 0 var(--crit); }

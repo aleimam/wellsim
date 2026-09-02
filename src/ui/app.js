@@ -460,7 +460,15 @@ function renderTables(containerId, tables) {
       (t, i) =>
         `<div class="dt-head"><span>${t.title}</span><button class="copybtn" data-i="${i}">Copy</button></div>` +
         `<table><thead><tr>${t.headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead>` +
-        `<tbody>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+        // t.rowClass(row, i) -> a class for that <tr>, so a table can mark the
+        // rows that need attention (a crossflowing layer) instead of leaving
+        // the reader to compare two columns for every row
+        `<tbody>${t.rows
+          .map((r, ri) => {
+            const cls = t.rowClass ? t.rowClass(r, ri) : '';
+            return `<tr${cls ? ` class="${cls}"` : ''}>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`;
+          })
+          .join('')}</tbody></table>`
     )
     .join('');
   el.querySelectorAll('.copybtn').forEach((b) => {
@@ -1179,7 +1187,48 @@ function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX, opts = {}) {
       marker: { symbol: 'diamond', size: 14, color: '#0B1418', line: { width: 2, color: '#fff' } },
     });
   }
+  // extra curves (per-layer IPRs) go UNDER the composite and the VLP: they are
+  // context, and a well with six layers must not bury the two curves the
+  // operating point actually sits on
+  if (opts.extra?.length) traces.unshift(...opts.extra);
   plot(div, traces, { ...LAYOUT(), title: opts.title ?? 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } });
+}
+
+// Per-layer IPR curves for the multi-layer nodal chart. Three deliberate
+// choices: layers are thin and dashed so the composite and the VLP stay the
+// curves your eye lands on; a layer that crossflows AT THE OPERATING POINT is
+// drawn in the warning colour and says so in the legend, because that is the
+// one fact a reader must not miss; and the TRUE commingled sum is drawn too,
+// because the chart's "IPR" is the collapsed one-final-J equivalent and the
+// layers would otherwise appear not to add up to it.
+const LAYER_COLORS = ['#4292c6', '#2C7048', '#8A6D1A', '#7038b0', '#00636D', '#93400A'];
+
+function mlLayerTraces(r, xOf) {
+  const ml = r.multiLayer;
+  if (!ml?.curves?.layers?.length) return [];
+  const atOp = ml.layersAtOp?.layers ?? [];
+  const traces = ml.curves.layers.map((L, i) => {
+    const xflow = atOp[i] ? atOp[i].qGrossStbD < 0 : false;
+    return {
+      x: L.curve.map(xOf),
+      y: L.curve.map((p) => p.pwfPsi),
+      name: `${L.name} · Pr ${fmt(L.prPsi, 0)}${xflow ? ' · CROSSFLOW' : ''}`,
+      mode: 'lines',
+      line: {
+        color: xflow ? '#A93A2C' : LAYER_COLORS[i % LAYER_COLORS.length],
+        width: 1.5,
+        dash: xflow ? 'dot' : 'dash',
+      },
+    };
+  });
+  traces.push({
+    x: ml.curves.total.map(xOf),
+    y: ml.curves.total.map((p) => p.pwfPsi),
+    name: 'IPR (layers summed)',
+    mode: 'lines',
+    line: { color: '#0B1418', width: 1.5, dash: 'longdash' },
+  });
+  return traces;
 }
 
 const FAM_BLUES = ['#9ecae1', '#4292c6', '#084594'];
@@ -1946,7 +1995,8 @@ async function liquidSolve(c) {
   const axis = `${c.fluidName[0].toUpperCase() + c.fluidName.slice(1)} rate, ${water ? 'bbl/d' : 'stb/d'}`;
   plotNodal(`${c.prefix}-chart-nodal`, axis, r.iprCurve, r.vlpCurve,
     r.op ? { q: r.op.qOilStbD, pwfPsi: r.op.pwfPsi } : null,
-    (p) => p.qOilStbD, (p) => p.q);
+    (p) => p.qOilStbD, (p) => p.q,
+    { extra: mlLayerTraces(r, (p) => p.qOilStbD) });
   plotWhp(`${c.prefix}-chart-whp`, axis, r.whpCurve, Number(val(`${c.prefix}-thpPsi`)));
   setComputed(`${c.prefix}-pbPsi`, r.computed.pbPsi, 1);
   setComputed(`${c.prefix}-prPsi`, r.computed.prPsi, 1);
@@ -1965,12 +2015,30 @@ async function liquidSolve(c) {
     },
   ];
   if (r.multiLayer?.layersAtOp) {
+    const lay = r.multiLayer.layersAtOp.layers;
+    const props = r.multiLayer.curves?.layers ?? [];
+    const tot = r.multiLayer.layersAtOp.totals;
+    // Share is of GROSS, and it is signed: a crossflowing layer takes a
+    // negative share, so the column sums to 100% and shows how much of the
+    // producing layers' output is being pushed back into the thief zone.
     nodalTables.unshift({
-      title: 'Layers @ operating Pwf',
-      headers: ['layer', 'q gross', 'q oil', 'q water'],
-      rows: r.multiLayer.layersAtOp.layers.map((l) => [
-        l.name, fmt(l.qGrossStbD, 0), fmt(l.qOilStbD, 0), fmt(l.qWaterStbD, 0),
-      ]),
+      title: `Layers @ operating Pwf ${r.op ? fmt(r.op.pwfPsi, 0) + ' psi' : ''}`,
+      headers: ['layer', 'Pr psi', 'J', 'q gross', 'q oil', 'q water', '% of gross', 'state'],
+      rows: lay.map((l, i) => {
+        const xflow = l.qGrossStbD < 0;
+        const share = tot.qGrossStbD !== 0 ? (l.qGrossStbD / tot.qGrossStbD) * 100 : null;
+        return [
+          l.name,
+          fmt(props[i]?.prPsi, 0),
+          fmt(props[i]?.j, 3),
+          fmt(l.qGrossStbD, 0),
+          fmt(l.qOilStbD, 0),
+          fmt(l.qWaterStbD, 0),
+          share == null ? '—' : fmt(share, 1),
+          xflow ? 'CROSSFLOW — taking fluid in' : 'producing',
+        ];
+      }),
+      rowClass: (row, i) => (lay[i].qGrossStbD < 0 ? 'crossflow' : ''),
     });
   }
   renderTables(`${c.prefix}-table-nodal`, nodalTables);

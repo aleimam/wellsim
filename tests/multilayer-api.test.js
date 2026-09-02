@@ -125,3 +125,68 @@ test('gas C&n mode ignores the multi-layer block (no exact collapse)', () => {
   assert.ok(!r.error, r.error);
   assert.equal(r.multiLayer, null);
 });
+
+// ---- per-layer curves for the chart, and the crossflow flag ----
+// Added 2 Sep 2026 with the per-layer IPR plot. The chart's "IPR" is the
+// collapsed one-final-J equivalent, so the API also ships the TRUE commingled
+// sum -- otherwise the layers visibly fail to add up to the curve beside them
+// and it reads as a bug rather than as the equivalent's known drift.
+test('oil nodal ships per-layer IPR curves that sum to the true composite', () => {
+  const r = oilNodal({
+    ...OIL_BASE,
+    mlMode: 'multi',
+    mlLayers: [
+      { permMd: 50, thicknessFt: 42.653, skin: 0, prPsi: 3550, wcPct: 50, gorScfStb: 5000 },
+      { permMd: 20, thicknessFt: 30, skin: 0, prPsi: 3000, wcPct: 60, gorScfStb: 4000 },
+    ],
+  });
+  assert.ok(!r.error, r.error);
+  const c = r.multiLayer.curves;
+  assert.ok(c, 'curves block expected');
+  assert.equal(c.layers.length, 2);
+
+  for (let i = 0; i < c.total.length; i++) {
+    const summed = c.layers.reduce((a, L) => a + L.curve[i].qOilStbD, 0);
+    assert.ok(
+      Math.abs(summed - c.total[i].qOilStbD) < 1e-9,
+      `at Pwf ${c.total[i].pwfPsi}: layers ${summed} vs total ${c.total[i].qOilStbD}`
+    );
+  }
+  // the legend and the table both read these off the curve block
+  for (const L of c.layers) {
+    assert.ok(L.name, 'layer name');
+    assert.ok(L.prPsi > 0 && L.j > 0, `Pr ${L.prPsi} J ${L.j}`);
+  }
+  // grid spans the highest layer Pr down to zero
+  assert.equal(c.total[0].pwfPsi, 3550);
+  assert.equal(c.total.at(-1).pwfPsi, 0);
+});
+
+test('a depleted layer below the operating Pwf is reported as taking fluid in', () => {
+  // 1800 psi sits well under the ~2700 psi operating Pwf of this well, so the
+  // layer must show NEGATIVE rate -- that sign is what the chart colours red
+  // and the table highlights, so it is pinned here rather than left to the UI.
+  const r = oilNodal({
+    ...OIL_BASE,
+    mlMode: 'multi',
+    mlLayers: [
+      { permMd: 50, thicknessFt: 42.653, skin: 0, prPsi: 3550, wcPct: 50, gorScfStb: 5000 },
+      { permMd: 20, thicknessFt: 30, skin: 0, prPsi: 1800, wcPct: 60, gorScfStb: 4000 },
+    ],
+  });
+  assert.ok(!r.error, r.error);
+  assert.equal(r.opStatus, 'ok');
+  const weak = r.multiLayer.layersAtOp.layers[1];
+  assert.ok(weak.qGrossStbD < 0, `depleted layer should take fluid in, got ${weak.qGrossStbD}`);
+  assert.ok(
+    r.multiLayer.layersAtOp.warnings.some((w) => /crossflow/i.test(w)),
+    `expected a crossflow warning, got ${JSON.stringify(r.multiLayer.layersAtOp.warnings)}`
+  );
+  // and the producing layer must carry MORE than the well makes, because part
+  // of it is going back down the hole
+  const strong = r.multiLayer.layersAtOp.layers[0];
+  assert.ok(
+    strong.qGrossStbD > r.multiLayer.layersAtOp.totals.qGrossStbD,
+    'producing layer must exceed the well total when another layer is thieving'
+  );
+});

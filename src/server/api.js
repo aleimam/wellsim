@@ -35,7 +35,7 @@ import {
   espSolutionPoint,
 } from '../core/vlp/esp.js';
 import { createOilInflow, createGasInflow, applyInflowFluids } from '../core/ipr/inflow.js';
-import { multiLayerOilRates, multiLayerGasRates } from '../core/ipr/multilayer.js';
+import { multiLayerOilRates, multiLayerOilCurves, multiLayerGasRates } from '../core/ipr/multilayer.js';
 import {
   createGasIpr,
   calibrateDarcyToTestGas,
@@ -434,6 +434,12 @@ export function oilNodal(f) {
           warnings: inflow.warnings,
           layersAtOp:
             op.status === 'ok' ? multiLayerOilRates(op.pwfPsi, inflow.layers) : null,
+          // per-layer IPR curves plus the TRUE commingled sum. The chart's
+          // "IPR" is the collapsed one-final-J equivalent, which is exact only
+          // at the solution point -- shipping the true sum alongside is what
+          // lets the layers visibly add up, and shows how far the equivalent
+          // drifts away from that point.
+          curves: multiLayerOilCurves(inflow.layers, { allowCrossflow: inflow.allowCrossflow }),
         }
       : null,
   };

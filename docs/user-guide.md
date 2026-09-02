@@ -328,6 +328,26 @@ table reports each layer's contribution — a layer with Pr below the operating
 Pwf is flagged as **crossflow**. Needs at least 2 layer rows; the gas C&n
 basis has no exact collapse, so the selector only appears for Darcy Pr².
 
+**Each layer is drawn on the IPR/VLP chart beside the total.** Layer curves
+are thin and dashed so the composite and the VLP stay the two curves your eye
+lands on, and each is labelled with its own Pr. A third curve, **IPR (layers
+summed)**, is the TRUE commingled sum. It is there because the solid **IPR**
+is the collapsed one-final-J equivalent, which is exact only at the solution
+point — seeing the two together tells you how far the equivalent has drifted
+at the rate you are actually producing. Without it the layers would appear
+not to add up to the curve beside them, which reads as a bug rather than as
+the equivalent's known behaviour.
+
+**Crossflow is shown, not hidden.** A layer whose Pr sits below the flowing
+pressure takes fluid IN, so its curve crosses into the NEGATIVE half of the
+rate axis — it is drawn red and dotted and labelled `· CROSSFLOW`, and its
+row in the layer table is tinted with a red rule. The table adds **Pr, J and
+% of gross** per layer, and that share is signed: a thieving layer takes a
+negative percentage, so the column still sums to 100% and tells you directly
+how much of the producing layers’ output is being pushed back downhole. On
+the shipped demo, dropping layer 2 to Pr 1800 psi against a ~2700 psi
+operating Pwf gives L1 132% and L2 −32%.
+
 **Fitting the total J to the test (K is the solver):** with Multi-layer
 active, *Calibrate from test* also fits the commingled system — the Jones/test
 J is computed against the theoretical average pressure, and **every layer

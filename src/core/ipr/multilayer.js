@@ -81,6 +81,40 @@ export function multiLayerOilCurve(layers, { points = 25, allowCrossflow = true 
   return curve;
 }
 
+/**
+ * Per-layer IPR curves on the SAME Pwf grid as the composite, for plotting
+ * each layer beside the total.
+ *
+ * Both come from ONE call to multiLayerOilRates per grid point rather than a
+ * second implementation, so at every Pwf the layer rates sum to the total by
+ * construction — including under allowCrossflow: false, where the clamp has
+ * to apply identically to both or the picture lies.
+ *
+ * A layer whose Pr sits below the grid Pwf carries a NEGATIVE rate. That is
+ * crossflow, and it is returned rather than clipped: a curve crossing into
+ * the negative half is the plainest statement that the well is pushing fluid
+ * INTO that layer, and hiding it would make the total look unexplained.
+ */
+export function multiLayerOilCurves(layers, { points = 25, allowCrossflow = true } = {}) {
+  const top = Math.max(...layers.map((l) => l.ipr.prPsi));
+  const per = layers.map((l) => ({
+    name: l.name,
+    prPsi: l.ipr.prPsi,
+    j: l.ipr.j,
+    wcPct: l.wcPct,
+    gorScfStb: l.gorScfStb,
+    curve: [],
+  }));
+  const total = [];
+  for (let i = 0; i <= points; i++) {
+    const pwfPsi = top * (1 - i / points);
+    const r = multiLayerOilRates(pwfPsi, layers, { allowCrossflow });
+    r.layers.forEach((lr, k) => per[k].curve.push({ pwfPsi, ...lr }));
+    total.push({ pwfPsi, ...r.totals });
+  }
+  return { layers: per, total };
+}
+
 /** Theoretical Average Reservoir Pressure (deck slide 6): the Pwf at which
  *  the commingled total rate is zero — crossflow included by definition. */
 export function prAvgOil(layers) {
