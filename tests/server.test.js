@@ -62,6 +62,7 @@ function startServer(port) {
       // switch from the developer's shell
       WELLSIM_ENABLE_LEGACY_CASE_STORE: '',
       WELLSIM_INVITE: '',
+      WELLSIM_DATABASE_ENABLED: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

@@ -3,15 +3,15 @@
 **Reference production:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
 **Repo:** https://github.com/aleimam/wellsim
 **Live production revision:** 30 August 2026 — commit `c6f1caa`, asset stamp
-`2026-08-30k`. **Current working tree:** 261 tests passing and 43/43 validation
-sweep. The v2 SQL is deployed to `bldrz.net` as inactive source only; no v2
-migration has been applied to a live database.
+`2026-08-30k`. **Current working tree:** 267 tests passing and 43/43 validation
+sweep. The separate `bldrz` database has migrations `0001`–`0003`, with
+least-privilege roles and an opt-in, bounded PostgreSQL connection pool.
 
 ---
 
 ## 1. What this is
 
-A zero-dependency Node.js web app for oil, gas and water well engineering:
+A Node.js web app for oil, gas and water well engineering:
 nodal analysis, minimum connected reserves from early production, and
 production forecasting. It is a **faithful port of the M. El-Ashry Excel
 toolset** — the author's tuned correlations and workflows are preserved
@@ -25,19 +25,20 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 32 test files.
+`nodal`, `reserve`, `solvers`), 33 test files.
 
 ## 2. Running it
 
 ```bash
+npm ci
 node src/server/server.js     # http://localhost:3355
 ```
 
-No `npm install` — the server uses only Node built-ins, and the UI is plain
-HTML/JS. Plotly is the single external asset, from a CDN.
+The web server uses Node built-ins plus `pg` for opt-in PostgreSQL. The UI is
+plain HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 261 unit, regression and security tests
+node --test                       # 267 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -82,7 +83,7 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               32 files — workbook cell pins, physics regressions, and
+tests/               33 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)
@@ -127,9 +128,11 @@ private; neither belongs in a repository. They **are** in the F: backup.
   `0001` through `0003`, non-login owner `bldrz_migration_owner`, login
   `bldrz_app`, and non-login least-privilege role `bldrz_runtime`. Native tests
   proved cross-company read, modify, link and export isolation. The credential
-  is only in `/etc/bldrz/postgresql.env` (`root:bldrz`, `0640`) and is not yet
-  loaded by the web service. Connection-pool isolation, API transaction wiring,
-  and PostgreSQL backup/restore are the next gates.
+  is only in `/etc/bldrz/postgresql.env` (`root:bldrz`, `0640`). The bldrz service
+  loads it into a maximum-10 connection pool, with a 50-request admission cap,
+  5-second acquisition timeout and 15-second statement timeout. Startup checks
+  fail closed on unsafe role privileges. No authenticated v2 data route is
+  exposed yet; identity integration and PostgreSQL backup/restore remain gates.
 - **Charts are drawn by Plotly at their container's width**, and that width is
   often wrong at draw time — the container is hidden, or its flex layout has
   not settled, or the web font has not loaded. This caused a long tail of

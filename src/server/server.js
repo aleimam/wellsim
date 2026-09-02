@@ -1,4 +1,4 @@
-// wellsim UI server — zero dependencies (Node built-in http). Serves the
+// wellsim UI server — Node built-in HTTP and opt-in PostgreSQL. Serves the
 // static UI from src/ui and the JSON API from src/server/api.js.
 // Run: node src/server/server.js   (PORT env overrides 3355)
 
@@ -8,6 +8,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handlers as apiHandlers } from './api.js';
 import { accountHandlers } from './accounts.js';
+import { initializeDatabase } from './database.js';
+
+let database;
+try {
+  database = await initializeDatabase();
+} catch (error) {
+  console.error(`Database startup failed: ${error.message}`);
+  process.exit(1);
+}
+// No v2 data handler is exposed yet. Future authenticated handlers must use
+// database.withTenantTransaction with server-verified identity and workspace.
 
 // free version stays: every calculation endpoint is open; accounts only add
 // the per-company server case database
@@ -88,7 +99,7 @@ const server = http.createServer(async (req, res) => {
       const body = req.method === 'POST' ? await readBody(req) : '{}';
       let result;
       try {
-        result = h(body ? JSON.parse(body) : {});
+        result = await h(body ? JSON.parse(body) : {});
       } catch (e) {
         result = { error: e.message };
       }
@@ -131,4 +142,21 @@ const server = http.createServer(async (req, res) => {
 const PORT = Number(process.env.PORT ?? 3355);
 server.listen(PORT, () => {
   console.log(`wellsim UI on http://localhost:${PORT}`);
+  console.log(`PostgreSQL boundary: ${database.enabled ? 'ready' : 'disabled'}`);
 });
+
+let stopping = false;
+async function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  const deadline = setTimeout(() => process.exit(1), 20000).unref();
+  try {
+    await new Promise((resolve) => server.close(resolve));
+    await database.close();
+    clearTimeout(deadline);
+  } catch {
+    process.exitCode = 1;
+  }
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

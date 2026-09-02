@@ -1,6 +1,6 @@
 # WellSim
 
-A zero-dependency Node.js web application for **oil & gas well performance engineering**:
+A Node.js web application for **oil & gas well performance engineering**:
 nodal analysis, minimum connected reserves from early production, and production
 forecasting. It is a faithful port of a field-proven Excel toolset (author **M. El-Ashry**),
 preserving the author's tuned correlations and workflows, with the spreadsheet macros
@@ -22,11 +22,13 @@ and the known gaps.
 ## Run
 
 ```bash
+npm ci
 node src/server/server.js
 ```
 
-Open http://localhost:3355. No npm install — the server uses only Node built-ins and
-the UI is plain HTML/JS (Plotly from CDN for charts).
+Open http://localhost:3355. The server uses Node built-ins plus the `pg` driver
+for opt-in PostgreSQL; the UI is plain HTML/JS (Plotly from CDN for charts).
+Database use is off by default; see `db/README.md` for the bldrz boundary.
 
 ## Tests
 
@@ -34,11 +36,11 @@ the UI is plain HTML/JS (Plotly from CDN for charts).
 node --test
 ```
 
-261 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+267 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries, plus
 PostgreSQL company and personal-workspace isolation for reads, writes, links and exports. Run
-`npm install` once to install the development-only PostgreSQL test harness.
+`npm ci` once to install the driver and development-only PostgreSQL test harness.
 
 ```bash
 node scripts/validation-sweep.mjs

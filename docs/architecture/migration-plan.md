@@ -8,7 +8,7 @@ reference until each vertical slice passes its replacement gates.
 Deliverables:
 
 - clean source revision recorded;
-- 261/261 tests and 43/43 validation sweep passing;
+- 267/267 tests and 43/43 validation sweep passing;
 - legacy web account/case store disabled by default;
 - visitor calculation and Save as / Open behavior preserved;
 - portable local case store preserved; and
@@ -69,10 +69,12 @@ least-privilege runtime role, RLS policies, composite tenant foreign keys,
 two-company adversarial suite and private personal-workspace integrity rules
 are implemented. Company-to-company and personal-to-company isolation pass in
 a disposable PostgreSQL engine, including links and export scope. Identity-
-provider integration, object storage, native PostgreSQL qualification,
-backup/restore and connection-pool tests remain open. The SQL is present on the
-isolated `bldrz.net` comparison deployment as source only; no v2 migration has
-been applied to a live database.
+provider integration, object storage and full backup/restore remain open.
+Migrations `0001`–`0003` are applied to the isolated `bldrz` database. The
+bounded pool and transaction helper are wired at application startup; no
+authenticated data handler is exposed until the verified identity boundary is
+implemented. `deploy/verify-bldrz-pool.sh` tests native connection reuse and
+error recovery against a disposable schema clone.
 
 ## Phase 4 — Modular shell and first vertical slice
 

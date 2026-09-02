@@ -42,8 +42,9 @@ directory, service, port, logs or case data.
 The checked-in service and Caddy definitions are
 `deploy/bldrz.service` and `deploy/bldrz.Caddyfile`. The legacy JSON account
 store is explicitly disabled. PostgreSQL migrations `0001` through `0003` are
-applied to the separate `bldrz` comparison database, but the current web
-service does not load its database credential or use PostgreSQL yet.
+applied to the separate `bldrz` comparison database. The web service now loads
+the application credential and verifies the database security boundary before
+listening. No authenticated v2 data route is exposed yet.
 
 The comparison source tree is owned by root and is read-only to the `bldrz`
 service user. Only `/opt/bldrz/app/data` and
@@ -81,7 +82,7 @@ bounded application pool rather than one database connection per user.
 
 The credential is stored only in `/etc/bldrz/postgresql.env`, owned
 `root:bldrz` with mode `0640`. It is not committed, printed in deployment
-records or loaded by `bldrz.service` yet. Do not expose port 5432 or use the
+records. `bldrz.service` loads it through `EnvironmentFile`. Do not expose port 5432 or use the
 `postgres` operating-system/database account from an application service.
 
 The portable migration names `wellsim_runtime`, but PostgreSQL roles are
@@ -97,6 +98,24 @@ saw one own case and zero Company B cases, changed zero cross-company rows, and
 cross-company project/well links and export/case references were rejected by
 composite foreign keys. The clone was removed after the test. The persistent
 `bldrz` database remains empty of user and customer data.
+
+The checked-in bldrz unit requires PostgreSQL and configures a maximum-10 pool,
+a 50-transaction admission cap, a 5-second acquisition timeout, and a 15-second
+statement timeout. `src/server/database.js` checks login/runtime privileges
+before HTTP startup. Its only handler-facing access method is
+`withTenantTransaction`, which sets transaction-local role and tenant context,
+rechecks membership and always commits or rolls back before release. A failed
+rollback destroys the connection. Do not expose this method through an API
+until the user identity comes from verified authentication.
+
+Unlike the older production revision, the comparison web server requires the
+`pg` runtime dependency. Every bldrz release must run `npm ci --omit=dev
+--ignore-scripts` from the committed lockfile before restart. Test a staged
+release with `bash deploy/verify-bldrz-pool.sh <absolute-release-directory>`
+before replacing the live source. Preserve `/etc/bldrz/postgresql.env`,
+`data/`, and `data-backups/`; none belong in a source archive. Back up the
+current app source and systemd unit so code and unit can be rolled back
+together. Never apply this bldrz unit or credential to `wellsim.service`.
 
 Verify the boundary with:
 

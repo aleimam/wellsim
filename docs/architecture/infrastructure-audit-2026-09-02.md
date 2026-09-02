@@ -23,7 +23,8 @@ default cluster is online. A separate `bldrz` database is owned by non-login
 `bldrz_migration_owner`; password-authenticated `bldrz_app` has `CONNECT` and
 may switch only to non-login, least-privilege `bldrz_runtime`. The credential is
 held outside the repository at `/etc/bldrz/postgresql.env` with
-`root:bldrz 0640` ownership and mode. The current web service does not load it.
+`root:bldrz 0640` ownership and mode. The bldrz unit loads it only into the
+comparison web process, whose startup verifies the least-privilege boundary.
 
 The effective listener is restricted to `127.0.0.1:5432`. Verification found
 one IPv4-loopback listener, no IPv6/wildcard/public listener, no UFW rule for
@@ -34,9 +35,11 @@ Migrations `0001` through `0003` are applied and owned by the migration owner.
 All 22 tenant-bearing tables have RLS enabled, all 54 policies target only
 `bldrz_runtime`, and `PUBLIC` has no application-table grants. A disposable
 native PostgreSQL clone proved that one company cannot read, modify, link or
-export another company's records; it was removed after the test. The API
-transaction boundary, connection-pool isolation and backup/restore remain
-deployment gates before persistent engineering data is accepted.
+export another company's records; it was removed after the test. The bounded
+pool and transaction helper now enforce local context and membership checking;
+the native probe script covers connection reuse, rollback and timeout recovery.
+Verified authentication, data routes, full backup/restore and measured load
+capacity remain gates before persistent engineering data is accepted.
 
 ## Evidence captured
 

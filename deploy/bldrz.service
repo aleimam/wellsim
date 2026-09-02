@@ -1,7 +1,8 @@
 [Unit]
 Description=WellSim v2 comparison app for bldrz.net
-After=network-online.target
+After=network-online.target postgresql.service
 Wants=network-online.target
+Requires=postgresql.service
 
 [Service]
 Type=simple
@@ -11,6 +12,13 @@ WorkingDirectory=/opt/bldrz/app
 Environment=NODE_ENV=production
 Environment=PORT=3356
 Environment=WELLSIM_ENABLE_LEGACY_CASE_STORE=0
+EnvironmentFile=/etc/bldrz/postgresql.env
+Environment=WELLSIM_DATABASE_ENABLED=1
+Environment=WELLSIM_DB_LOGIN_ROLE=bldrz_app
+Environment=WELLSIM_DB_RUNTIME_ROLE=bldrz_runtime
+Environment=WELLSIM_DB_POOL_MAX=10
+Environment=WELLSIM_DB_MAX_PENDING=50
+Environment=WELLSIM_DB_STATEMENT_TIMEOUT_MS=15000
 ExecStart=/usr/bin/node /opt/bldrz/app/src/server/server.js
 Restart=always
 RestartSec=3
