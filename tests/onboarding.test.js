@@ -5,6 +5,8 @@ import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import vm from 'node:vm';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { PGlite } from '@electric-sql/pglite';
 import { createOnboardingRepository } from '../src/server/onboarding-repository.js';
 import { createAuthRepository } from '../src/server/auth-repository.js';
@@ -308,6 +310,18 @@ test('onboarding remains opt-in and unavailable with only the authentication fou
   assert.throws(() => authConfigFromEnv({ WELLSIM_ONBOARDING_ENABLED: '1' }), /requires/);
   for (const settings of [{ enabled: false }, { onboardingEnabled: false }]) {
     assert.equal((await request('/api/v2/companies', { settings, body: { name: 'Hidden' } })).status, 404);
+  }
+  for (const DATABASE_URL of ['invalid-test-sentinel-secret',
+    'postgresql://bldrz_app:test-sentinel-secret@127.0.0.1:5432/bldrz',
+    'postgresql://bldrz_app:test-sentinel-secret@remote.invalid/bldrz_onboarding_probe']) {
+    await assert.rejects(promisify(execFile)(process.execPath,
+      [path.resolve(import.meta.dirname, '../scripts/verify-postgres-onboarding.mjs')],
+      { env: { ...process.env, DATABASE_URL }, timeout: 5000 }), (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /requires the loopback disposable probe/);
+      assert.ok(!error.stderr.includes('test-sentinel-secret'));
+      return true;
+    });
   }
 });
 

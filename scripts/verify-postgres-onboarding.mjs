@@ -8,9 +8,16 @@ import { createOnboardingRepository } from '../src/server/onboarding-repository.
 import { createAuthRepository } from '../src/server/auth-repository.js';
 import { tokenHash } from '../src/server/auth-http.js';
 
-const url = new URL(process.env.DATABASE_URL);
-assert.equal(url.hostname, '127.0.0.1');
-assert.equal(url.pathname, '/bldrz_onboarding_probe', 'Requires the explicitly disposable onboarding probe');
+try {
+  const url = new URL(process.env.DATABASE_URL);
+  assert.equal(url.hostname, '127.0.0.1');
+  assert.equal(url.pathname, '/bldrz_onboarding_probe');
+} catch {
+  // URL parser errors include their raw input; never let a credential-bearing
+  // invalid URL escape into command output, even before the pools are created.
+  console.error('Native onboarding qualification requires the loopback disposable probe');
+  process.exit(1);
+}
 const env = { ...process.env, WELLSIM_DATABASE_ENABLED: '1', WELLSIM_DB_LOGIN_ROLE: 'bldrz_app',
   WELLSIM_DB_RUNTIME_ROLE: 'bldrz_runtime', WELLSIM_DB_POOL_MAX: '2' };
 const random = () => randomBytes(32).toString('base64url');
@@ -47,8 +54,11 @@ async function waitForBlock(tx, blocker) {
   const deadline = Date.now() + 4000;
   while (Date.now() < deadline) {
     await tx.query('SELECT pg_stat_clear_snapshot()');
+    // Under SET ROLE runtime, detailed session statistics (including
+    // wait_event_type) are hidden. The public blocking-PID relationship is
+    // sufficient; never grant pg_read_all_stats just to run a test.
     const waiting = await tx.query(`SELECT count(*)::int AS n FROM pg_stat_activity
-      WHERE datname=current_database() AND usename=session_user AND wait_event_type='Lock'
+      WHERE datname=current_database() AND usename=session_user
         AND $1=ANY(pg_blocking_pids(pid))`, [blocker]);
     if (waiting.rows[0].n > 0) return;
     await delay(20);
@@ -239,7 +249,8 @@ try {
   console.log(`NATIVE_ONBOARDING_VERIFICATION_OK (${checks.length} groups)`);
 } catch (error) {
   // Do not print assertion operands, connection strings, SQL detail or tokens.
-  console.error(`NATIVE_ONBOARDING_VERIFICATION_FAILED after ${checks.length} groups (${error.code ?? error.name})`);
+  const location = error.stack?.match(/verify-postgres-onboarding\.mjs:\d+:\d+/)?.[0] ?? 'unknown location';
+  console.error(`NATIVE_ONBOARDING_VERIFICATION_FAILED after ${checks.length} groups (${error.code ?? error.name}; ${location})`);
   process.exitCode = 1;
 } finally {
   await left?.close(); await right?.close();
