@@ -106,6 +106,22 @@ of the future management workflow.
 
 ## Verification
 
+Qualification on 2 September 2026 passed against candidate `f6ed507`:
+
+- 282/282 local tests, 43/43 engineering validation checks and no advisories
+  reported by `npm audit --omit=dev` at verification time.
+- `NATIVE_AUTH_VERIFICATION_OK` and `NATIVE_POOL_VERIFICATION_OK` on PostgreSQL
+  16.15, using the real non-inheriting application login. Both probe databases
+  were removed afterward; live bldrz migration history stayed at `0001`–`0003`.
+- A loopback-access-only transient HTTP candidate returned 200 for the visitor
+  UI and 404 for disabled sign-in/workspace routes. A second candidate with
+  authentication enabled against the unmigrated live schema exited with a
+  sanitized startup error before opening an HTTP listener; it did not contact
+  a real identity provider. Both transient services were stopped.
+- No live app deployment/restart was performed. `wellsim.service` remained at
+  PID 1887 throughout. The qualified source is staged separately under
+  `/opt/bldrz/staging/f6ed507`.
+
 The local OIDC tests exercise the real client with a synthetic HTTPS issuer
 transport and RSA-signed ID tokens. They reject bad signatures, wrong
 issuer/audience/nonce, expired or missing tokens, bad state, spoofed callbacks,
