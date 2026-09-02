@@ -1191,7 +1191,22 @@ function plotNodal(div, xTitle, ipr, vlp, op, iprX, vlpX, opts = {}) {
   // context, and a well with six layers must not bury the two curves the
   // operating point actually sits on
   if (opts.extra?.length) traces.unshift(...opts.extra);
-  plot(div, traces, { ...LAYOUT(), title: opts.title ?? 'IPR / VLP — bottomhole node', xaxis: { title: xTitle }, yaxis: { title: 'Pressure, psi' } });
+  plot(div, traces, {
+    ...LAYOUT(),
+    title: opts.title ?? 'IPR / VLP — bottomhole node',
+    // The rate axis starts at zero. A well does not produce a negative rate,
+    // and letting the axis run left of zero pushed the whole operating range
+    // into the right half of the plot. 'nonnegative' floors it whatever the
+    // data does, the same guarantee floorPressureAxes gives the psi axes.
+    //
+    // The one thing this clips is the negative branch of a crossflowing
+    // multi-layer curve. That branch is a picture of the sign, not the only
+    // statement of it: the layer stays in the legend as "· CROSSFLOW", its
+    // curve visibly runs off the left edge instead of turning up, and the
+    // layer table still prints the negative rate and share on a tinted row.
+    xaxis: { title: xTitle, rangemode: 'nonnegative' },
+    yaxis: { title: 'Pressure, psi' },
+  });
 }
 
 // Per-layer IPR curves for the multi-layer nodal chart. Three deliberate

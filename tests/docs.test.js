@@ -217,3 +217,20 @@ test('no chart layout leaves a pressure axis on bare autorange', () => {
     'plot() must route its layout through floorPressureAxes'
   );
 });
+
+// The IPR/VLP rate axis must start at zero: a well does not make a negative
+// rate, and before this the axis ran left of zero whenever a multi-layer
+// crossflow curve went negative, squeezing the entire operating range into
+// the right half of the plot. Guarded here because it is a single property of
+// one shared helper that four charts depend on (oil natural, oil ESP, water
+// injection, gas).
+test('the IPR/VLP rate axis is floored at zero', () => {
+  const src = fs.readFileSync(path.join(root, 'src/ui/app.js'), 'utf8');
+  const m = src.match(/function plotNodal[\s\S]*?\r?\n\}\r?\n/);
+  assert.ok(m, 'plotNodal must exist in app.js');
+  assert.match(
+    m[0],
+    /xaxis:\s*\{[^}]*rangemode:\s*'nonnegative'/,
+    "plotNodal's x axis must set rangemode 'nonnegative' so the rate axis starts at 0"
+  );
+});
