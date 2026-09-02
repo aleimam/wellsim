@@ -72,7 +72,7 @@ BEGIN
   SELECT count(*) INTO found_count FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'app' AND c.relrowsecurity;
-  IF found_count <> CASE WHEN identity_enabled THEN 25 ELSE 22 END OR (SELECT count(*) FROM pg_policy p
+  IF found_count <> (CASE WHEN identity_enabled THEN 25 ELSE 22 END) OR (SELECT count(*) FROM pg_policy p
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'app') <> 54
     OR EXISTS (SELECT FROM pg_policy p
