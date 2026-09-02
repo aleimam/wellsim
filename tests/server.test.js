@@ -12,6 +12,7 @@
 // the day one of those lands in src/ as `ui-old` the whole folder goes on the
 // internet. Fixed 31 Aug 2026 by comparing against UI_DIR + path.sep.
 
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -170,7 +171,16 @@ test('the portable build opens straight into its local case store', async () => 
     assert.match(html, /\/vendor\/plotly\.min\.js/, 'portable must serve the embedded Plotly');
     assert.ok(!/cdn\.plot\.ly/.test(html), 'portable must not reference the CDN');
     assert.match(html, /serviceWorker\.register/, 'portable must neuter service-worker registration');
-    assert.match(html, /\/export\.js\?v=2026-09-02c/, 'portable must load the shared export registry');
+    // take the stamp from index.html rather than pinning a date here: the point
+    // is that portable serves the SAME build as the website, and a literal date
+    // breaks this test on every cache-bust
+    const uiStamp = readFileSync(new URL('../src/ui/index.html', import.meta.url), 'utf8')
+      .match(/export\.js\?v=([0-9]{4}-[0-9]{2}-[0-9]{2}[a-z])/)[1];
+    assert.match(
+      html,
+      new RegExp(`/export\\.js\\?v=${uiStamp}`),
+      'portable must load the export registry at the current stamp'
+    );
     assert.equal((await rawGet(port, '/export.js')).status, 200, 'portable must serve the export registry');
 
     // the store the panel talks to answers WITHOUT a token...

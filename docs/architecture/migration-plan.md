@@ -8,7 +8,7 @@ reference until each vertical slice passes its replacement gates.
 Deliverables:
 
 - clean source revision recorded;
-- 282/282 tests and 43/43 validation sweep passing;
+- 285/285 tests and 43/43 validation sweep passing;
 - legacy web account/case store disabled by default;
 - visitor calculation and Save as / Open behavior preserved;
 - portable local case store preserved; and

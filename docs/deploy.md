@@ -20,7 +20,7 @@ GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  �
 | Firewall | ufw: OpenSSH, 80/tcp, 443/tcp only |
 | DNS | Cloudflare (both domains) |
 | Also on this box | **thepwf.net** — a static site served by the same Caddy from `/opt/thepwf` |
-| Access | SSH key only, password auth disabled. Private key: `~/.ssh/wellsim_hetzner` |
+| Access | SSH key only, password auth disabled. **`wellsim_hetzner` (`wellsim-deploy`) was RETIRED on 2 Sep 2026** — the server rejects it. The working identity is the Ed25519 recovery key installed that day through the Hetzner console (`wellsim-ops-2026-09-02` in the project); it is NOT on the original deploy workstation. Every `-i ~/.ssh/wellsim_hetzner` below needs replacing with it. |
 | Host keys | ED25519 `SHA256:bkTKZB/FixF9hI99Mp+634XNa/3Ohud4AK9kdl6ntI0` · RSA `SHA256:tHM+HmqYYOUok++pJ+bx9WgAzsZZ6HAKWIesnhxc0hg` (recorded 31 Aug 2026 — compare on any first connection from a new machine) |
 | Key backup | `F:\WellSim-Backup-2026-08-29\ssh-key\` — passphrase-protected; passphrase in the password manager |
 
@@ -163,6 +163,11 @@ www.thepwf.net {
 ```
 
 ## Deploy a new version
+
+> **Check what production is running first.** Since 2 Sep 2026 it serves
+> `codex/v2-foundation` (the containment release), not `main`. Deploying
+> `main` over it re-enables the legacy web account/case store that release
+> deliberately disabled.
 
 From a clean working tree on `main`, after `node --test` passes:
 

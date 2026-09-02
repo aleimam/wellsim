@@ -122,6 +122,11 @@ Qualification on 2 September 2026 passed against candidate `f6ed507`:
   PID 1887 throughout. The qualified source is staged separately under
   `/opt/bldrz/staging/f6ed507`.
 
+The branch subsequently integrated upstream `9a270c5` (engineering/backup
+work). Authentication implementation files were unchanged by that integration;
+the combined suite passed 285/285 and the engineering sweep 43/43. Incoming
+operational scripts were preserved in Git, not executed or deployed here.
+
 The local OIDC tests exercise the real client with a synthetic HTTPS issuer
 transport and RSA-signed ID tokens. They reject bad signatures, wrong
 issuer/audience/nonce, expired or missing tokens, bad state, spoofed callbacks,

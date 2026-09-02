@@ -26,8 +26,9 @@ npm ci
 node src/server/server.js
 ```
 
-Open http://localhost:3355. The server uses Node built-ins plus the `pg` driver
-for opt-in PostgreSQL; the UI is plain HTML/JS (Plotly from CDN for charts).
+Open http://localhost:3355. The server uses Node built-ins, `pg` for opt-in
+PostgreSQL, and `openid-client` for gated sign-in; the UI is plain HTML/JS
+(Plotly from CDN for charts).
 Database use is off by default; see `db/README.md` for the bldrz boundary.
 
 ## Tests
@@ -36,7 +37,7 @@ Database use is off by default; see `db/README.md` for the bldrz boundary.
 node --test
 ```
 
-282 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+285 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries, plus
 PostgreSQL company and personal-workspace isolation for reads, writes, links and exports. Run

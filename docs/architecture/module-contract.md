@@ -127,7 +127,7 @@ No calculation module is releasable without:
 - a migration policy explaining whether old cases rerun or retain the old
   engine.
 
-The existing 282-test suite and 43-case sweep are the initial validation
+The existing 285-test suite and 43-case sweep are the initial validation
 package for the current WellSim engine. They remain mandatory throughout the
 platform migration.
 
