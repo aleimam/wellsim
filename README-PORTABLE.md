@@ -1,9 +1,40 @@
 # WellSim — standalone portable program
 
-**Build 1.3 — 31 August 2026**, from commit `6a12ea9` of the main project.
-Identical physics to https://wellsim.app; the current source is guarded by 281 tests and the
-43/43 validation sweep both passing there. Changes since build 1.2 (30 Aug):
+**Build 1.4 — 2 September 2026**, from commit `ea1418c` of the main project.
+Identical physics to https://wellsim.app; the current source is guarded by 281
+tests and the 43/43 validation sweep both passing there. Changes since build
+1.3 (31 Aug):
 
+- **Multi-layer IPR now shows every layer, not just their sum.** Each layer is
+  drawn on the IPR/VLP chart beside the total, dashed and labelled with its own
+  Pr, in both the oil and gas well models. A third curve, *IPR (layers summed)*,
+  is the true commingled sum — the solid *IPR* is the collapsed one-final-J
+  equivalent, so seeing both tells you how far the equivalent has drifted at the
+  rate you are producing. For gas the collapse is exact and the two must
+  coincide everywhere.
+- **A thief zone is now impossible to miss.** A layer whose Pr sits below the
+  flowing pressure takes fluid IN; its curve is red and dotted, labelled
+  `· CROSSFLOW`, and its row in the layer table is tinted red. That table gained
+  **Pr, J and % of gross** (`% of gas` for gas), and the share is SIGNED — a
+  thieving layer takes a negative percentage, so the column still sums to 100%
+  and states directly how much of the producing layers’ output is going back
+  downhole. On the gas demo with layer 2 at Pr 1500: L1 147.1%, L2 −47.1%.
+- **Gas forecast reports the flowing wellhead state.** The table carries FTHP
+  and FTHT for every step. Off plateau the FTHP is the value you entered; **on
+  plateau the well is choked**, so the real wellhead pressure is higher and is
+  back-solved through the same downward gas march — those rows are marked `*`.
+  The chart runs the measured FTHP of each production row straight into the
+  forecast FTHP as one line.
+- **The forecast says where its GIIP came from** instead of leaving you to
+  guess whether it was solved or typed.
+- **Export.** A new *Export* entry writes the current case as an engineering
+  workbook (Excel), WellSim case JSON, or inputs CSV. In build 1.3 this was
+  absent; the packaging bug that would have broken it in a standalone exe was
+  found and fixed before this build shipped.
+- **IPR/VLP rate axes start at zero**, so the operating range uses the whole
+  plot instead of leaving room for rates no well produces.
+
+Changes in build 1.3 (31 Aug), kept for reference:
 - **Your saved cases are reachable again.** Builds 1.0–1.2 showed the website’s
   *Sign in* panel, but the portable registers no accounts — so the panel
   answered “unknown endpoint auth/register” and the `cases/` folder beside the
