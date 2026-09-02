@@ -1,0 +1,33 @@
+[Unit]
+Description=WellSim v2 comparison app for bldrz.net
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bldrz
+Group=bldrz
+WorkingDirectory=/opt/bldrz/app
+Environment=NODE_ENV=production
+Environment=PORT=3356
+Environment=WELLSIM_ENABLE_LEGACY_CASE_STORE=0
+ExecStart=/usr/bin/node /opt/bldrz/app/src/server/server.js
+Restart=always
+RestartSec=3
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/bldrz/app/data
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

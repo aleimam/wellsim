@@ -24,6 +24,32 @@ GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  �
 | Host keys | ED25519 `SHA256:bkTKZB/FixF9hI99Mp+634XNa/3Ohud4AK9kdl6ntI0` · RSA `SHA256:tHM+HmqYYOUok++pJ+bx9WgAzsZZ6HAKWIesnhxc0hg` (recorded 31 Aug 2026 — compare on any first connection from a new machine) |
 | Key backup | `F:\WellSim-Backup-2026-08-29\ssh-key\` — passphrase-protected; passphrase in the password manager |
 
+## Isolated v2 comparison environment
+
+Development from `codex/v2-foundation` is published separately at
+`https://bldrz.net`. It must never reuse or overwrite the production app
+directory, service, port, logs or case data.
+
+| | `wellsim.app` production | `bldrz.net` comparison |
+|---|---|---|
+| Branch | `main` | `codex/v2-foundation` |
+| App path | `/opt/wellsim/app` | `/opt/bldrz/app` |
+| Service | `wellsim.service` | `bldrz.service` |
+| Local port | 3355 | 3356 |
+| Access log | `wellsim.access.log` | `bldrz.access.log` |
+| Stateful data | `/opt/wellsim/app/data` | `/opt/bldrz/app/data` |
+
+The checked-in service and Caddy definitions are
+`deploy/bldrz.service` and `deploy/bldrz.Caddyfile`. The legacy JSON account
+store is explicitly disabled. PostgreSQL migration files may be present in the
+deployed source tree, but they are not applied until the v2 API transaction
+boundary and native-PostgreSQL deployment gate are complete.
+
+Deploy only a committed branch revision using `git archive`; never copy the
+working tree or secrets. Before switching DNS, verify the comparison service
+locally through `127.0.0.1:3356`, validate the complete Caddy configuration,
+and confirm `wellsim.service` remains active on port 3355.
+
 Caddyfile (whole file — Caddy handles certificates unprompted):
 
 ```

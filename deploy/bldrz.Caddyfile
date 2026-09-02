@@ -1,0 +1,13 @@
+bldrz.net {
+    reverse_proxy 127.0.0.1:3356
+    log {
+        output file /var/log/caddy/bldrz.access.log {
+            roll_size 10MB
+            roll_keep 10
+        }
+    }
+}
+
+www.bldrz.net {
+    redir https://bldrz.net{uri} permanent
+}
