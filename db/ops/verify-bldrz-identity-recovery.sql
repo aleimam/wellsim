@@ -65,6 +65,25 @@ BEGIN
     RAISE EXCEPTION 'restored login flow is not single-use';
   END IF;
   PERFORM app.auth_revoke_session(repeat('a',64));
+  IF to_regprocedure('app.auth_complete_login(text,text,text,boolean,text,text,text,bigint,uuid,boolean)') IS NOT NULL THEN
+    IF (SELECT mfa_expires_at FROM app.auth_read_session(repeat('b',64))) IS NULL OR
+      (SELECT mfa_expires_at FROM app.auth_read_session(repeat('b',64)))<=clock_timestamp() THEN
+      RAISE EXCEPTION 'restored MFA assurance missing or expired';
+    END IF;
+    PERFORM app.auth_complete_login('https://recovery.example.test','b','pool-b@example.test',true,
+      repeat('1',64),repeat('2',64),NULL,NULL,NULL,true);
+    BEGIN
+      PERFORM app.onboarding_command(repeat('1',64),'company.create',NULL,'{"name":"MFA bypass"}');
+      RAISE EXCEPTION 'restored basic session bypassed MFA';
+    EXCEPTION WHEN SQLSTATE 'PM001' THEN NULL;
+    END;
+    BEGIN
+      PERFORM app.onboarding_command_v5(repeat('1',64),'company.create',NULL,'{"name":"Helper bypass"}');
+      RAISE EXCEPTION 'restored private helper accessible';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    PERFORM app.onboarding_command(repeat('b',64),'members.list','20000000-0000-4000-8000-000000000020','{}');
+  END IF;
   IF EXISTS (SELECT FROM app.auth_read_session(repeat('a',64))) OR
     EXISTS (SELECT FROM app.auth_list_workspaces(repeat('a',64))) THEN
     RAISE EXCEPTION 'restored session revocation failed';

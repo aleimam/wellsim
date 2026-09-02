@@ -3,8 +3,8 @@
 ## Decision and scope
 
 Use OpenID Connect authorization-code flow with a maintained client library
-(`openid-client` 6.8.7). Provider selection remains open; no identity-provider
-account was created and no provider credential was reused from another
+(`openid-client` 6.8.7). Auth0 is selected for the dedicated bldrz integration;
+account setup is pending and no provider credential was reused from another
 application. Only an exact configured issuer is trusted, with an RS256 client
 registration and an exact HTTPS redirect URI.
 
@@ -18,7 +18,7 @@ An organization owner/administrator must have an approved stronger-authenticatio
 policy before a public pilot. Email addresses and company domains never grant
 membership automatically.
 
-**Stage 2b is now implemented locally behind a separate default-off flag:**
+**Stage 2b is deployed behind a separate default-off flag:**
 see [company onboarding](company-onboarding.md) for verified-email registration,
 personal workspace bootstrap, companies, invitations and member controls.
 The provisioned-only behavior below still applies with onboarding disabled.
@@ -29,8 +29,9 @@ Automatic independent backups remain a separate prerequisite for customer data.
 
 ## Current activation state
 
-- Local source includes migrations `0004_verified_sessions` and `0005_controlled_onboarding`.
-- The last verified live `bldrz` database remains at `0001`–`0003`; neither new migration is applied there.
+- Live `bldrz` release `d5187b4` includes migrations `0001`–`0005`, with sign-in/onboarding disabled.
+- Local source adds `0006_administrator_mfa`; this migration and Auth0 activation are not live.
+- See [administrator MFA](auth0-administrator-mfa.md) for current behavior and remaining activation gates.
 - `WELLSIM_AUTH_ENABLED` defaults off. No live provider registration, callback
   or sign-in button has been activated.
 - `wellsim.app` is outside this change. The old JSON account store stays off.
@@ -68,6 +69,7 @@ call, issuer/subject override, user-ID override or raw query endpoint to clients
 | `/auth/callback` | GET | Consume the flow and verify the provider response |
 | `/auth/session` | GET | Return the current local user and CSRF token |
 | `/auth/logout` | POST | Revoke session; exact Origin and CSRF token required |
+| `/auth/step-up` | POST | Fresh same-account MFA; exact Origin and CSRF required |
 | `/api/v2/workspaces` | GET | List only the session user's active workspaces |
 | `/api/v2/workspace` | GET | Read one workspace selected with `X-Workspace-Id` |
 
@@ -145,13 +147,14 @@ revocation, role/membership changes, forged identity headers/bodies, cookie
 duplication, logout CSRF and fail-closed disabled/error behavior. Existing
 engineering and adversarial cross-tenant suites remain mandatory.
 
-Native verification is isolated by `deploy/verify-bldrz-auth.sh`. It refuses
+The original stage-2a native verification was isolated by `deploy/verify-bldrz-auth.sh`. It refused
 an existing `bldrz_auth_probe`, copies only live schema/reference definitions,
 applies `0004` only to that disposable clone, seeds synthetic users, then uses
 the real application login and two independent connection pools to check
 single-use callback consumption, shared sessions/revocation, personal/company
 workspace discovery and denied cross-company reads, writes, links and exports.
-The probe is dropped afterward. This is not a provider/browser acceptance test
+The current script delegates to the combined onboarding/MFA probe described in
+[administrator MFA](auth0-administrator-mfa.md). This is not a provider/browser acceptance test
 or a user-capacity benchmark.
 
 ## Activation checklist — not automatic

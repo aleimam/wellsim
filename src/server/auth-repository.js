@@ -10,27 +10,36 @@ export function createAuthRepository(call) {
           AND has_function_privilege(current_user, p.oid, 'EXECUTE')
           AND NOT has_function_privilege('public', p.oid, 'EXECUTE'))
         FROM pg_proc p WHERE p.oid = ANY(ARRAY[
-          'app.auth_create_flow(text,text,text,text)'::regprocedure,
+          'app.auth_create_flow(text,text,text,text,boolean,uuid)'::regprocedure,
           'app.auth_consume_flow(text)'::regprocedure,
           'app.auth_create_session(text,text,text,text,text)'::regprocedure,
+          'app.auth_complete_login(text,text,text,boolean,text,text,text,bigint,uuid,boolean)'::regprocedure,
           'app.auth_read_session(text)'::regprocedure,
           'app.auth_revoke_session(text)'::regprocedure,
           'app.auth_list_workspaces(text)'::regprocedure]::oid[]))
         AND NOT EXISTS (SELECT FROM unnest(ARRAY['app.login_transaction',
           'app.web_session', 'app.authentication_event']) AS t(name)
-          WHERE has_table_privilege(current_user, name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE'))
+          WHERE has_table_privilege(current_user, name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+            OR has_any_column_privilege(current_user, name, 'SELECT,INSERT,UPDATE,REFERENCES'))
         AS safe`, []);
       if (result.rows[0]?.safe !== true) throw new Error('Unsafe identity repository privileges');
     },
     async createFlow(hash, flow) {
-      const result = await call('SELECT app.auth_create_flow($1,$2,$3,$4) AS accepted',
-        [hash, flow.state, flow.nonce, flow.codeVerifier]);
+      const result = await call('SELECT app.auth_create_flow($1,$2,$3,$4,$5,$6::uuid) AS accepted',
+        [hash, flow.state, flow.nonce, flow.codeVerifier, flow.requireMfa === true, flow.expectedUserId ?? null]);
       return result.rows[0]?.accepted === true;
     },
     async consumeFlow(hash) {
       const result = await call('SELECT * FROM app.auth_consume_flow($1)', [hash]);
       const row = result.rows[0];
-      return row && { state: row.state, nonce: row.nonce, codeVerifier: row.code_verifier };
+      return row && { state: row.state, nonce: row.nonce, codeVerifier: row.code_verifier,
+        ...(row.require_mfa ? { requireMfa: true, expectedUserId: row.expected_user_id } : {}) };
+    },
+    async completeLogin(identity, hash, csrf, previousHash, { expectedUserId = null, onboardingEnabled = false } = {}) {
+      const result = await call('SELECT app.auth_complete_login($1,$2,$3,$4,$5,$6,$7,$8::bigint,$9::uuid,$10) AS id',
+        [identity.issuer, identity.subject, identity.email ?? null, identity.emailVerified === true,
+          hash, csrf, previousHash, identity.mfaAuthenticatedAt ?? null, expectedUserId, onboardingEnabled]);
+      return result.rows[0]?.id ?? undefined;
     },
     async createSession(identity, hash, csrf, previousHash) {
       const result = await call('SELECT * FROM app.auth_create_session($1,$2,$3,$4,$5)',
@@ -40,7 +49,8 @@ export function createAuthRepository(call) {
     async readSession(hash) {
       const result = await call('SELECT * FROM app.auth_read_session($1)', [hash]);
       const row = result.rows[0];
-      return row && { userId: row.user_id, displayName: row.display_name, csrfToken: row.csrf_token };
+      return row && { userId: row.user_id, displayName: row.display_name, csrfToken: row.csrf_token,
+        mfaExpiresAt: row.mfa_expires_at ?? null };
     },
     async revokeSession(hash) { await call('SELECT app.auth_revoke_session($1)', [hash]); },
     async listWorkspaces(hash) {

@@ -5,6 +5,7 @@ DECLARE
   found_count integer;
   versions text[];
   identity_enabled boolean;
+  mfa_enabled boolean := false;
 BEGIN
   IF current_database() NOT IN ('bldrz', 'bldrz_restore_probe',
       'bldrz_pool_probe', 'bldrz_restore_security') THEN
@@ -18,6 +19,11 @@ BEGIN
       '0003_personal_workspace_integrity', '0004_verified_sessions',
       '0005_controlled_onboarding']::text[] THEN
     identity_enabled := true;
+  ELSIF versions IS NOT DISTINCT FROM ARRAY['0001_platform_foundation', '0002_tenant_isolation',
+      '0003_personal_workspace_integrity', '0004_verified_sessions',
+      '0005_controlled_onboarding', '0006_administrator_mfa']::text[] THEN
+    identity_enabled := true;
+    mfa_enabled := true;
   ELSE
     RAISE EXCEPTION 'unexpected migration history';
   END IF;
@@ -90,7 +96,8 @@ BEGIN
   IF identity_enabled THEN
     IF EXISTS (SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
         WHERE n.nspname='app' AND c.relname IN ('login_transaction','web_session','authentication_event')
-          AND has_table_privilege('bldrz_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE')) OR
+          AND (has_table_privilege('bldrz_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+            OR has_any_column_privilege('bldrz_runtime',c.oid,'SELECT,INSERT,UPDATE,REFERENCES'))) OR
       has_table_privilege('bldrz_runtime','app.membership','INSERT') OR
       has_any_column_privilege('bldrz_runtime','app.membership','UPDATE') OR
       has_table_privilege('bldrz_runtime','app.workspace_invitation','INSERT') OR
@@ -98,13 +105,12 @@ BEGIN
       RAISE EXCEPTION 'identity or membership tables bypass the guarded function boundary';
     END IF;
     SELECT count(*) INTO found_count FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-      WHERE n.nspname='app' AND p.proname IN ('auth_create_flow','auth_consume_flow',
-        'auth_revoke_session','auth_create_session','auth_read_session','auth_list_workspaces',
-        'onboarding_sign_in','onboarding_command');
-    IF found_count <> 8 OR EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='app' AND (p.proname LIKE 'auth\_%' ESCAPE '\' OR p.proname LIKE 'onboarding\_%' ESCAPE '\');
+    IF found_count <> (CASE WHEN mfa_enabled THEN 12 ELSE 8 END) OR EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='app' AND (p.proname LIKE 'auth\_%' ESCAPE '\' OR p.proname LIKE 'onboarding\_%' ESCAPE '\')
           AND (NOT p.prosecdef OR p.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog']::text[]
-            OR NOT has_function_privilege('bldrz_runtime',p.oid,'EXECUTE')
+            OR has_function_privilege('bldrz_runtime',p.oid,'EXECUTE') IS DISTINCT FROM
+              (p.proname NOT IN ('auth_session_has_recent_mfa','onboarding_command_v5'))
             OR has_function_privilege('bldrz_app',p.oid,'EXECUTE')
             OR EXISTS (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
               WHERE a.grantee=0))) THEN

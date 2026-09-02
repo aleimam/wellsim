@@ -18,7 +18,7 @@ Keep secrets, user data, backups and generated dependencies out of Git.
 
 ## Qualification and rollout
 
-1. Confirm a clean worktree and fetch the remote. Run all 309 tests and the
+1. Confirm a clean worktree and fetch the remote. Run all 318 tests and the
    43-check engineering sweep. Inspect the exact branch/commit to be released.
 2. Take a fresh encrypted bldrz-only backup, copy it off-server and verify all
    checksums and local decryption. Keep the recovery identity off the VPS.
@@ -50,6 +50,11 @@ diagnose before retrying. Once customer writes are enabled, rollback and
 schema compatibility require a separate reviewed plan.
 
 ## What deployment does not enable
+
+The last deployed release is `d5187b4` with schema 0001–0005. The local
+administrator-MFA candidate is not deployed. Its 0005 → 0006 qualification and
+activation procedure is in [Auth0 administrator MFA](auth0-administrator-mfa.md);
+do not rerun the original 0003 → 0005 procedure on the current database.
 
 The release includes company/private-workspace UI and the secure backend, but
 deploying them does not authorize a public identity service or signup. Choose

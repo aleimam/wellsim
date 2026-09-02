@@ -7,7 +7,7 @@ test "$(id -u)" = 0
 APP_DIR=${1:?absolute qualified source directory required}
 DUMP=${2:?absolute decrypted dump path required}
 MODE=${3:-restored-schema}
-case "$MODE" in restored-schema|qualify-onboarding) ;; *) echo 'Invalid drill mode' >&2; exit 1 ;; esac
+case "$MODE" in restored-schema|qualify-onboarding|qualify-mfa) ;; *) echo 'Invalid drill mode' >&2; exit 1 ;; esac
 test -f "$DUMP"
 PG_BIN=/usr/lib/postgresql/16/bin
 AGE_DIR=/opt/bldrz/tools/age-v1.3.2/age
@@ -67,6 +67,10 @@ if [ "$MODE" = qualify-onboarding ]; then
   # database or the recovered source copy. Qualify their encrypted round trip
   # before the same guarded transaction is applied to the live bldrz database.
   bash "$APP_DIR/deploy/render-bldrz-onboarding.sh" "$APP_DIR" | psql_drill -d bldrz_pool_probe
+  psql_drill -d bldrz_pool_probe < "$APP_DIR/db/ops/verify-bldrz-catalog.sql"
+fi
+if [ "$MODE" = qualify-mfa ]; then
+  bash "$APP_DIR/deploy/render-bldrz-mfa.sh" "$APP_DIR" | psql_drill -d bldrz_pool_probe
   psql_drill -d bldrz_pool_probe < "$APP_DIR/db/ops/verify-bldrz-catalog.sql"
 fi
 psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/pool-probe.sql"

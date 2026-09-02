@@ -1,11 +1,13 @@
-# Company and user onboarding — qualified stage 2b, not live
+# Company and user onboarding — deployed but disabled
 
 ## Status and boundaries
 
-Implemented on `codex/v2-foundation`, 2 September 2026. No deployment, live
-migration, provider registration, email delivery or production restart was
-performed for this slice. `wellsim.app` is untouched. The last verified live
-`bldrz` schema remains 0001–0003; source now includes 0004 and 0005.
+Implemented on `codex/v2-foundation`, 2 September 2026; subsequently deployed
+to bldrz in release `d5187b4`, schema 0001–0005, with authentication/onboarding
+disabled. No provider registration or email delivery is active. `wellsim.app`
+is untouched. Local 0006 adds [administrator MFA](auth0-administrator-mfa.md),
+which is not yet deployed or activated. Historical qualification receipts below
+describe the earlier 0001–0003 baseline, not the current live schema.
 Native PostgreSQL qualification subsequently passed on 2 September 2026 in
 an isolated disposable database. This is qualification, not pilot activation.
 
@@ -229,6 +231,6 @@ runner is a pre-upgrade test; do not rerun it blindly on the upgraded database.
 6. Activate only on bldrz, then build the well → case → calculation → immutable
    revision → reopen → export workflow. Load-test 50/100/200 users afterward.
 
-Email delivery, MFA step-up, platform administration, project-scoped external
+Email delivery, platform administration, project-scoped external
 collaborators, member expiry editing, bulk invitation tools, company verification,
 account deletion/identity linking and saved engineering workflow are not included.

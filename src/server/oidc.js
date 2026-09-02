@@ -1,5 +1,8 @@
 import * as oidc from 'openid-client';
 
+export const MFA_ACR = 'http://schemas.openid.net/pape/policies/2007/06/multi-factor';
+export const MFA_MAX_AGE_SECONDS = 900;
+
 function secureUrl(value, name) {
   let url;
   try { url = new URL(value); } catch { throw new Error(`Invalid ${name}`); }
@@ -43,13 +46,14 @@ export async function createOidcProvider(settings, { fetchImplementation } = {})
     secureUrl(config.serverMetadata()[key], key);
   }
   return Object.freeze({
-    async start() {
+    async start({ requireMfa = false } = {}) {
       const flow = { state: oidc.randomState(), nonce: oidc.randomNonce(),
         codeVerifier: oidc.randomPKCECodeVerifier() };
       const url = oidc.buildAuthorizationUrl(config, {
         redirect_uri: settings.redirectUri, response_type: 'code', response_mode: 'query',
         scope: settings.onboardingEnabled ? 'openid email' : 'openid', state: flow.state, nonce: flow.nonce,
         code_challenge_method: 'S256', code_challenge: await oidc.calculatePKCECodeChallenge(flow.codeVerifier),
+        ...(requireMfa ? { acr_values: MFA_ACR, max_age: '0', prompt: 'login' } : {}),
       });
       return { flow, url: url.href };
     },
@@ -58,10 +62,24 @@ export async function createOidcProvider(settings, { fetchImplementation } = {})
       const tokens = await oidc.authorizationCodeGrant(config, callback, {
         pkceCodeVerifier: flow.codeVerifier, expectedState: flow.state,
         expectedNonce: flow.nonce, idTokenExpected: true,
+        ...(flow.requireMfa === true ? { maxAge: MFA_MAX_AGE_SECONDS } : {}),
       });
       const claims = tokens.claims();
       if (!claims || claims.iss !== settings.issuer || typeof claims.sub !== 'string'
           || !claims.sub || claims.sub.length > 255) throw new Error('Invalid identity');
+      const now = Math.floor(Date.now() / 1000);
+      // Auth0's signed AMR claim is evidence; requesting an ACR is not.
+      // Use auth_time, never token issuance time, so SSO/token renewal cannot
+      // silently refresh an old MFA window. Only step-up records gain assurance.
+      let assurance = {};
+      if (flow.requireMfa === true) {
+        if (!Array.isArray(claims.amr) || !claims.amr.every((v) => typeof v === 'string') ||
+          !claims.amr.includes('mfa') || !Number.isSafeInteger(claims.auth_time) ||
+          claims.auth_time > now + 60 || claims.auth_time <= now - MFA_MAX_AGE_SECONDS) {
+          throw new Error('Fresh MFA required');
+        }
+        assurance = { mfaAuthenticatedAt: Math.min(now, claims.auth_time) };
+      }
       // Access/refresh/ID tokens are deliberately neither returned nor stored.
       // A verified immutable issuer+subject pair is the only identity key.
       if (settings.onboardingEnabled) {
@@ -70,9 +88,9 @@ export async function createOidcProvider(settings, { fetchImplementation } = {})
           throw new Error('A verified email claim is required');
         }
         return Object.freeze({ issuer: claims.iss, subject: claims.sub,
-          email: claims.email.trim().toLowerCase(), emailVerified: true });
+          email: claims.email.trim().toLowerCase(), emailVerified: true, ...assurance });
       }
-      return Object.freeze({ issuer: claims.iss, subject: claims.sub });
+      return Object.freeze({ issuer: claims.iss, subject: claims.sub, ...assurance });
     },
   });
 }

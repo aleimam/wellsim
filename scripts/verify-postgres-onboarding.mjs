@@ -22,7 +22,8 @@ const env = { ...process.env, WELLSIM_DATABASE_ENABLED: '1', WELLSIM_DB_LOGIN_RO
   WELLSIM_DB_RUNTIME_ROLE: 'bldrz_runtime', WELLSIM_DB_POOL_MAX: '2' };
 const random = () => randomBytes(32).toString('base64url');
 const issuer = 'https://qualification.example.test';
-const identity = (name) => ({ issuer, subject: name, email: `${name}@example.test`, emailVerified: true });
+const identity = (name) => ({ issuer, subject: name, email: `${name}@example.test`, emailVerified: true,
+  mfaAuthenticatedAt: Math.floor(Date.now()/1000) });
 const credentials = (name) => ({ identity: identity(name), hash: tokenHash(random()), csrf: tokenHash(random()) });
 const context = (user, workspaceId) => ({ userId: user.id, workspaceId });
 const success = (outcome) => { assert.equal(outcome.ok, true, `Unexpected failure (${outcome.code})`); return outcome.value; };
@@ -243,6 +244,62 @@ try {
   await left.onboarding.changeMember(a.hash, wa, employee.id, 'viewer', 'removed');
   await assert.rejects(capabilities(), { code: 'tenant_access_denied' });
   assert.equal((await right.auth.listWorkspaces(employee.hash)).some((w) => w.kind === 'personal'), true);
+  const basic = { ...credentials('company-a-owner'), id: a.id };
+  delete basic.identity.mfaAuthenticatedAt;
+  await signIn(left, basic);
+  assert.equal((await left.auth.readSession(basic.hash)).mfaExpiresAt, null);
+  await left.onboarding.profile(basic.hash, 'Synthetic owner');
+  for (const operation of [() => left.onboarding.createCompany(basic.hash, 'Blocked'),
+    () => left.onboarding.members(basic.hash, wa), () => left.onboarding.leave(basic.hash, wa)]) {
+    await assert.rejects(operation(), { code: 'PM001' });
+  }
+  await assert.rejects(left.withTenantTransaction(context(a, wa), (tx) => tx.query(
+    "SELECT app.onboarding_command_v5($1,'members.list',$2,'{}')", [basic.hash, wa])), { code: '42501' });
+  await assert.rejects(left.onboarding.members(basic.hash, wb), { code: '42501' });
+  pass('basic sessions cannot bypass recent MFA, private helpers or company boundaries');
+
+  const mfaRecipient = await signIn(left, credentials('mfa-admin-recipient'));
+  const adminBasic = { ...credentials('mfa-admin-recipient'), id: mfaRecipient.id };
+  delete adminBasic.identity.mfaAuthenticatedAt;
+  await signIn(right, adminBasic);
+  const adminInvitation = await invite(a, wa, mfaRecipient, 'administrator');
+  await assert.rejects(right.onboarding.accept(adminBasic.hash, adminInvitation.hash), { code: 'PM001' });
+  await right.onboarding.accept(mfaRecipient.hash, adminInvitation.hash);
+  await assert.rejects(right.onboarding.members(adminBasic.hash, wa), { code: 'PM001' });
+  assert.ok((await right.onboarding.members(mfaRecipient.hash, wa)).length);
+  pass('administrator invitation and management require that session to verify MFA');
+
+  const elevated = credentials('company-a-owner');
+  assert.equal(await left.auth.completeLogin(b.identity, elevated.hash, elevated.csrf, basic.hash,
+    { expectedUserId: a.id, onboardingEnabled: true }), undefined);
+  assert.ok(await left.auth.readSession(basic.hash));
+  const stepUpRace = await orderedRace(a, wa,
+    () => right.auth.completeLogin(elevated.identity, elevated.hash, elevated.csrf, basic.hash,
+      { expectedUserId: a.id, onboardingEnabled: true }),
+    (_, auth) => auth.revokeSession(basic.hash), { advisory: true });
+  assert.equal(success(stepUpRace.waiting), undefined);
+  assert.equal(await right.auth.readSession(elevated.hash), undefined);
+  const freshBasic = { ...credentials('company-a-owner'), id: a.id };
+  delete freshBasic.identity.mfaAuthenticatedAt;
+  await signIn(left, freshBasic);
+  assert.equal(await right.auth.completeLogin(elevated.identity, elevated.hash, elevated.csrf, freshBasic.hash,
+    { expectedUserId: a.id, onboardingEnabled: true }), a.id);
+  assert.equal(await right.auth.readSession(freshBasic.hash), undefined);
+  assert.ok((await right.auth.readSession(elevated.hash)).mfaExpiresAt);
+  pass('MFA account binding, session rotation and revocation during a queued callback');
+
+  const expiring = credentials('company-a-owner');
+  expiring.identity.mfaAuthenticatedAt = Math.floor(Date.now()/1000)-898;
+  await signIn(left, expiring);
+  const expiryRace = await orderedRace(a, wa, () => right.onboarding.members(expiring.hash, wa),
+    async () => {
+      assert.equal((await right.onboarding.members(b.hash, wb)).length, 1);
+      await delay(2500);
+    });
+  failure(expiryRace.waiting, 'PM001');
+  assert.ok(await right.auth.readSession(expiring.hash), 'MFA expiry is independent of session expiry');
+  pass('MFA expiring behind an observed company lock fails closed without blocking company B');
+
   await left.close(); left = undefined;
   assert.ok(await right.auth.readSession(b.hash));
   pass('private workspace isolation, immediate downgrade/removal checks and session survival across pool replacement');

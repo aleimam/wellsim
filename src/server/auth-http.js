@@ -44,7 +44,7 @@ export function createAuthHttp({ settings, provider, database }) {
       const url = new URL(req.url, settings.origin);
       if (url.origin !== settings.origin) { send(res, 400, { error: 'invalid_request' }); return true; }
       const methods = { '/auth/login': 'GET', '/auth/callback': 'GET', '/auth/session': 'GET',
-        '/auth/logout': 'POST', '/api/v2/workspaces': 'GET', '/api/v2/workspace': 'GET',
+        '/auth/logout': 'POST', '/auth/step-up': 'POST', '/api/v2/workspaces': 'GET', '/api/v2/workspace': 'GET',
         ...(settings.onboardingEnabled ? onboardingRoutes : {}) };
       const method = methods[url.pathname];
       if (!method) { send(res, 404, { error: 'not_found' }); return true; }
@@ -74,9 +74,12 @@ export function createAuthHttp({ settings, provider, database }) {
         catch { send(res, 400, { error: 'sign_in_failed' }); return true; }
         const sessionToken = token();
         const previous = readCookie(req, SESSION);
-        const signIn = settings.onboardingEnabled ? database.onboarding.signIn : database.auth.createSession;
-        const userId = await signIn(identity, tokenHash(sessionToken),
-          randomBytes(32).toString('hex'), previous ? tokenHash(previous) : null);
+        if (flow.requireMfa && (!flow.expectedUserId || !Number.isSafeInteger(identity.mfaAuthenticatedAt))) {
+          send(res, 400, { error: 'sign_in_failed' }); return true;
+        }
+        const userId = await database.auth.completeLogin(identity, tokenHash(sessionToken),
+          randomBytes(32).toString('hex'), previous ? tokenHash(previous) : null,
+          { expectedUserId: flow.expectedUserId ?? null, onboardingEnabled: settings.onboardingEnabled === true });
         if (!userId) { send(res, 403, { error: 'access_not_provisioned' }); return true; }
         res.setHeader('set-cookie', [cookie(FLOW, '', 0), cookie(SESSION, sessionToken, 28800)]);
         // Fixed same-origin destination. No returnTo/open redirect parameter.
@@ -94,6 +97,16 @@ export function createAuthHttp({ settings, provider, database }) {
         !equal(req.headers['x-csrf-token'], session.csrfToken))) {
         send(res, 403, { error: 'request_not_allowed' }); return true;
       }
+      if (url.pathname === '/auth/step-up') {
+        const { flow, url: location } = await provider.start({ requireMfa: true });
+        const browserToken = token();
+        if (!await database.auth.createFlow(tokenHash(browserToken),
+          { ...flow, requireMfa: true, expectedUserId: session.userId })) {
+          send(res, 429, { error: 'try_again_later' }); return true;
+        }
+        res.setHeader('set-cookie', cookie(FLOW, browserToken, 600));
+        send(res, 200, { redirectTo: location }); return true;
+      }
       if (settings.onboardingEnabled && Object.hasOwn(onboardingRoutes, url.pathname)) {
         send(res, 200, await runOnboardingRequest(req, url.pathname, hash, database.onboarding, settings.origin));
         return true;
@@ -105,7 +118,8 @@ export function createAuthHttp({ settings, provider, database }) {
       }
       if (url.pathname === '/auth/session') {
         send(res, 200, { user: { id: session.userId, displayName: session.displayName },
-          csrfToken: session.csrfToken, onboardingEnabled: settings.onboardingEnabled === true });
+          csrfToken: session.csrfToken, onboardingEnabled: settings.onboardingEnabled === true,
+          mfaExpiresAt: session.mfaExpiresAt });
       } else if (url.pathname === '/api/v2/workspaces') {
         send(res, 200, { workspaces: await database.auth.listWorkspaces(hash) });
       } else {
@@ -119,7 +133,8 @@ export function createAuthHttp({ settings, provider, database }) {
         else send(res, 200, { workspace });
       }
     } catch (error) {
-      if (error.httpStatus) send(res, error.httpStatus, { error: 'invalid_request' });
+      if (error.code === 'PM001') send(res, 403, { error: 'mfa_required' });
+      else if (error.httpStatus) send(res, error.httpStatus, { error: 'invalid_request' });
       else if (error.code === '22023' || error.code === '22P02') send(res, 400, { error: 'invalid_request' });
       else if (error.code === '23514') send(res, 409, { error: 'change_not_allowed' });
       else if (error.code === '54000') send(res, 429, { error: 'limit_reached' });

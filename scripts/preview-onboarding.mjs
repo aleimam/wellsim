@@ -20,7 +20,7 @@ const call = (text, values) => db.transaction(async (tx) => {
 const auth = createAuthRepository(call), onboarding = createOnboardingRepository(call);
 const token = randomBytes(32).toString('base64url'), hash = tokenHash(token);
 await onboarding.signIn({ issuer: 'https://synthetic.example.test', subject: 'local-preview',
-  email: 'preview@example.test', emailVerified: true }, hash, tokenHash('synthetic-csrf'), null);
+  email: 'preview@example.test', emailVerified: true, mfaAuthenticatedAt: Math.floor(Date.now()/1000) }, hash, tokenHash('synthetic-csrf'), null);
 await onboarding.profile(hash, 'Synthetic QA User');
 await onboarding.createCompany(hash, 'Synthetic Petroleum Company');
 const server = http.createServer(async (req, res) => {

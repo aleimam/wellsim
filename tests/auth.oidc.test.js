@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { authConfigFromEnv, createOidcProvider } from '../src/server/oidc.js';
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
+import { authConfigFromEnv, createOidcProvider, MFA_ACR } from '../src/server/oidc.js';
 
 const env = { WELLSIM_AUTH_ENABLED: '1', WELLSIM_DATABASE_ENABLED: '1',
   WELLSIM_PUBLIC_ORIGIN: 'https://bldrz.example.test',
@@ -14,7 +16,7 @@ const jwk = { ...keys.publicKey.export({ format: 'jwk' }), kid: 'test-key', use:
 const encode = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
 
 async function fixture(override = {}, { badSignature = false, missingToken = false,
-    issuerOverride, badEndpoint = false, badVerifier = false, onboardingEnabled = false } = {}) {
+    issuerOverride, badEndpoint = false, badVerifier = false, onboardingEnabled = false, requireMfa = false } = {}) {
   let flow;
   let requestParameters;
   let jwksRequests = 0;
@@ -47,8 +49,8 @@ async function fixture(override = {}, { badSignature = false, missingToken = fal
     return reply({ access_token: 'must-not-escape-server', token_type: 'Bearer',
       ...(!missingToken && { id_token: `${body}.${signature.toString('base64url')}` }) });
   } });
-  const started = await provider.start();
-  flow = started.flow;
+  const started = await provider.start({ requireMfa });
+  flow = { ...started.flow, requireMfa };
   const callback = new URL(settings.redirectUri);
   callback.searchParams.set('code', 'one-use-code');
   callback.searchParams.set('state', flow.state);
@@ -113,4 +115,51 @@ test('onboarding requests email scope and requires a signature-verified boolean 
     const bad = await fixture(claims, { onboardingEnabled: true });
     await assert.rejects(bad.provider.finish(bad.callback, bad.flow));
   }
+});
+
+test('MFA step-up requests fresh authentication and trusts only verified signed AMR plus auth_time', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const claims = { amr: ['pwd', 'mfa'], auth_time: now, email: 'alice@example.test', email_verified: true };
+  const f = await fixture(claims, { requireMfa: true, onboardingEnabled: true });
+  assert.equal(f.authorization.searchParams.get('acr_values'), MFA_ACR);
+  assert.equal(f.authorization.searchParams.get('prompt'), 'login');
+  assert.equal(f.authorization.searchParams.get('max_age'), '0');
+  assert.deepEqual(await f.provider.finish(f.callback, f.flow), { issuer: settings.issuer, subject: 'subject-A',
+    email: claims.email, emailVerified: true, mfaAuthenticatedAt: now });
+  assert.equal(f.requests.jwksRequests, 1);
+  const ordinary = await fixture(claims);
+  assert.equal(ordinary.authorization.searchParams.has('acr_values'), false);
+  assert.equal((await ordinary.provider.finish(ordinary.callback, ordinary.flow)).mfaAuthenticatedAt, undefined);
+});
+
+test('MFA fails closed on missing, malformed, stale or forged assurance even with a requested ACR', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  for (const override of [{ amr: undefined }, { amr: 'mfa' }, { amr: ['pwd'] }, { amr: ['mfa', true] },
+    { auth_time: undefined }, { auth_time: String(now) }, { auth_time: now - 901 }, { auth_time: now + 120 }]) {
+    const f = await fixture({ amr: ['mfa'], auth_time: now, acr: MFA_ACR, ...override }, { requireMfa: true });
+    await assert.rejects(f.provider.finish(f.callback, f.flow));
+  }
+  const forged = await fixture({ amr: ['mfa'], auth_time: now }, { requireMfa: true, badSignature: true });
+  await assert.rejects(forged.provider.finish(forged.callback, forged.flow));
+});
+
+test('Auth0 Action isolates the dedicated client, requires verified email and challenges requested MFA', async () => {
+  const action = { exports: {} };
+  vm.runInNewContext(await fs.readFile(new URL('../deploy/auth0/bldrz-post-login.cjs', import.meta.url), 'utf8'), action);
+  async function run(changes = {}) {
+    const result = { denied: false, mfa: false };
+    await action.exports.onExecutePostLogin({ secrets: { BLDRZ_CLIENT_ID: 'bldrz-client' },
+      client: { client_id: 'bldrz-client' }, user: { email_verified: true },
+      transaction: { acr_values: [MFA_ACR] }, ...changes }, {
+      access: { deny() { result.denied = true; } },
+      multifactor: { enable(factor, options) { assert.equal(factor, 'any');
+        assert.equal(options.allowRememberBrowser, false); result.mfa = true; } },
+    });
+    return result;
+  }
+  assert.deepEqual(await run(), { denied: false, mfa: true });
+  assert.deepEqual(await run({ client: { client_id: 'other-app' } }), { denied: false, mfa: false });
+  assert.deepEqual(await run({ transaction: { acr_values: [] } }), { denied: false, mfa: false });
+  assert.deepEqual(await run({ secrets: {} }), { denied: true, mfa: false });
+  assert.deepEqual(await run({ user: { email_verified: 'true' } }), { denied: true, mfa: false });
 });

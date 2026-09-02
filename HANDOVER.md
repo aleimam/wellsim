@@ -10,7 +10,7 @@ account/case store is DISABLED there: `/api/accounts/status` reports
 Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
-**Comparison release:** `codex/v2-foundation`, 309 tests passing and 43/43
+**Comparison release:** `codex/v2-foundation`, 318 tests passing and 43/43
 validation sweep. Earlier `main` work was merged; subsequent `main` commits
 remain the other developer's separate line of work. This release includes
 migrations `0001`–`0005`, least-privilege roles and a bounded PostgreSQL pool.
@@ -51,7 +51,7 @@ The web server uses Node built-ins, `pg` for opt-in PostgreSQL, and
 external asset, from a CDN.
 
 ```bash
-node --test                       # 309 unit, regression and security tests
+node --test                       # 318 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 

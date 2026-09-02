@@ -14,6 +14,7 @@ function clearPrivateUi() {
   for (const id of ['members', 'invitations', 'workspace-select']) el(id).replaceChildren();
   for (const id of ['display-name', 'company-name', 'invite-email', 'invitation-url', 'accept-token']) el(id).value = '';
   el('who').textContent = ''; el('workspace-description').textContent = '';
+  el('mfa-status').textContent = '';
 }
 async function api(path, body, workspaceId) {
   const epoch = pageEpoch;
@@ -26,6 +27,12 @@ async function api(path, body, workspaceId) {
   if (epoch !== pageEpoch) throw new Error('This page session has ended.');
   if (!response.ok) {
     if (response.status === 401) { clearPrivateUi(); el('signed-out').hidden = false; }
+    if (response.status === 403 && result.error === 'mfa_required') {
+      el('team').hidden = true;
+      el('members').replaceChildren(); el('invitations').replaceChildren();
+      el('mfa-status').textContent = 'Fresh MFA is required. Select Verify with MFA, then return and retry the action.';
+      throw new Error('Verify with MFA before managing this company.');
+    }
     const descriptions = { 400: 'Check the information and try again.',
       401: 'Please sign in again.', 403: 'Request not allowed. Refresh and sign in again.',
       404: 'Not available. Check your access, invitation recipient, and expiry.',
@@ -104,6 +111,13 @@ el('profile-form').addEventListener('submit', (event) => action(event, async () 
   const result = await api('/api/v2/profile', { displayName: el('display-name').value });
   el('who').textContent = `Signed in as ${result.displayName}`; message('Display name saved.');
 }));
+el('verify-mfa').addEventListener('click', (event) => action(event, async () => {
+  const result = await api('/auth/step-up', {});
+  const destination = new URL(result.redirectTo);
+  if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('Invalid verification destination.');
+  clearPrivateUi();
+  location.assign(destination.href);
+}));
 el('company-form').addEventListener('submit', (event) => action(event, async () => {
   const company = await api('/api/v2/companies', { name: el('company-name').value });
   el('company-name').value = ''; await refresh(company.id); message('Company created. You are its owner.');
@@ -162,6 +176,10 @@ async function initialize() {
     el('who').textContent = `Signed in as ${session.user.displayName}`;
     el('display-name').value = session.user.displayName;
     el('signed-in').hidden = false;
+    const mfaUntil = new Date(session.mfaExpiresAt);
+    el('mfa-status').textContent = mfaUntil.getTime() > Date.now()
+      ? `Administrator verification expires at ${mfaUntil.toLocaleTimeString()}. The server checks it on every management request.`
+      : 'Company owners and administrators must verify with MFA before company-management actions.';
     if (invitation && /^[A-Za-z0-9_-]{43}$/.test(invitation)) el('accept-token').value = invitation;
     invitation = undefined;
     await refresh(); message('Choose a workspace, create a company, or accept an invitation.');

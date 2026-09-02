@@ -32,7 +32,8 @@ before(async () => {
 });
 after(async () => db?.close());
 async function user(name, overrides = {}) {
-  const identity = { issuer, subject: name, email: `${name}@example.test`, emailVerified: true, ...overrides };
+  const identity = { issuer, subject: name, email: `${name}@example.test`, emailVerified: true,
+    mfaAuthenticatedAt: Math.floor(Date.now() / 1000), ...overrides };
   const token = rand(), hash = tokenHash(token), csrf = tokenHash(rand());
   const id = await repo.signIn(identity, hash, csrf, null);
   return { id, identity, token, hash, csrf, cookie: `__Host-bldrz_session=${token}` };
@@ -57,7 +58,7 @@ function handler(settings = {}, provider = {}) {
   return createAuthHttp({ settings: { enabled: true, onboardingEnabled: true, origin, ...settings }, provider,
     database: { enabled: true, auth, onboarding: repo } });
 }
-async function request(route, { actor = a, method = 'POST', headers = {}, body = {}, raw, settings } = {}) {
+async function request(route, { actor = a, method = 'POST', headers = {}, body = {}, raw, settings, provider } = {}) {
   const bytes = raw ?? JSON.stringify(body);
   const req = Readable.from([Buffer.from(bytes)]);
   Object.assign(req, { url: route, method, headers: {
@@ -69,7 +70,7 @@ async function request(route, { actor = a, method = 'POST', headers = {}, body =
     writeHead(status, headers) { this.status = status; Object.assign(this.headers, headers); },
     end(text = '') { this.text = text; },
   };
-  await handler(settings)(req, res);
+  await handler(settings, provider)(req, res);
   res.json = res.text ? JSON.parse(res.text) : null; return res;
 }
 async function tenant(user, workspace, sql, params = []) {
@@ -341,7 +342,128 @@ test('HTTP verified callback bootstraps identity/session and redirects to onboar
   const hash = tokenHash(session.split(';')[0].split('=')[1]);
   const created = await auth.readSession(hash); assert.ok(created); assert.notEqual(created.userId, b.id);
   assert.deepEqual((await auth.listWorkspaces(hash)).map((w) => w.kind), ['personal']);
-  assert.ok((await repo.createCompany(hash, 'New callback company')).id);
+  assert.equal(created.mfaExpiresAt, null);
+  await assert.rejects(repo.createCompany(hash, 'New callback company'), { code: 'PM001' });
+});
+
+async function basicSession(actor) {
+  const token = rand(), hash = tokenHash(token), csrf = tokenHash(rand());
+  const identity = { ...actor.identity, mfaAuthenticatedAt: undefined };
+  assert.equal(await auth.completeLogin(identity, hash, csrf, null, { onboardingEnabled: true }), actor.id);
+  return { ...actor, identity, token, hash, csrf, cookie: `__Host-bldrz_session=${token}` };
+}
+
+test('basic sessions cannot manage companies, forge MFA fields or call the unguarded helper', async () => {
+  const basic = await basicSession(a);
+  assert.equal((await auth.readSession(basic.hash)).mfaExpiresAt, null);
+  assert.equal((await auth.listWorkspaces(basic.hash)).length, 2);
+  await repo.profile(basic.hash, 'Alice');
+  for (const operation of [() => repo.createCompany(basic.hash, 'Blocked'),
+    () => repo.members(basic.hash, companyA), () => repo.invitations(basic.hash, companyA),
+    () => repo.invite(basic.hash, companyA, c.identity.email, 'viewer', tokenHash(rand())),
+    () => repo.leave(basic.hash, companyA)]) await assert.rejects(operation(), { code: 'PM001' });
+  await denied(tenant(basic, companyA, "SELECT app.onboarding_command_v5($1,'company.create',NULL,'{\"name\":\"Bypass\"}')", [basic.hash]));
+  await denied(tenant(basic, companyA, 'SELECT app.auth_session_has_recent_mfa($1)', [basic.hash]));
+  await denied(tenant(basic, companyA, 'UPDATE app.web_session SET mfa_authenticated_at=clock_timestamp() WHERE token_hash=$1', [basic.hash]));
+  await db.exec('GRANT UPDATE(mfa_authenticated_at) ON app.web_session TO wellsim_runtime');
+  try { await assert.rejects(auth.ready(), /Unsafe/); }
+  finally { await db.exec('REVOKE UPDATE(mfa_authenticated_at) ON app.web_session FROM wellsim_runtime'); }
+  const forged = await request('/api/v2/companies', { actor: basic, body: { name: 'Injected', mfa: true } });
+  assert.equal(forged.status, 400);
+  const blocked = await request('/api/v2/companies', { actor: basic, body: { name: 'Blocked' },
+    headers: { 'x-mfa': 'true', 'x-user-role': 'owner', 'x-mfa-authenticated-at': String(Date.now()) } });
+  assert.equal(blocked.status, 403); assert.equal(blocked.json.error, 'mfa_required');
+  await denied(repo.members(basic.hash, companyB));
+  assert.equal((await repo.members(a.hash, companyA)).length, 1);
+});
+
+test('administrator invitation acceptance and newly promoted administrators require their own recent MFA', async () => {
+  const basicC = await basicSession(c), basicB = await basicSession(b);
+  const adminInvite = await invitation(a, companyA, c, 'administrator');
+  await assert.rejects(repo.accept(basicC.hash, adminInvite.hash), { code: 'PM001' });
+  assert.equal((await auth.listWorkspaces(basicC.hash)).some((w) => w.id === companyA), false);
+  await repo.accept(c.hash, adminInvite.hash);
+  await assert.rejects(repo.members(basicC.hash, companyA), { code: 'PM001' });
+  const viewerInvite = await invitation(a, companyA, b, 'viewer');
+  await repo.accept(basicB.hash, viewerInvite.hash);
+  await denied(repo.members(basicB.hash, companyA));
+  await repo.changeMember(a.hash, companyA, b.id, 'administrator', 'active');
+  await assert.rejects(repo.members(basicB.hash, companyA), { code: 'PM001' });
+  await repo.changeMember(a.hash, companyA, b.id, 'viewer', 'active');
+  await repo.leave(basicB.hash, companyA);
+});
+
+test('MFA expires independently of session activity and stale/future timestamps cannot refresh it', async () => {
+  const originalExpiry = (await auth.readSession(a.hash)).mfaExpiresAt;
+  assert.ok(new Date(originalExpiry).getTime() > Date.now());
+  assert.equal(new Date((await auth.readSession(a.hash)).mfaExpiresAt).getTime(), new Date(originalExpiry).getTime());
+  for (const epoch of [Math.floor(Date.now() / 1000) - 901, Math.floor(Date.now() / 1000) + 120]) {
+    await assert.rejects(auth.completeLogin({ ...a.identity, mfaAuthenticatedAt: epoch }, tokenHash(rand()), a.csrf,
+      a.hash, { expectedUserId: a.id, onboardingEnabled: true }), { code: 'PM001' });
+    assert.ok(await auth.readSession(a.hash), 'failed step-up must not revoke the previous session');
+  }
+  await db.query("UPDATE app.web_session SET mfa_authenticated_at=clock_timestamp()-interval '16 minutes' WHERE token_hash=$1", [a.hash]);
+  assert.ok(await auth.readSession(a.hash));
+  await assert.rejects(repo.members(a.hash, companyA), { code: 'PM001' });
+  await repo.profile(a.hash, 'Still signed in');
+  await auth.revokeSession(a.hash); await denied(repo.members(a.hash, companyA));
+});
+
+async function startStepUp(actor, identity) {
+  const state = rand();
+  const provider = { async start(options) {
+    assert.equal(options.requireMfa, true);
+    return { flow: { state, nonce: rand(), codeVerifier: rand() }, url: `${issuer}/authorize` };
+  }, async finish(_callback, flow) {
+    assert.equal(flow.requireMfa, true); assert.equal(flow.expectedUserId, actor.id); return identity;
+  } };
+  const start = await request('/auth/step-up', { actor, provider });
+  assert.equal(start.status, 200); assert.equal(start.json.redirectTo, `${issuer}/authorize`);
+  const flowCookie = start.headers['set-cookie'].split(';')[0];
+  assert.match(start.headers['set-cookie'], /Secure; HttpOnly; SameSite=Lax/);
+  return { provider, route: `/auth/callback?code=fixture&state=${state}`,
+    headers: { cookie: `${actor.cookie}; ${flowCookie}` } };
+}
+
+test('HTTP MFA step-up requires POST, active session, exact Origin and CSRF', async () => {
+  const provider = { async start() { assert.fail('provider must not be contacted'); } };
+  for (const headers of [{ origin: undefined }, { origin: 'https://evil.test' }, { 'x-csrf-token': 'fake' }]) {
+    assert.equal((await request('/auth/step-up', { headers, provider })).status, 403);
+  }
+  assert.equal((await request('/auth/step-up', { actor: null, provider })).status, 401);
+  assert.equal((await request('/auth/step-up', { method: 'GET', provider })).status, 405);
+  await auth.revokeSession(a.hash);
+  assert.equal((await request('/auth/step-up', { provider })).status, 401);
+});
+
+test('HTTP successful same-account MFA rotates session and CSRF without gaining another company', async () => {
+  const basic = await basicSession(a), flow = await startStepUp(basic, a.identity);
+  const done = await request(flow.route, { ...flow, actor: basic, method: 'GET' });
+  assert.equal(done.status, 303); assert.equal(done.headers.location, '/workspace.html');
+  const sessionCookie = done.headers['set-cookie'].find((s) => s.startsWith('__Host-bldrz_session='));
+  const hash = tokenHash(sessionCookie.split(';')[0].split('=')[1]);
+  const session = await auth.readSession(hash);
+  assert.equal(session.userId, a.id); assert.notEqual(session.csrfToken, basic.csrf);
+  assert.ok(session.mfaExpiresAt); assert.equal(await auth.readSession(basic.hash), undefined);
+  assert.equal((await repo.members(hash, companyA)).length, 1);
+  await denied(repo.members(hash, companyB));
+  assert.equal((await request(flow.route, { ...flow, actor: basic, method: 'GET' })).status, 400);
+});
+
+test('HTTP MFA cannot switch accounts, omit assurance or resurrect a revoked browser session', async () => {
+  for (const mode of ['different-account', 'missing-mfa', 'revoked', 'missing-cookie']) {
+    const basic = await basicSession(a);
+    const identity = mode === 'different-account' ? b.identity : mode === 'missing-mfa' ? basic.identity : a.identity;
+    const flow = await startStepUp(basic, identity);
+    if (mode === 'revoked') await auth.revokeSession(basic.hash);
+    if (mode === 'missing-cookie') flow.headers.cookie = flow.headers.cookie.split('; ')[1];
+    const result = await request(flow.route, { ...flow, actor: basic, method: 'GET' });
+    assert.equal(result.status, mode === 'missing-mfa' ? 400 : 403, mode);
+    assert.ok(!String(result.headers['set-cookie']).includes('__Host-bldrz_session='));
+    if (mode !== 'revoked') assert.ok(await auth.readSession(basic.hash));
+    assert.equal((await request(flow.route, { ...flow, actor: basic, method: 'GET' })).status, 400);
+  }
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM app.app_user')).rows[0].n, 3);
 });
 
 test('service worker never intercepts authentication, API or workspace-page requests', async () => {
