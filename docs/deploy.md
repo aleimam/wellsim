@@ -45,6 +45,11 @@ store is explicitly disabled. PostgreSQL migration files may be present in the
 deployed source tree, but they are not applied until the v2 API transaction
 boundary and native-PostgreSQL deployment gate are complete.
 
+The comparison source tree is owned by root and is read-only to the `bldrz`
+service user. Only `/opt/bldrz/app/data` and
+`/opt/bldrz/app/data-backups` are writable by that process; neither path is
+shared with `wellsim.app`.
+
 Deploy only a committed branch revision using `git archive`; never copy the
 working tree or secrets. Before switching DNS, verify the comparison service
 locally through `127.0.0.1:3356`, validate the complete Caddy configuration,
