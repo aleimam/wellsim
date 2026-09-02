@@ -2,8 +2,9 @@
 
 **Live:** https://wellsim.app · **Repo:** https://github.com/aleimam/wellsim ·
 **Manual:** https://wellsim.app/help.html
-**As of:** 30 August 2026 — commit `c6f1caa`, asset stamp `2026-08-30k`,
-253 tests passing, 43/43 validation sweep.
+**Live production revision:** 30 August 2026 — commit `c6f1caa`, asset stamp
+`2026-08-30k`. **Current working tree:** 260 tests passing and 43/43 validation
+sweep; the v2 database foundation is local only and has not been deployed.
 
 ---
 
@@ -23,7 +24,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 31 test files.
+`nodal`, `reserve`, `solvers`), 32 test files.
 
 ## 2. Running it
 
@@ -35,7 +36,7 @@ No `npm install` — the server uses only Node built-ins, and the UI is plain
 HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 253 unit + regression tests
+node --test                       # 260 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -80,7 +81,7 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               31 files — workbook cell pins, physics regressions, and
+tests/               32 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)

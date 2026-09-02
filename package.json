@@ -6,12 +6,13 @@
   "private": true,
   "scripts": {
     "test": "node --test",
+    "test:tenancy": "node --test tests/tenancy.postgres.test.js",
     "start": "node src/server/server.js",
     "build:portable": "powershell -ExecutionPolicy Bypass -File build.ps1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "esbuild": "^0.28.2",
-    "postject": "^1.0.0-alpha.6",
-    "xlsx": "^0.18.5"
+    "postject": "^1.0.0-alpha.6"
   }
 }

@@ -61,6 +61,32 @@ control.
 - Resource lookup returns the same not-found behavior for unauthorized and
   nonexistent identifiers where disclosure would be harmful.
 
+### Implemented local foundation
+
+The first database implementation is isolated to `codex/v2-foundation` and is
+not deployed. `db/migrations/0001_platform_foundation.sql` defines identities,
+workspaces, memberships, assets, cases, immutable revisions and calculation
+evidence, datasets, file metadata, exports and audit events.
+
+`db/migrations/0002_tenant_isolation.sql` adds the least-privilege
+`wellsim_runtime` role, revokes public access, enables row-level security and
+binds every policy to a transaction-local user/workspace context. Composite
+foreign keys carry `workspace_id` through nested resource links and actor
+attribution, so a valid identifier from one company cannot be attached to a
+record in another company.
+
+The request transaction contract and local test procedure are documented in
+`db/README.md`. The adversarial suite in `tests/tenancy.postgres.test.js`
+creates two companies and proves application-role isolation for reads, writes,
+typed links and export scope. It also proves missing/malformed context fails
+closed, membership suspension is immediate, and transaction context does not
+survive connection reuse.
+
+This is the authorization/storage foundation, not a claim that authentication,
+object delivery or production operations are finished. The identity-provider
+ADR, API composition root, signed file delivery, native PostgreSQL verification,
+backup/restore and pool integration remain required before customer data.
+
 ## Authentication baseline
 
 - Use a maintained standards-based authentication implementation or identity
@@ -128,4 +154,3 @@ temporary enablement:
 - Archived and approved resources honor their lifecycle permissions.
 - Visitor requests cannot persist server-side data.
 - Logs and error messages do not reveal secrets or another tenant's data.
-
