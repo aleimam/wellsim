@@ -588,6 +588,18 @@ input uncertainty.
 
 ## 6. Gas — Forecast (Module 3)
 
+**FTHP and FTHT per step.** The forecast table and chart carry the flowing
+wellhead pressure and temperature. Off plateau the produced rate IS the nodal
+intersection at your forecast FTHP, so FTHP is that input. **On plateau the
+well is choked**: Pwf comes from the IPR at the constrained rate, so the real
+wellhead pressure is HIGHER than the input and is back-solved (Brent) through
+the same downward gas march — those rows are marked with `*`. The solved FTHP
+reproduces the Pwf printed beside it to ~1e-7 psi, which a separate upward
+march could not guarantee (the march is an explicit Euler integration, so an
+upward pass does not invert the downward one exactly). FTHT needs no
+inversion: the march temperature is the geothermal shelf with Ramey
+relaxation — a function of RATE and depth, independent of pressure.
+
 **Where GIIP comes from.** Left blank, GIIP and pi/Zi chain off the Reserve
 module’s **selection 1 (prod data & macro)** p/Z straight-line fit — the same
 chain the workbook’s Forecast sheet uses, and it does NOT follow whichever

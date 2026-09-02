@@ -2822,7 +2822,13 @@ async function gasForecastRun() {
     // PROD-DATA sheet, so this chain ignores whichever reserve selection is
     // on screen. On the demo that is 182 Bscf vs ~120 from SITHP/gauges —
     // worth saying out loud rather than leaving two numbers to disagree.
-    `GIIP and pi/Zi are the prod-data p/Z fit (Reserve selection 1), not the selection currently shown. Type a GIIP to override.`;
+    `GIIP and pi/Zi are the prod-data p/Z fit (Reserve selection 1), not the selection currently shown. Type a GIIP to override.` +
+    // an FTHP marked * was back-solved because the well was choked to the
+    // plateau -- it is the wellhead pressure the constrained rate implies,
+    // not the FTHP you typed
+    (r.rows.some((p) => p.fthpSource === 'solved')
+      ? `\nFTHP marked * is back-solved from the choked rate (${r.rows.filter((p) => p.fthpSource === 'solved').length} step(s) on plateau); elsewhere it is the forecast FTHP you entered.`
+      : '');
   setComputed('gas-giipBscf', r.giipBscf, 2);
   setComputed('gas-pziPsi', r.pziPsi, 1);
   setComputed('gas-startGpBscf', r.startGpBscf, 3);
@@ -2846,6 +2852,8 @@ async function gasForecastRun() {
   traces.push(
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.qMMscfd), name: 'F Rate', mode: 'lines', line: { color: '#2C7048', width: 3, dash: 'dash' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.fthpPsi), name: 'FTHP', yaxis: 'y2', mode: 'lines', line: { color: '#C2540B', width: 2 } },
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.fthtF), name: 'FTHT °F', yaxis: 'y3', mode: 'lines', line: { color: '#8A6D1A', width: 1.5, dash: 'dash' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gpBscf), name: 'Cum gas', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
   );
   plot('gas-chart-fc', traces, {
@@ -2854,15 +2862,23 @@ async function gasForecastRun() {
     title: 'Gas forecast — history + forecast (p/Z tank + nodal)',
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
     yaxis: { title: 'Rate MMscf/d · Gp Bscf', rangemode: 'tozero' },
-    yaxis2: { title: 'Pres, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
+    yaxis2: { title: 'Pres · FTHP, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
+    // FTHT gets its own axis: a temperature in F shares no scale with psi
+    yaxis3: { title: 'FTHT, °F', overlaying: 'y', side: 'right', position: 1, anchor: 'free', showgrid: false, titlefont: { color: '#8A6D1A' }, tickfont: { color: '#8A6D1A' } },
   });
   mobileShowResults();
   renderTables('gas-table-fc', [
     {
-      title: 'Forecast', headers: ['date', 'q MMscf/d', 'Pres', 'p/Z', 'Pwf', 'Gp Bscf', 'plateau'],
+      title: 'Forecast', headers: ['date', 'q MMscf/d', 'Pres', 'p/Z', 'Pwf', 'FTHP', 'FTHT °F', 'Gp Bscf', 'plateau'],
       rows: r.rows.map((p) => [
         useDates ? dayToDateStr(p.tDays) : fmt(p.dtDays, 0),
-        fmt(p.qMMscfd, 2), fmt(p.presPsi, 0), fmt(p.pOverZ, 0), fmt(p.pwfPsi, 0), fmt(p.gpBscf, 2), p.onPlateau ? 'yes' : '',
+        fmt(p.qMMscfd, 2), fmt(p.presPsi, 0), fmt(p.pOverZ, 0), fmt(p.pwfPsi, 0),
+        // on plateau the well is choked, so the FTHP is BACK-SOLVED from the
+        // produced rate and Pwf and is higher than the forecast FTHP input;
+        // off plateau it is the input by construction. Flag the solved ones.
+        fmt(p.fthpPsi, 0) + (p.fthpSource === 'solved' ? '*' : ''),
+        fmt(p.fthtF, 1),
+        fmt(p.gpBscf, 2), p.onPlateau ? 'yes' : '',
       ]),
     },
   ]);

@@ -385,6 +385,34 @@ export function reservoirLimitWorkbook(
  * Each step: Pr from the p/Z line -> IPR at Pr -> operating point at the
  * forecast FTHP -> q = min(op, plateau) -> Gp += q*dt.
  */
+/**
+ * Flowing wellhead state at a produced rate. Returns { fthpPsi, fthtF }.
+ *
+ * unconstrained: the rate IS the intersection at the running THP, so the
+ *   wellhead pressure is that THP and one march gives the temperature.
+ * on plateau: the well is choked back, so solve the THP whose march lands
+ *   on the IPR Pwf at this rate. Bracketed between the running THP (which
+ *   under-shoots, being the unconstrained case) and a ceiling at the
+ *   reservoir pressure -- a wellhead pressure above Pres cannot flow.
+ */
+export function forecastWellhead(cfg, { qMMscfd, pwfPsi, fthpPsi, onPlateau, presPsi }) {
+  const at = (thp) => gasMarch({ ...cfg, thpPsi: thp, qGasMMscfd: qMMscfd });
+  if (!onPlateau) {
+    return { fthpPsi, fthtF: at(fthpPsi).whtF, fthpSource: 'input' };
+  }
+  const resid = (thp) => at(thp).pwfPsi - pwfPsi;
+  const lo = fthpPsi;
+  const hi = Math.max(presPsi ?? fthpPsi * 4, fthpPsi * 1.05);
+  const rLo = resid(lo);
+  const rHi = resid(hi);
+  // no sign change means the choked Pwf is not reachable from any THP in
+  // the bracket -- report the input rather than a fabricated number
+  if (!(rLo * rHi <= 0)) {
+    return { fthpPsi, fthtF: at(fthpPsi).whtF, fthpSource: 'unbracketed' };
+  }
+  const { root } = brent(resid, lo, hi, { tol: 1e-6 });
+  return { fthpPsi: root, fthtF: at(root).whtF, fthpSource: 'solved' };
+}
 export function gasForecast({
   marchCfg,
   ipr,
@@ -426,6 +454,9 @@ export function gasForecast({
     }
     const pwfPsi =
       iprNow.c != null ? pwfAtQGasCn(q, iprNow) : pwfAtQGasJ(q, iprNow);
+    // flowing wellhead state: the input FTHP off plateau, back-solved when
+    // the well is choked (see forecastWellhead above)
+    const wh = forecastWellhead(cfg, { qMMscfd: q, pwfPsi, fthpPsi, onPlateau, presPsi });
     rows.push({
       tDays: startDay + i * stepDays,
       dtDays: i * stepDays,
@@ -433,6 +464,9 @@ export function gasForecast({
       pOverZ: presPsi / zAtRes(cfg, presPsi),
       qMMscfd: q,
       pwfPsi,
+      fthpPsi: wh.fthpPsi,
+      fthtF: wh.fthtF,
+      fthpSource: wh.fthpSource,
       gpBscf: gp,
       onPlateau,
     });
