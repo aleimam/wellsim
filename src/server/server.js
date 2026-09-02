@@ -132,9 +132,12 @@ const server = http.createServer(async (req, res) => {
     }
     const data = await readFile(file);
     const ext = path.extname(file);
+    if (p.startsWith('/workspace.')) {
+      res.setHeader('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    }
     res.writeHead(200, {
       'content-type': MIME[ext] ?? 'application/octet-stream',
-      'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
+      'cache-control': p.startsWith('/workspace.') ? 'no-store' : ext === '.html' ? 'no-cache' : 'public, max-age=300',
     });
     res.end(data);
   } catch (e) {

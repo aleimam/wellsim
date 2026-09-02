@@ -11,7 +11,7 @@ Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
 **Current working tree:** `main` merged into `codex/v2-foundation`,
-285 tests passing and 43/43 validation sweep. The separate `bldrz`
+309 tests passing and 43/43 validation sweep. The separate `bldrz`
 database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
@@ -33,7 +33,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 35 test files.
+`nodal`, `reserve`, `solvers`), 36 test files.
 
 ## 2. Running it
 
@@ -47,7 +47,7 @@ The web server uses Node built-ins, `pg` for opt-in PostgreSQL, and
 external asset, from a CDN.
 
 ```bash
-node --test                       # 285 unit, regression and security tests
+node --test                       # 309 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -92,7 +92,7 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               35 files — workbook cell pins, physics regressions, and
+tests/               36 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)
@@ -165,12 +165,18 @@ private; neither belongs in a repository. They **are** in the F: backup.
   off-server retention/alerts/key redundancy remain gates. The new bldrz
   backup timer is deliberately not enabled yet. See
   **docs/architecture/bldrz-recovery.md**.
-- **Provisioned OIDC authentication is implemented locally, not activated.**
+- **OIDC authentication and controlled onboarding are implemented locally, not activated.**
   Migration `0004_verified_sessions`, server-side sessions and read-only
   company/private-workspace discovery are feature-gated. No provider has been
   selected/configured, no live migration applied, and public signup/invitations
-  remain off. See **docs/architecture/identity-authentication.md** for the
-  verified boundary and activation checklist.
+  remain off. Migration `0005_controlled_onboarding` adds verified-email
+  registration, private workspace bootstrap, explicit company creation,
+  invitations and owner-controlled membership changes. `/workspace.html`
+  provides the opt-in management UI. Direct runtime membership writes are
+  revoked. Native multi-connection qualification of 0005 is still required;
+  earlier native auth evidence applies to 0004 only. See
+  **docs/architecture/identity-authentication.md** and
+  **docs/architecture/company-onboarding.md** for boundaries and activation gates.
 - **Charts are drawn by Plotly at their container's width**, and that width is
   often wrong at draw time — the container is hidden, or its flex layout has
   not settled, or the web font has not loaded. This caused a long tail of

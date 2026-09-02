@@ -2,6 +2,7 @@
 // must come from the server's verified session, never directly from a body.
 import pg from 'pg';
 import { createAuthRepository, runAuthStatement } from './auth-repository.js';
+import { createOnboardingRepository } from './onboarding-repository.js';
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -210,6 +211,8 @@ export async function initializeDatabase(env = process.env, {
   return Object.freeze({
     enabled: true,
     auth: createAuthRepository((text, values) =>
+      admit(() => runAuthStatement(pool, config, text, values))),
+    onboarding: createOnboardingRepository((text, values) =>
       admit(() => runAuthStatement(pool, config, text, values))),
     async withTenantTransaction(context, operation) {
       return admit(() => runTenantTransaction(pool, config, context, operation));

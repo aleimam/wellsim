@@ -43,7 +43,7 @@ const rawGet = (port, rawPath) =>
     const req = http.request({ host: '127.0.0.1', port, path: rawPath, method: 'GET' }, (res) => {
       let body = '';
       res.on('data', (c) => (body += c));
-      res.on('end', () => resolve({ status: res.statusCode, body }));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
     });
     req.on('error', reject);
     req.end();
@@ -64,6 +64,8 @@ function startServer(port) {
       WELLSIM_ENABLE_LEGACY_CASE_STORE: '',
       WELLSIM_INVITE: '',
       WELLSIM_DATABASE_ENABLED: '',
+      WELLSIM_AUTH_ENABLED: '',
+      WELLSIM_ONBOARDING_ENABLED: '',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -110,6 +112,15 @@ test('static serving stays inside src/ui, and every real asset still loads', asy
 
     // the stamped form the browser really requests
     assert.equal((await rawGet(port, '/app.js?v=2026-08-30k')).status, 200);
+    for (const asset of ['/workspace.html', '/workspace.js', '/workspace.css']) {
+      const res = await rawGet(port, asset);
+      assert.equal(res.status, 200);
+      assert.equal(res.headers['cache-control'], 'no-store');
+      assert.match(res.headers['content-security-policy'], /script-src 'self'/);
+      assert.match(res.headers['content-security-policy'], /frame-ancestors 'none'/);
+    }
+    assert.equal((await rawGet(port, '/auth/session')).status, 404);
+    assert.equal((await rawGet(port, '/api/v2/members')).status, 404);
   } finally {
     child.kill();
   }

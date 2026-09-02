@@ -278,6 +278,7 @@ test('PostgreSQL migrations enable RLS and a non-bypass runtime role', async () 
     '0002_tenant_isolation',
     '0003_personal_workspace_integrity',
     '0004_verified_sessions',
+    '0005_controlled_onboarding',
   ]);
 
   const role = await db.query(
@@ -439,8 +440,6 @@ test('Company A can read its own records but cannot read or modify Company B', a
   const tenantUpdates = [
     ['workspace', 'name = name', 'id'],
     ['organization', 'legal_name = legal_name', 'workspace_id'],
-    ['membership', 'status = status', 'workspace_id'],
-    ['workspace_invitation', 'status = status', 'workspace_id'],
     ['field_asset', 'name = name', 'workspace_id'],
     ['reservoir', 'name = name', 'workspace_id'],
     ['well', 'name = name', 'workspace_id'],
@@ -459,6 +458,8 @@ test('Company A can read its own records but cannot read or modify Company B', a
   }
 
   const nonMutableUpdates = [
+    ['membership', 'status = status'],
+    ['workspace_invitation', 'status = status'],
     ['export_job', "status = 'cancelled'"],
     ['project_well', 'linked_at = linked_at'],
   ];
@@ -666,24 +667,24 @@ test('personal workspaces stay private, unshareable and tenant-bound', async () 
   );
 
   await expectDatabaseError(
-    runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+    db.query(
       `INSERT INTO app.membership
          (workspace_id, user_id, role_key, status, invited_by)
        VALUES ($1, $2, 'viewer', 'active', $3)`,
       [ID.workspacePersonal, ID.userA, ID.userPersonal],
-    )),
+    ),
     '23514',
   );
 
   await expectDatabaseError(
-    runAs(ID.userPersonal, ID.workspacePersonal, () => db.query(
+    db.query(
       `INSERT INTO app.workspace_invitation
          (workspace_id, id, email, role_key, token_hash, invited_by, expires_at)
        VALUES ($1, '00000000-0000-4000-8000-0000000011c1',
                'share@example.test', 'viewer', repeat('c', 64), $2,
                statement_timestamp() + interval '1 day')`,
       [ID.workspacePersonal, ID.userPersonal],
-    )),
+    ),
     '23514',
   );
 

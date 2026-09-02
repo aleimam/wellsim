@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { authConfigFromEnv, createOidcProvider } from './oidc.js';
+import { onboardingRoutes, runOnboardingRequest } from './onboarding-http.js';
 
 const SESSION = '__Host-bldrz_session';
 const FLOW = '__Host-bldrz_login';
@@ -43,7 +44,8 @@ export function createAuthHttp({ settings, provider, database }) {
       const url = new URL(req.url, settings.origin);
       if (url.origin !== settings.origin) { send(res, 400, { error: 'invalid_request' }); return true; }
       const methods = { '/auth/login': 'GET', '/auth/callback': 'GET', '/auth/session': 'GET',
-        '/auth/logout': 'POST', '/api/v2/workspaces': 'GET', '/api/v2/workspace': 'GET' };
+        '/auth/logout': 'POST', '/api/v2/workspaces': 'GET', '/api/v2/workspace': 'GET',
+        ...(settings.onboardingEnabled ? onboardingRoutes : {}) };
       const method = methods[url.pathname];
       if (!method) { send(res, 404, { error: 'not_found' }); return true; }
       if (req.method !== method) {
@@ -72,31 +74,38 @@ export function createAuthHttp({ settings, provider, database }) {
         catch { send(res, 400, { error: 'sign_in_failed' }); return true; }
         const sessionToken = token();
         const previous = readCookie(req, SESSION);
-        const userId = await database.auth.createSession(identity, tokenHash(sessionToken),
+        const signIn = settings.onboardingEnabled ? database.onboarding.signIn : database.auth.createSession;
+        const userId = await signIn(identity, tokenHash(sessionToken),
           randomBytes(32).toString('hex'), previous ? tokenHash(previous) : null);
         if (!userId) { send(res, 403, { error: 'access_not_provisioned' }); return true; }
         res.setHeader('set-cookie', [cookie(FLOW, '', 0), cookie(SESSION, sessionToken, 28800)]);
         // Fixed same-origin destination. No returnTo/open redirect parameter.
-        redirect(res, '/'); return true;
+        redirect(res, settings.onboardingEnabled ? '/workspace.html' : '/'); return true;
       }
       const browserToken = readCookie(req, SESSION);
       const hash = browserToken && tokenHash(browserToken);
       const session = hash && await database.auth.readSession(hash);
       if (!session) {
         res.setHeader('set-cookie', cookie(SESSION, '', 0));
-        send(res, 401, { error: 'authentication_required' }); return true;
+        send(res, 401, { error: 'authentication_required',
+          ...(url.pathname === '/auth/session' ? { onboardingEnabled: settings.onboardingEnabled === true } : {}) }); return true;
+      }
+      if (req.method === 'POST' && (req.headers.origin !== settings.origin ||
+        !equal(req.headers['x-csrf-token'], session.csrfToken))) {
+        send(res, 403, { error: 'request_not_allowed' }); return true;
+      }
+      if (settings.onboardingEnabled && Object.hasOwn(onboardingRoutes, url.pathname)) {
+        send(res, 200, await runOnboardingRequest(req, url.pathname, hash, database.onboarding, settings.origin));
+        return true;
       }
       if (url.pathname === '/auth/logout') {
-        if (req.headers.origin !== settings.origin ||
-            !equal(req.headers['x-csrf-token'], session.csrfToken)) {
-          send(res, 403, { error: 'request_not_allowed' }); return true;
-        }
         await database.auth.revokeSession(hash);
         res.setHeader('set-cookie', cookie(SESSION, '', 0));
         send(res, 200, { signedOut: true }); return true;
       }
       if (url.pathname === '/auth/session') {
-        send(res, 200, { user: { id: session.userId, displayName: session.displayName }, csrfToken: session.csrfToken });
+        send(res, 200, { user: { id: session.userId, displayName: session.displayName },
+          csrfToken: session.csrfToken, onboardingEnabled: settings.onboardingEnabled === true });
       } else if (url.pathname === '/api/v2/workspaces') {
         send(res, 200, { workspaces: await database.auth.listWorkspaces(hash) });
       } else {
@@ -110,7 +119,11 @@ export function createAuthHttp({ settings, provider, database }) {
         else send(res, 200, { workspace });
       }
     } catch (error) {
-      if (error.code === 'tenant_access_denied') send(res, 404, { error: 'not_found' });
+      if (error.httpStatus) send(res, error.httpStatus, { error: 'invalid_request' });
+      else if (error.code === '22023' || error.code === '22P02') send(res, 400, { error: 'invalid_request' });
+      else if (error.code === '23514') send(res, 409, { error: 'change_not_allowed' });
+      else if (error.code === '54000') send(res, 429, { error: 'limit_reached' });
+      else if (error.code === 'tenant_access_denied' || error.code === '42501') send(res, 404, { error: 'not_found' });
       else send(res, 503, { error: 'temporarily_unavailable' });
       // Never log driver errors, callback URLs, cookies, provider tokens or PII.
     } finally { inFlight -= 1; }
@@ -124,6 +137,7 @@ export async function initializeAuthentication(database, env = process.env) {
   try {
     if (!database.enabled || !database.auth) throw new Error('Database required');
     await database.auth.ready();
+    if (settings.onboardingEnabled) await database.onboarding.ready();
     const provider = await createOidcProvider(settings);
     return createAuthHttp({ settings, provider, database });
   } catch { throw new Error('Verified authentication startup failed'); }

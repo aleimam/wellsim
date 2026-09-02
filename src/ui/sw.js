@@ -15,7 +15,7 @@
  * CACHE_VERSION must match the asset stamp in index.html; tests/docs.test.js
  * asserts that, so the two cannot drift.
  */
-const CACHE_VERSION = '2026-09-02e';
+const CACHE_VERSION = '2026-09-02f';
 const CACHE = `wellsim-${CACHE_VERSION}`;
 
 // Enough to boot offline. Plotly is added on first fetch rather than listed,
@@ -56,7 +56,8 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   // never serve a cached calculation, and never cache one
-  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
+  if (url.origin === self.location.origin && (url.pathname.startsWith('/api/')
+    || url.pathname.startsWith('/auth/') || url.pathname.startsWith('/workspace.'))) return;
 
   // HTML: network first so a new deploy is picked up immediately
   const isDoc = req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html');

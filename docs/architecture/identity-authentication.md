@@ -8,7 +8,7 @@ account was created and no provider credential was reused from another
 application. Only an exact configured issuer is trusted, with an RS256 client
 registration and an exact HTTPS redirect URI.
 
-This is **stage 2a**, not completed onboarding. It implements verified sign-in,
+This document describes **stage 2a**. It implements verified sign-in,
 server-side sessions and read-only workspace discovery for identities and
 memberships provisioned administratively. It does not implement public signup,
 automatic personal-workspace creation, company creation, invitation acceptance,
@@ -18,14 +18,19 @@ An organization owner/administrator must have an approved stronger-authenticatio
 policy before a public pilot. Email addresses and company domains never grant
 membership automatically.
 
-The three stages after this slice remain: controlled onboarding/invitations,
-the first persisted engineering workflow, and realistic capacity testing.
+**Stage 2b is now implemented locally behind a separate default-off flag:**
+see [company onboarding](company-onboarding.md) for verified-email registration,
+personal workspace bootstrap, companies, invitations and member controls.
+The provisioned-only behavior below still applies with onboarding disabled.
+With onboarding enabled, the verified OIDC email claim is also required and
+new identities can register; company membership is never inferred from email.
+The persisted engineering workflow and realistic capacity testing remain next.
 Automatic independent backups remain a separate prerequisite for customer data.
 
 ## Current activation state
 
-- Local source includes migration `0004_verified_sessions`.
-- The live `bldrz` database remains at `0001`–`0003`; `0004` is not applied there.
+- Local source includes migrations `0004_verified_sessions` and `0005_controlled_onboarding`.
+- The last verified live `bldrz` database remains at `0001`–`0003`; neither new migration is applied there.
 - `WELLSIM_AUTH_ENABLED` defaults off. No live provider registration, callback
   or sign-in button has been activated.
 - `wellsim.app` is outside this change. The old JSON account store stays off.
@@ -156,7 +161,7 @@ or a user-capacity benchmark.
    Entra, a specific approved tenant, not an unrestricted common endpoint).
 2. Resolve independent backup destination/retention, failure alerts and key
    redundancy before accepting real customer state. Requalify backup/restore
-   for migration `0004`: existing recovery catalog assertions deliberately
+   for migrations `0004` and `0005`: existing recovery catalog assertions deliberately
    still require the live `0001`–`0003` schema and must be updated/tested first.
 3. Review provider policy (including owner/admin MFA), callback log redaction,
    abuse controls and operational session-maintenance/alerting requirements.

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Workspaces · WellSim</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/workspace.css">
+  <script type="module" src="/workspace.js"></script>
+</head>
+<body>
+  <header><a href="/" class="brand">WellSim <span>WORKSPACES</span></a><a href="/">Engineering tools ↗</a></header>
+  <main>
+    <p class="eyebrow">YOUR WORK, YOUR TEAM</p>
+    <h1>A private space.<br>A shared company.</h1>
+    <p class="intro">Keep personal work separate from every company you join. Membership is explicit, and access is checked on every request.</p>
+    <p id="message" role="status" aria-live="polite">Checking secure sign-in availability…</p>
+    <section id="signed-out" hidden>
+      <h2>Start with secure sign-in</h2>
+      <p>A verified email is required. Your first sign-in creates one private workspace. Creating a company or accepting an invitation is always a separate choice.</p>
+      <a class="button" href="/auth/login">Sign in / create account</a>
+      <p>If you received an invitation, sign in first, then reopen the invitation link.</p>
+    </section>
+    <div id="signed-in" hidden>
+      <div class="identity"><p id="who"></p><button id="signout" type="button" class="secondary">Sign out</button></div>
+      <div class="grid">
+        <section>
+          <h2>Your profile</h2>
+          <form id="profile-form"><label for="display-name">Display name</label><input id="display-name" maxlength="100" required autocomplete="name"><button>Save name</button></form>
+        </section>
+        <section>
+          <h2>Create a company workspace</h2>
+          <form id="company-form"><label for="company-name">Company name</label><input id="company-name" maxlength="160" required autocomplete="organization"><button>Create company</button></form>
+          <p class="hint">You become its owner. This does not verify legal ownership of a company or join anyone automatically.</p>
+        </section>
+      </div>
+      <section>
+        <h2>Your workspaces</h2>
+        <label for="workspace-select">Active workspace</label><select id="workspace-select"></select>
+        <p id="workspace-description"></p>
+        <p class="hint">Saved engineering cases and exports will arrive in the next implementation stage.</p>
+      </section>
+      <section id="team" hidden>
+        <h2>Company team</h2>
+        <p>Only owners can grant or change owner and administrator roles. At least one active owner must remain.</p>
+        <div class="table-scroll"><table><thead><tr><th scope="col">Member</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead><tbody id="members"></tbody></table></div>
+        <h3>Invite a colleague</h3>
+        <form id="invite-form"><label for="invite-email">Recipient email</label><input id="invite-email" type="email" maxlength="254" required autocomplete="off"><label for="invite-role">Role</label><select id="invite-role"></select><button>Create invitation link</button></form>
+        <div id="invitation-result" hidden><label for="invitation-url">Share this link privately with the named recipient</label><input id="invitation-url" readonly autocomplete="off"><button id="copy-invitation" type="button" class="secondary">Copy link</button><p class="hint">Expires in 48 hours. No email is sent automatically. The link is shown only once; a new invitation revokes the previous pending link for that email.</p></div>
+        <h3>Recent invitations</h3><ul id="invitations"></ul>
+      </section>
+      <section>
+        <h2>Join an invited company</h2>
+        <form id="accept-form"><label for="accept-token">Invitation link or code</label><input id="accept-token" required autocomplete="off" spellcheck="false"><button>Accept invitation</button></form>
+        <p class="hint">Only the invited verified email can accept. A link alone cannot grant access. Existing members must ask an owner to change their role or restore access.</p>
+      </section>
+      <section id="leave-company" hidden><h2>Leave this company</h2><p>Your company access will end. Your private workspace is unaffected.</p><button id="leave" type="button" class="danger">Leave company</button></section>
+    </div>
+  </main>
+  <footer>WellSim v2 foundation · Personal workspaces are private. Company data stays with its company.</footer>
+</body>
+</html>

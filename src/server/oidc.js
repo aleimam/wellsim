@@ -10,6 +10,9 @@ function secureUrl(value, name) {
 }
 
 export function authConfigFromEnv(env = process.env) {
+  if (env.WELLSIM_ONBOARDING_ENABLED === '1' && env.WELLSIM_AUTH_ENABLED !== '1') {
+    throw new Error('Onboarding requires verified authentication');
+  }
   if (env.WELLSIM_AUTH_ENABLED !== '1') return Object.freeze({ enabled: false });
   if (env.WELLSIM_DATABASE_ENABLED !== '1' || env.WELLSIM_ENABLE_LEGACY_CASE_STORE === '1') {
     throw new Error('Verified authentication requires PostgreSQL and the legacy store disabled');
@@ -25,7 +28,8 @@ export function authConfigFromEnv(env = process.env) {
       typeof clientSecret !== 'string' || !clientSecret.trim() || clientSecret.length > 4096) {
     throw new Error('OIDC client credentials are required');
   }
-  return Object.freeze({ enabled: true, origin: origin.origin, issuer: env.WELLSIM_OIDC_ISSUER,
+  return Object.freeze({ enabled: true, onboardingEnabled: env.WELLSIM_ONBOARDING_ENABLED === '1',
+    origin: origin.origin, issuer: env.WELLSIM_OIDC_ISSUER,
     clientId, clientSecret, redirectUri: `${origin.origin}/auth/callback` });
 }
 
@@ -44,7 +48,7 @@ export async function createOidcProvider(settings, { fetchImplementation } = {})
         codeVerifier: oidc.randomPKCECodeVerifier() };
       const url = oidc.buildAuthorizationUrl(config, {
         redirect_uri: settings.redirectUri, response_type: 'code', response_mode: 'query',
-        scope: 'openid', state: flow.state, nonce: flow.nonce,
+        scope: settings.onboardingEnabled ? 'openid email' : 'openid', state: flow.state, nonce: flow.nonce,
         code_challenge_method: 'S256', code_challenge: await oidc.calculatePKCECodeChallenge(flow.codeVerifier),
       });
       return { flow, url: url.href };
@@ -60,6 +64,14 @@ export async function createOidcProvider(settings, { fetchImplementation } = {})
           || !claims.sub || claims.sub.length > 255) throw new Error('Invalid identity');
       // Access/refresh/ID tokens are deliberately neither returned nor stored.
       // A verified immutable issuer+subject pair is the only identity key.
+      if (settings.onboardingEnabled) {
+        if (claims.email_verified !== true || typeof claims.email !== 'string'
+          || claims.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(claims.email)) {
+          throw new Error('A verified email claim is required');
+        }
+        return Object.freeze({ issuer: claims.iss, subject: claims.sub,
+          email: claims.email.trim().toLowerCase(), emailVerified: true });
+      }
       return Object.freeze({ issuer: claims.iss, subject: claims.sub });
     },
   });

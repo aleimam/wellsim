@@ -14,11 +14,11 @@ const jwk = { ...keys.publicKey.export({ format: 'jwk' }), kid: 'test-key', use:
 const encode = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
 
 async function fixture(override = {}, { badSignature = false, missingToken = false,
-    issuerOverride, badEndpoint = false, badVerifier = false } = {}) {
+    issuerOverride, badEndpoint = false, badVerifier = false, onboardingEnabled = false } = {}) {
   let flow;
   let requestParameters;
   let jwksRequests = 0;
-  const provider = await createOidcProvider(settings, { fetchImplementation: async (input, options) => {
+  const provider = await createOidcProvider({ ...settings, onboardingEnabled }, { fetchImplementation: async (input, options) => {
     const url = new URL(String(input));
     const reply = (value, status = 200) => new Response(JSON.stringify(value), {
       status, headers: { 'content-type': 'application/json' },
@@ -101,4 +101,16 @@ test('OIDC rejects wrong/duplicate state, callback-origin spoofing and insecure 
   await assert.rejects(f.provider.finish(elsewhere, f.flow));
   await assert.rejects(fixture({}, { issuerOverride: 'https://different.example.test' }));
   await assert.rejects(fixture({}, { badEndpoint: true }));
+});
+
+test('onboarding requests email scope and requires a signature-verified boolean email verification claim', async () => {
+  const f = await fixture({ email: 'ALICE@example.test', email_verified: true }, { onboardingEnabled: true });
+  assert.equal(f.authorization.searchParams.get('scope'), 'openid email');
+  assert.deepEqual(await f.provider.finish(f.callback, f.flow), { issuer: settings.issuer, subject: 'subject-A',
+    email: 'alice@example.test', emailVerified: true });
+  for (const claims of [{}, { email: 'a@example.test' }, { email: 'a@example.test', email_verified: 'true' },
+    { email: 'a@example.test', email_verified: false }, { email: 'bad', email_verified: true }]) {
+    const bad = await fixture(claims, { onboardingEnabled: true });
+    await assert.rejects(bad.provider.finish(bad.callback, bad.flow));
+  }
 });
