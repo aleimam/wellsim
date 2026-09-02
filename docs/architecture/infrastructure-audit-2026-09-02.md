@@ -41,6 +41,20 @@ the native probe script covers connection reuse, rollback and timeout recovery.
 Verified authentication, data routes, full backup/restore and measured load
 capacity remain gates before persistent engineering data is accepted.
 
+On 2 September, the committed pool candidate passed native verification with
+the real application login: sequential A/B requests reused the same backend,
+role and context reset after every transaction, mismatched membership stopped
+before application SQL, failed writes rolled back, SQL errors and statement
+timeouts recovered safely, and 20 interleaved requests remained isolated on a
+maximum-one connection pool. The schema-only probe database was removed. This
+is an isolation check, not a multi-user load/capacity benchmark.
+
+A transient bldrz staging service also passed HTTP startup with the safe role
+configuration. A second startup configured with an unauthorized runtime role
+exited before opening its HTTP port and emitted only a sanitized failure
+message. The existing bldrz, WellSim, PostgreSQL and Caddy services remained
+active during these tests.
+
 ## Evidence captured
 
 ### Source and release controls
