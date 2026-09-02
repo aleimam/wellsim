@@ -121,6 +121,11 @@ private; neither belongs in a repository. They **are** in the F: backup.
   **docs/architecture/infrastructure-audit-2026-09-02.md**.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
+- **PostgreSQL 16.15 is installed for the `bldrz.net` comparison environment.**
+  It listens only on `127.0.0.1:5432`; IPv6, wildcard/public listeners and a
+  UFW rule for 5432 are absent. No WellSim database or application role exists
+  yet and no migration has been applied. The next gate is separated database
+  roles plus native migration and connection-pool isolation testing.
 - **Charts are drawn by Plotly at their container's width**, and that width is
   often wrong at draw time — the container is hidden, or its flex layout has
   not settled, or the web font has not loaded. This caused a long tail of

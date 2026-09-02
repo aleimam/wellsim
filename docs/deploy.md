@@ -50,6 +50,36 @@ service user. Only `/opt/bldrz/app/data` and
 `/opt/bldrz/app/data-backups` are writable by that process; neither path is
 shared with `wellsim.app`.
 
+### Local-only PostgreSQL staging service
+
+PostgreSQL 16.15 was installed from Ubuntu 24.04's supported repository on
+2 September 2026. Cluster `16/main` is online on port 5432 and the effective
+`listen_addresses` setting is exactly `127.0.0.1`. It does not listen on IPv6,
+the public interface or any wildcard address. UFW has no rule for 5432, and an
+external TCP test confirms that the port is unreachable from the workstation.
+
+The loopback host rule uses `scram-sha-256`; local administrative access uses
+the package-default peer authentication. The bind override is held in
+`/var/lib/postgresql/16/main/postgresql.auto.conf`. The package-generated file
+from immediately before the change is preserved at
+`/var/lib/postgresql/16/main/postgresql.auto.conf.before-local-only-20260902`.
+
+No WellSim database, application login, migration owner or password has been
+created yet, and no migration has been applied. Do not expose port 5432 or use
+the `postgres` operating-system/database account from an application service.
+Future application access must use separate migration and login roles, with
+the runtime transaction switching to the non-login `wellsim_runtime` role.
+
+Verify the boundary with:
+
+```bash
+sudo -u postgres psql -Atc "SHOW server_version; SHOW listen_addresses; SHOW port;"
+ss -ltnp | grep ':5432 '
+pg_isready -h 127.0.0.1 -p 5432
+systemctl is-active postgresql bldrz wellsim caddy
+ufw status numbered
+```
+
 Deploy only a committed branch revision using `git archive`; never copy the
 working tree or secrets. Before switching DNS, verify the comparison service
 locally through `127.0.0.1:3356`, validate the complete Caddy configuration,

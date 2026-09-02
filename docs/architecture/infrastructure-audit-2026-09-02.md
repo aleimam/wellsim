@@ -15,6 +15,23 @@ system of record for new company data.
 
 No credential value was copied into the repository or audit output.
 
+## PostgreSQL comparison-environment update
+
+PostgreSQL 16.15 was installed on the existing Hetzner VPS from Ubuntu 24.04's
+supported repository for the isolated `bldrz.net` comparison environment. The
+default cluster is online, but no WellSim database, application role or schema
+has been created and no migration has been applied.
+
+The effective listener is restricted to `127.0.0.1:5432`. Verification found
+one IPv4-loopback listener, no IPv6/wildcard/public listener, no UFW rule for
+5432 and no external TCP reachability. PostgreSQL, `bldrz.service`,
+`wellsim.service` and Caddy remained active after the database restart.
+
+This closes only the package-installation and network-bind task. Native
+PostgreSQL migration qualification, separated database roles, the API
+transaction boundary, connection-pool isolation and backup/restore remain
+deployment gates before persistent engineering data is accepted.
+
 ## Evidence captured
 
 ### Source and release controls
