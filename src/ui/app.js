@@ -1524,8 +1524,11 @@ function switchEspTab() {
   applyOilRows();
 }
 
-/** Fill the oil and water pump selectors from the shared 69-pump database
- *  (the water tab has no custom-curve builder, so no "add new" option). */
+/** Fill the oil and water pump selectors. BOTH tabs read the SAME catalogues:
+ *  a pump curve is fluid-blind, so the original workbook set serves oil ESP and
+ *  water ESP alike, and every added vendor catalogue appears on both. Manual ΔP
+ *  and Custom pump stay at the top of the list, before any catalogue, because
+ *  they are not catalogue entries and must not scroll away behind one. */
 async function loadEspPumps() {
   const oil = document.getElementById('oil-espPumpSel');
   const water = document.getElementById('water-espPumpSel');
@@ -1539,7 +1542,7 @@ async function loadEspPumps() {
     // kind of number as one transcribed from the workbook, and the person
     // picking it should be able to see which they are choosing.
     const LABEL = {
-      workbook: 'Workbook catalogue (verbatim)',
+      workbook: 'Original catalogue (oil + water ESP)',
       'borets-2015': 'Borets 2015 catalogue (from vendor curves, ~3% on head)',
     };
     const groups = r.bySource ?? [{ source: 'workbook', pumps: r.pumps }];
