@@ -1589,6 +1589,20 @@ async function loadEspPumps() {
   }
   for (const c of cats) {
     c.innerHTML = '';
+    // An unreachable server used to leave Manual dP and Custom pump in the one
+    // dropdown -- degraded but usable. With a catalogue selector in front, the
+    // same failure produced an EMPTY dropdown that opens nothing and explains
+    // nothing. Say so instead; the pump list below still offers both non-
+    // catalogue options, so the app keeps working.
+    if (!ESP_SOURCES.length) {
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = 'Catalogues unavailable — Manual ΔP / Custom pump still work';
+      c.appendChild(o);
+      c.disabled = true;
+      continue;
+    }
+    c.disabled = false;
     for (const s of ESP_SOURCES) {
       const o = document.createElement('option');
       o.value = s.source;
