@@ -1,9 +1,46 @@
 # WellSim — standalone portable program
 
-**Build 1.5 — 3 September 2026**, from commit `4c53d22` of the main project.
+**Build 1.6 — 4 September 2026**, from commit `8f226ec` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 302
-tests and the 43/43 validation sweep both passing there. Changes since build
-1.4 (2 Sep):
+tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
+there. Changes since build 1.5 (3 Sep):
+
+- **An ESP well can now be forecast at all.** Selecting a pump used to make the
+  forecast refuse to run, asking you to type a STOIIP N that the Reserve module
+  had already solved and was showing on screen two panels away. Both modules
+  rebuild the flowing pressure by marching the wellbore, and under ESP that
+  march needs a pump ΔP — which, for a catalogue pump, is *solved from the
+  curve* rather than typed. The march therefore failed, the reserve chain inside
+  the forecast died with it, and N was never derived. The ΔP is now re-solved at
+  every history row and every forecast step, which is also the physically right
+  answer: a pump's ΔP falls as the well depletes, so one typed value would be
+  wrong everywhere except the row it was measured on. Natural flow and gas lift
+  are unchanged to the digit, and a typed Manual ΔP still stands.
+- **The reserve prod_data table opens on the ESP stream.** All three default
+  dates now carry **GOR 384 scf/stb and W.C 5 %**, matching the ESP workbook the
+  module is reached from, instead of the 5000 / 50–60 % of the natural-flow case
+  their rates and pressures came from.
+- **A sensitivity curve that runs off the chart now says so.** The pressure axis
+  is pinned to [0, Pri] so families stay comparable between runs, but a
+  high-water-cut VLP can need several times that — one demo set reaches 10979
+  psi against a 2650 psi axis. Only the fragments crossing the top edge were
+  drawn, which read as a corrupted curve rather than a well that cannot lift
+  that case. The legend now reads *(5 pts above axis)*, *(all above axis)* and
+  so on. Nothing is redrawn or hidden; the chart simply states what the eye
+  cannot see.
+- **An ESP failure names the thing that is actually wrong.** One message used to
+  cover two different failures, and in the worst case every number in it was
+  NaN: *"no traverse match found (closest residual NaN psi at NaN stb/d) — check
+  PI/Pres, stages or frequency"*, blaming the pump when the well simply had no
+  IPR yet. A well that cannot be evaluated and a pump that cannot meet the well
+  are now reported separately, each naming the inputs that govern it, and no NaN
+  can reach you from either path.
+- **All 123 catalogue pumps were swept** with the PI retuned to each pump's own
+  BEP: 89 give a clean VLP, 20 wobble where the pump is badly mismatched to the
+  well, 14 cannot be solved on that well at all — and, the two that matter, zero
+  non-finite points and zero convergence failures anywhere in the catalogue.
+
+Changes in build 1.5 (3 Sep), kept for reference:
 
 - **Gas condensate is now in the material balance, not just the tables.** A gas
   condensate well produces liquid that was gas in the reservoir, so the p/Z
