@@ -363,8 +363,12 @@ test('Borets 2015 catalogue is separate, well-formed and reachable', async () =>
   const r = espPumps();
   assert.ok(Array.isArray(r.bySource), 'espPumps must report bySource');
   const sources = r.bySource.map((s) => s.source);
-  assert.deepEqual(sources, ['workbook', 'borets-2015']);
-  assert.equal(r.pumps.length, ESP_PUMPS.length + BORETS_2015_PUMPS.length);
+  // catalogues stay ordered workbook-first; each added vendor appends
+  assert.equal(sources[0], 'workbook');
+  assert.ok(sources.includes('borets-2015'), 'Borets catalogue must be offered');
+  assert.ok(sources.includes('slb-reda-2020'), 'SLB catalogue must be offered');
+  const total = r.bySource.reduce((a, g) => a + g.pumps.length, 0);
+  assert.equal(r.pumps.length, total, 'the flat list must be exactly the catalogues concatenated');
   assert.equal(new Set(r.pumps).size, r.pumps.length, 'no duplicate pump names across catalogues');
 });
 
@@ -387,4 +391,43 @@ test('a Borets 2015 pump can actually be selected and solved', async () => {
   const r = oilEsp(F);
   assert.ok(!r.error, `selecting a Borets 2015 pump failed: ${r.error}`);
   assert.ok(r.op && r.op.qOilStbD > 0, 'the well must actually flow on it');
+});
+
+// The SLB REDA 2020 catalogue. Unlike Borets, these pumps share no model with
+// the workbook, so they were checked against the catalogue's OWN printed
+// "Optimum operating range": the recovered efficiency peak had to fall inside
+// it. Structure is asserted here because the builder's guards are the only
+// thing standing between a mis-read chart and a pump curve that looks fine.
+test('SLB REDA 2020 catalogue is well-formed and physically sane', async () => {
+  const { SLB_REDA_2020_PUMPS } = await import('../src/core/vlp/esp-catalog-slb-2020.js');
+  assert.ok(SLB_REDA_2020_PUMPS.length >= 15, `expected a real catalogue, got ${SLB_REDA_2020_PUMPS.length}`);
+
+  for (const p of SLB_REDA_2020_PUMPS) {
+    assert.match(p.name, /^REDA /, `${p.name} must carry its vendor prefix`);
+    assert.equal(p.points.length, 11);
+    assert.equal(p.refFreqHz, 60);
+    assert.equal(p.points[0].rateBpd, 0);
+
+    // shut-in head must be REAL. An earlier build substituted 0 whenever the
+    // plotted curve did not reach zero flow, which produced pumps whose head
+    // rose from nothing -- structurally valid, physically meaningless.
+    assert.ok(p.points[0].headFt > 0, `${p.name} has no shut-in head`);
+
+    for (let i = 1; i < 11; i++) {
+      assert.ok(p.points[i].rateBpd > p.points[i - 1].rateBpd, `${p.name} rates must increase at ${i}`);
+    }
+    const [down, bep, up] = [p.points[3], p.points[5], p.points[7]];
+    assert.ok(down.rateBpd < bep.rateBpd && bep.rateBpd < up.rateBpd, `${p.name} thrust window disordered`);
+    assert.ok(down.headFt > up.headFt, `${p.name} head must fall across its window`);
+
+    // a centrifugal stage makes its BEP head well below shut-in but not near
+    // zero; outside this band the head axis was mis-identified
+    const ratio = bep.headFt / p.points[0].headFt;
+    assert.ok(ratio > 0.4 && ratio < 0.95, `${p.name} BEP head is ${(ratio * 100).toFixed(0)}% of shut-in`);
+  }
+
+  // no name may collide with another catalogue
+  const { BORETS_2015_PUMPS } = await import('../src/core/vlp/esp-catalog-borets-2015.js');
+  const others = new Set([...ESP_PUMPS, ...BORETS_2015_PUMPS].map((p) => p.name));
+  for (const p of SLB_REDA_2020_PUMPS) assert.ok(!others.has(p.name), `${p.name} collides with another catalogue`);
 });

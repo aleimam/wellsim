@@ -15,7 +15,7 @@
  * CACHE_VERSION must match the asset stamp in index.html; tests/docs.test.js
  * asserts that, so the two cannot drift.
  */
-const CACHE_VERSION = '2026-09-03d';
+const CACHE_VERSION = '2026-09-03e';
 const CACHE = `wellsim-${CACHE_VERSION}`;
 
 // Enough to boot offline. Plotly is added on first fetch rather than listed,

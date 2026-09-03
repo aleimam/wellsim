@@ -26,6 +26,7 @@ import {
 import { getPwfOil } from '../core/nodal/calibrate.js';
 import { ESP_PUMPS, pumpByName, THRUST } from '../core/vlp/esp-catalog.js';
 import { BORETS_2015_PUMPS } from '../core/vlp/esp-catalog-borets-2015.js';
+import { SLB_REDA_2020_PUMPS } from '../core/vlp/esp-catalog-slb-2020.js';
 import {
   pumpCurveAt,
   espOperatingPoint,
@@ -1587,6 +1588,7 @@ export function waterInjCalibrate(f) {
 const PUMP_SOURCES = [
   { source: 'workbook', pumps: ESP_PUMPS },
   { source: 'borets-2015', pumps: BORETS_2015_PUMPS },
+  { source: 'slb-reda-2020', pumps: SLB_REDA_2020_PUMPS },
 ];
 
 export function espPumps() {
@@ -1598,7 +1600,11 @@ export function espPumps() {
 
 /** Look a pump up across every catalogue, workbook first. */
 function anyPumpByName(name) {
-  return pumpByName(name) ?? BORETS_2015_PUMPS.find((p) => p.name === name) ?? null;
+  for (const s of PUMP_SOURCES) {
+    const hit = s.pumps.find((p) => p.name === name);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /** Pump from the background catalog or a custom curve; null = manual dP. */

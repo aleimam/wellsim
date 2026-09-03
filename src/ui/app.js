@@ -1536,6 +1536,7 @@ let ESP_SOURCES = [];
 const CATALOG_LABEL = {
   workbook: 'Original catalogue (oil + water ESP)',
   'borets-2015': 'Borets 2015 (from vendor curves, ~3% on head)',
+  'slb-reda-2020': 'SLB REDA 2020 (from vendor curves, BEP cross-checked)',
 };
 const catalogLabel = (s) => CATALOG_LABEL[s] ?? s;
 
