@@ -25,6 +25,7 @@ import {
 } from '../core/ipr/oil-ipr.js';
 import { getPwfOil } from '../core/nodal/calibrate.js';
 import { ESP_PUMPS, pumpByName, THRUST } from '../core/vlp/esp-catalog.js';
+import { BORETS_2015_PUMPS } from '../core/vlp/esp-catalog-borets-2015.js';
 import {
   pumpCurveAt,
   espOperatingPoint,
@@ -1578,15 +1579,33 @@ export function waterInjCalibrate(f) {
 
 // ---- ESP stack (Oil well model_ESP_V5.01) ----
 
+// Catalogues stay SEPARATE by source. The workbook pumps are verbatim
+// transcriptions of ESP_DataBase; the Borets 2015 set was recovered from the
+// vendor's printed curves and carries ~3% spread on head. Merging them into
+// one array would erase that difference at exactly the moment somebody needs
+// to know it, so the source travels with the name.
+const PUMP_SOURCES = [
+  { source: 'workbook', pumps: ESP_PUMPS },
+  { source: 'borets-2015', pumps: BORETS_2015_PUMPS },
+];
+
 export function espPumps() {
-  return { pumps: ESP_PUMPS.map((p) => p.name) };
+  return {
+    pumps: PUMP_SOURCES.flatMap((s) => s.pumps.map((p) => p.name)),
+    bySource: PUMP_SOURCES.map((s) => ({ source: s.source, pumps: s.pumps.map((p) => p.name) })),
+  };
+}
+
+/** Look a pump up across every catalogue, workbook first. */
+function anyPumpByName(name) {
+  return pumpByName(name) ?? BORETS_2015_PUMPS.find((p) => p.name === name) ?? null;
 }
 
 /** Pump from the background catalog or a custom curve; null = manual dP. */
 function buildEspPump(f) {
   const mode = f.espPumpMode ?? 'manual';
   if (mode === 'db') {
-    const p = pumpByName(f.espPumpName);
+    const p = anyPumpByName(f.espPumpName);
     if (!p) return { error: `pump "${f.espPumpName}" not in the database` };
     return { pump: p };
   }

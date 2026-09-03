@@ -325,3 +325,66 @@ test('the Novomet 50 Hz pump from the workbook is in the catalog', () => {
   // and head must fall across that window, or it is not a pump curve
   assert.ok(p.points[3].headFt > p.points[7].headFt);
 });
+
+// ---- the Borets 2015 catalogue, recovered from vendor curves ----
+// Kept in its own module rather than merged into ESP_PUMPS: those are verbatim
+// workbook transcriptions, these carry ~3% spread on head from being read off
+// a printed curve. The separation is the point, so it is asserted.
+test('Borets 2015 catalogue is separate, well-formed and reachable', async () => {
+  const { BORETS_2015_PUMPS } = await import('../src/core/vlp/esp-catalog-borets-2015.js');
+  const { espPumps } = await import('../src/server/api.js');
+
+  assert.ok(BORETS_2015_PUMPS.length >= 10, `expected a real catalogue, got ${BORETS_2015_PUMPS.length}`);
+  for (const p of BORETS_2015_PUMPS) {
+    assert.equal(p.points.length, 11, `${p.name} must have 11 points like every other pump`);
+    assert.equal(p.refFreqHz, 60);
+    assert.equal(p.points[0].rateBpd, 0, `${p.name} must start at zero flow`);
+    assert.equal(p.points[10].headFt, 0, `${p.name} must end at zero head`);
+    for (let i = 1; i < 11; i++) {
+      assert.ok(
+        p.points[i].rateBpd > p.points[i - 1].rateBpd,
+        `${p.name} rates must increase (point ${i})`
+      );
+    }
+    // the thrust window the physics reads must be ordered and the head must
+    // fall across it, or it is not a usable pump curve
+    const [down, bep, up] = [p.points[3], p.points[5], p.points[7]];
+    assert.ok(down.rateBpd < bep.rateBpd && bep.rateBpd < up.rateBpd, `${p.name} thrust window disordered`);
+    assert.ok(down.headFt > up.headFt, `${p.name} head must fall across its window`);
+  }
+
+  // none of these may collide with a workbook pump
+  const names = new Set(ESP_PUMPS.map((x) => x.name));
+  for (const p of BORETS_2015_PUMPS) {
+    assert.ok(!names.has(p.name), `${p.name} duplicates a workbook pump`);
+  }
+
+  // and the API must offer both, tagged by source, so the UI can group them
+  const r = espPumps();
+  assert.ok(Array.isArray(r.bySource), 'espPumps must report bySource');
+  const sources = r.bySource.map((s) => s.source);
+  assert.deepEqual(sources, ['workbook', 'borets-2015']);
+  assert.equal(r.pumps.length, ESP_PUMPS.length + BORETS_2015_PUMPS.length);
+  assert.equal(new Set(r.pumps).size, r.pumps.length, 'no duplicate pump names across catalogues');
+});
+
+test('a Borets 2015 pump can actually be selected and solved', async () => {
+  const { oilEsp } = await import('../src/server/api.js');
+  const { BORETS_2015_PUMPS } = await import('../src/core/vlp/esp-catalog-borets-2015.js');
+  // The demo well with a pump reachable ONLY through the new catalogue: if the
+  // lookup did not span both, this would come back "not in the database".
+  const F = {
+    qOilStbD: 1500, wcPct: 50, gorScfStb: 384, thpPsi: 200, api: 30,
+    gasSg: 0.812, rsiScfStb: 384, tresF: 230, oilViscCp: 6, waterSg: 1.05,
+    tubingIdIn: 2.992, roughness: 0.00006, topPerfAhM: 3240, devStartM: 1500,
+    devAngleDeg: 0, soilTempF: 90, htcBtu: 3, tubingOdIn: 3.5, cpBtu: 0.51,
+    priPsi: 2650, prPsi: 2650, permMd: 54.816, thicknessFt: 42.653,
+    reFt: 1640.5, rwFt: 0.5104166667, skin: 0, matchHead: 1, matchFriction: 1,
+    liftType: 'esp', pumpTvdM: 2985, espPumpMode: 'db',
+    espPumpName: BORETS_2015_PUMPS[0].name,
+    espStages: 145, espFreqHz: 50, espWearFactor: 0, espSepEffPct: 95,
+  };
+  const r = oilEsp(F);
+  assert.ok(!r.error, `selecting a Borets 2015 pump failed: ${r.error}`);
+  assert.ok(r.op && r.op.qOilStbD > 0, 'the well must actually flow on it');
+});

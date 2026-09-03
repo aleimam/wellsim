@@ -1535,13 +1535,26 @@ async function loadEspPumps() {
   if (water) water.innerHTML = '<option value="__manual">Manual ΔP (no pump model)</option>' + '<option value="__custom">Custom pump (add new)…</option>';
   try {
     const r = await api('esp/pumps', {});
-    for (const name of r.pumps) {
+    // Group by catalogue. A pump recovered from a vendor PDF is not the same
+    // kind of number as one transcribed from the workbook, and the person
+    // picking it should be able to see which they are choosing.
+    const LABEL = {
+      workbook: 'Workbook catalogue (verbatim)',
+      'borets-2015': 'Borets 2015 catalogue (from vendor curves, ~3% on head)',
+    };
+    const groups = r.bySource ?? [{ source: 'workbook', pumps: r.pumps }];
+    for (const g of groups) {
       for (const sel of [oil, water]) {
         if (!sel) continue;
-        const o = document.createElement('option');
-        o.value = name;
-        o.textContent = name;
-        sel.appendChild(o);
+        const grp = document.createElement('optgroup');
+        grp.label = LABEL[g.source] ?? g.source;
+        for (const name of g.pumps) {
+          const o = document.createElement('option');
+          o.value = name;
+          o.textContent = name;
+          grp.appendChild(o);
+        }
+        sel.appendChild(grp);
       }
     }
     oil.value = 'ESP B 538-3600'; // demo default from the workbook
