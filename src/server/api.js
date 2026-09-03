@@ -27,6 +27,7 @@ import { getPwfOil } from '../core/nodal/calibrate.js';
 import { ESP_PUMPS, pumpByName, THRUST } from '../core/vlp/esp-catalog.js';
 import { BORETS_2015_PUMPS } from '../core/vlp/esp-catalog-borets-2015.js';
 import { SLB_REDA_2020_PUMPS } from '../core/vlp/esp-catalog-slb-2020.js';
+import { NOVOMET_PUMPS } from '../core/vlp/esp-catalog-novomet.js';
 import {
   pumpCurveAt,
   espOperatingPoint,
@@ -1621,6 +1622,7 @@ const PUMP_SOURCES = [
   { source: 'workbook', pumps: ESP_PUMPS },
   { source: 'borets-2015', pumps: BORETS_2015_PUMPS },
   { source: 'slb-reda-2020', pumps: SLB_REDA_2020_PUMPS },
+  { source: 'novomet', pumps: NOVOMET_PUMPS },
 ];
 
 export function espPumps() {

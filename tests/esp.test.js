@@ -431,3 +431,44 @@ test('SLB REDA 2020 catalogue is well-formed and physically sane', async () => {
   const others = new Set([...ESP_PUMPS, ...BORETS_2015_PUMPS].map((p) => p.name));
   for (const p of SLB_REDA_2020_PUMPS) assert.ok(!others.has(p.name), `${p.name} collides with another catalogue`);
 });
+
+// The Novomet catalogue. Its charts draw every axis twice (bpd and m3/day, ft
+// and m, hp and kW), so it needed unit-aware axis pairing rather than the
+// shared extractor's magnitude rule; and every pump is drawn at both 60 and
+// 50 Hz with neither page saying which, separated by the exact 1.2 ratio
+// between their printed ranges. Structure is asserted because those two facts
+// are exactly what a silent mis-read would corrupt.
+test('Novomet catalogue is well-formed, 60 Hz, and physically sane', async () => {
+  const { NOVOMET_PUMPS } = await import('../src/core/vlp/esp-catalog-novomet.js');
+  assert.ok(NOVOMET_PUMPS.length >= 12, `expected a real catalogue, got ${NOVOMET_PUMPS.length}`);
+
+  for (const p of NOVOMET_PUMPS) {
+    // the design suffix must be present: the same model ships in several
+    // designs with DIFFERENT ranges, so a bare model name would collide
+    assert.match(p.name, /^NOV \S+ (FL|C|SEMI|CP)$/, `${p.name} needs a vendor prefix and design suffix`);
+    assert.equal(p.refFreqHz, 60, `${p.name} must be the 60 Hz page`);
+    assert.equal(p.points.length, 11);
+    assert.equal(p.points[0].rateBpd, 0);
+    assert.ok(p.points[0].headFt > 0, `${p.name} has no shut-in head`);
+    for (let i = 1; i < 11; i++) {
+      assert.ok(p.points[i].rateBpd > p.points[i - 1].rateBpd, `${p.name} rates must increase at ${i}`);
+    }
+    const [down, bep, up] = [p.points[3], p.points[5], p.points[7]];
+    assert.ok(down.rateBpd < bep.rateBpd && bep.rateBpd < up.rateBpd, `${p.name} thrust window disordered`);
+    assert.ok(down.headFt > up.headFt, `${p.name} head must fall across its window`);
+    const ratio = bep.headFt / p.points[0].headFt;
+    assert.ok(ratio > 0.4 && ratio < 0.95, `${p.name} BEP head is ${(ratio * 100).toFixed(0)}% of shut-in`);
+  }
+
+  // no collision with any other catalogue
+  const { BORETS_2015_PUMPS } = await import('../src/core/vlp/esp-catalog-borets-2015.js');
+  const { SLB_REDA_2020_PUMPS } = await import('../src/core/vlp/esp-catalog-slb-2020.js');
+  const others = new Set([...ESP_PUMPS, ...BORETS_2015_PUMPS, ...SLB_REDA_2020_PUMPS].map((p) => p.name));
+  for (const p of NOVOMET_PUMPS) assert.ok(!others.has(p.name), `${p.name} collides with another catalogue`);
+
+  // and the API offers it as its own source
+  const { espPumps } = await import('../src/server/api.js');
+  const r = espPumps();
+  assert.ok(r.bySource.some((s) => s.source === 'novomet'), 'Novomet must be offered as a catalogue');
+  assert.equal(r.pumps.length, r.bySource.reduce((a, g) => a + g.pumps.length, 0));
+});
