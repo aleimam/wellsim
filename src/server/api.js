@@ -1217,7 +1217,7 @@ function gasReserveInner(f) {
   // selection; its points are returned for chart overlay, not the fit)
   let fit;
   try {
-    fit = giipFromPz(solved.map((s) => ({ gpBscf: s.gpBscf, pOverZ: s.pOverZ })));
+    fit = giipFromPz(solved.map((s) => ({ gpBscf: s.gpBscf, gpTotalBscf: s.gpTotalBscf, pOverZ: s.pOverZ }))); // Gp TOTAL, like every other route
   } catch (e) {
     return { error: e.message };
   }
@@ -1261,7 +1261,7 @@ export function gasForecastApi(f) {
     // can run the FTHP history into the forecast FTHP as one line
     history = rsv.rows.map((r) => ({
       tDays: r.tDays, qMMscfd: r.qMMscfd, presPsi: r.presPsi, thpPsi: r.thpPsi, gpBscf: r.gpBscf,
-      qCondStbD: r.qCondStbD, condMMstb: r.condMMstb,
+      qCondStbD: r.qCondStbD, condMMstb: r.condMMstb, condBscf: r.condBscf, gpTotalBscf: r.gpTotalBscf,
     }));
     if (rsv.fit.giipBscf != null) {
       giip = giip ?? rsv.fit.giipBscf;

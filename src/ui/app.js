@@ -2915,8 +2915,8 @@ async function gasReserveRun() {
     });
     renderTables('gas-table-pz', [
       {
-        title: 'Reservoir limit', headers: ['dt d', 'q', 'Pwf', 'pr', 'z', 'Cond STB/d', 'Cond cum MMstb'],
-        rows: pts.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3)]),
+        title: 'Reservoir limit', headers: ['dt d', 'q', 'Pwf', 'pr', 'z', 'Cond STB/d', 'Cond cum MMstb', 'Cond Bscf', 'Gp total Bscf'],
+        rows: pts.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3), fmt(p.condBscf, 3), fmt(p.gpTotalBscf, 3)]),
       },
     ]);
     return;
@@ -2931,7 +2931,9 @@ async function gasReserveRun() {
   const mainColor = r.mode === 'sithp' ? '#C2540B' : r.mode === 'gauge' ? '#7038b0' : '#00636D';
   const mainSymbol = r.mode === 'sithp' ? 'square' : r.mode === 'gauge' ? 'diamond' : 'circle';
   const traces = [
-    { x: r.rows.map((p) => p.gpBscf), y: r.rows.map((p) => p.pOverZ), name: mainName, mode: 'markers', marker: { size: 9, color: mainColor, symbol: mainSymbol } },
+    // abscissa is Gp TOTAL (gas + condensate as gas equivalent): that is what
+    // the line is fitted on, so the points and the line share one axis
+    { x: r.rows.map((p) => p.gpTotalBscf ?? p.gpBscf), y: r.rows.map((p) => p.pOverZ), name: mainName, mode: 'markers', marker: { size: 9, color: mainColor, symbol: mainSymbol } },
   ];
   if (r.fit.giipBscf != null) {
     traces.push({ x: [0, r.fit.giipBscf], y: [r.fit.pziPsi, 0], name: 'p/Z line → GIIP', mode: 'lines', line: { color: '#2C7048', dash: 'dash', width: 2 } });
@@ -2940,24 +2942,24 @@ async function gasReserveRun() {
     ...LAYOUT(),
     // the selection is already named by the legend trace, so the title does
     // not repeat it — it overran the chart canvas on a narrow results column
-    title: 'p/Z vs Gp — minimum connected GIIP',
-    xaxis: { title: 'Gp, Bscf', rangemode: 'tozero' },
+    title: 'p/Z vs Gp total — minimum connected GIIP',
+    xaxis: { title: 'Gp total (gas + cond. equiv.), Bscf', rangemode: 'tozero' },
     yaxis: { title: 'p/Z, psi', rangemode: 'tozero' },
   });
   renderTables('gas-table-pz', [
     r.mode === 'gauge'
       ? {
-          title: 'Memory gauges → p/Z', headers: ['dt d', 'Pr psi', 'z', 'Gp Bscf', 'Cond cum MMstb', 'p/Z psi'],
-          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.gpBscf, 3), fmt(p.condMMstb, 3), fmt(p.pOverZ, 1)]),
+          title: 'Memory gauges → p/Z', headers: ['dt d', 'Pr psi', 'z', 'Gp Bscf', 'Cond cum MMstb', 'Cond Bscf', 'Gp total Bscf', 'p/Z psi'],
+          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.gpBscf, 3), fmt(p.condMMstb, 3), fmt(p.condBscf, 3), fmt(p.gpTotalBscf, 3), fmt(p.pOverZ, 1)]),
         }
       : r.mode === 'sithp'
       ? {
-          title: 'SITHP → Pres → p/Z', headers: ['dt d', 'SITHP', 'Pres', 'z', 'p/Z', 'Gp Bscf', 'Cond cum MMstb'],
-          rows: r.rows.map((p) => [fmt(p.dtDays ?? p.tDays, 2), fmt(p.sithpPsi, 0), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3), fmt(p.condMMstb, 3)]),
+          title: 'SITHP → Pres → p/Z', headers: ['dt d', 'SITHP', 'Pres', 'z', 'p/Z', 'Gp Bscf', 'Cond cum MMstb', 'Cond Bscf', 'Gp total Bscf'],
+          rows: r.rows.map((p) => [fmt(p.dtDays ?? p.tDays, 2), fmt(p.sithpPsi, 0), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3), fmt(p.condMMstb, 3), fmt(p.condBscf, 3), fmt(p.gpTotalBscf, 3)]),
         }
       : {
-          title: 'prod_data (solver outputs)', headers: ['dt d', 'q', 'Pwf', 'dp', 'pr', 'z', 'p/Z', 'Gp Bscf', 'Cond STB/d', 'Cond cum MMstb'],
-          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.dpPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3), fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3)]),
+          title: 'prod_data (solver outputs)', headers: ['dt d', 'q', 'Pwf', 'dp', 'pr', 'z', 'p/Z', 'Gp Bscf', 'Cond STB/d', 'Cond cum MMstb', 'Cond Bscf', 'Gp total Bscf'],
+          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.dpPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3), fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3), fmt(p.condBscf, 3), fmt(p.gpTotalBscf, 3)]),
         },
   ]);
 }
@@ -2978,7 +2980,7 @@ function dayToDateStr(t) {
 async function gasForecastRun() {
   const r = await api('gas/forecast', gasForm());
   document.getElementById('gas-fc-result').textContent =
-    `EUR = ${fmt(r.eurBscf, 2)} Bscf (${fmt(r.recoveryPct, 1)}% of GIIP ${fmt(r.giipBscf, 1)}), status: ${r.status}\n` +
+    `EUR = ${fmt(r.eurBscf, 2)} Bscf gas + ${fmt(r.eurCondBscf, 2)} Bscf cond. equiv. = ${fmt(r.eurTotalBscf, 2)} Bscf total (${fmt(r.recoveryPct, 1)}% of GIIP ${fmt(r.giipBscf, 1)}, total basis), status: ${r.status}\n` +
     `Plateau held ${r.rows.filter((p) => p.onPlateau).length} of ${r.rows.length} steps. ` +
     `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf, Pres ${fmt(r.startPresPsi, 0)} psi. ` +
     `Condensate at CGR ${fmt(r.forecastCgrStbMMscf, 1)} STB/MMscf: cum ${fmt(r.startCondMMstb, 3)} → ${fmt(r.eurCondMMstb, 3)} MMstb` +
@@ -3033,7 +3035,7 @@ async function gasForecastRun() {
   mobileShowResults();
   renderTables('gas-table-fc', [
     {
-      title: 'Forecast', headers: ['date', 'q MMscf/d', 'Pres', 'p/Z', 'Pwf', 'FTHP', 'FTHT °F', 'Gp Bscf', 'Cond STB/d', 'Cond cum MMstb', 'plateau'],
+      title: 'Forecast', headers: ['date', 'q MMscf/d', 'Pres', 'p/Z', 'Pwf', 'FTHP', 'FTHT °F', 'Gp Bscf', 'Cond STB/d', 'Cond cum MMstb', 'Cond Bscf', 'Gp total Bscf', 'plateau'],
       rows: r.rows.map((p) => [
         useDates ? dayToDateStr(p.tDays) : fmt(p.dtDays, 0),
         fmt(p.qMMscfd, 2), fmt(p.presPsi, 0), fmt(p.pOverZ, 0), fmt(p.pwfPsi, 0),
@@ -3044,6 +3046,7 @@ async function gasForecastRun() {
         fmt(p.fthtF, 1),
         fmt(p.gpBscf, 2),
         fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3),
+        fmt(p.condBscf, 3), fmt(p.gpTotalBscf, 2),
         p.onPlateau ? 'yes' : '',
       ]),
     },

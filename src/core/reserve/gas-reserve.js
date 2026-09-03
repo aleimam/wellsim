@@ -42,6 +42,20 @@ export function condProps(api) {
   return { api, sg, mw: (42.43 * sg) / (1.008 - sg) };
 }
 
+/**
+ * Gas equivalent of a stock-tank barrel of condensate, Mscf/STB:
+ * 133.01 * SG / MW -- the sheet's constant. (133.00 lands 0.008% off its
+ * cell; 133.01 reproduces it.) Null properties -> 0, so a well with no
+ * condensate API degrades to the dry-gas balance rather than throwing.
+ */
+export function gasEquivMscfPerStb(sg, mw) {
+  if (sg == null || mw == null || !(mw > 0)) return 0;
+  return (133.01 * sg) / mw;
+}
+
+/** Condensate cumulative as gas, Bscf: MMstb x (Mscf/STB) is Bscf exactly. */
+export const condBscfFrom = (condMMstb, geMscfPerStb) => (condMMstb ?? 0) * (geMscfPerStb ?? 0);
+
 /** Z at reservoir temperature for this well's gas (sour route, explicit). */
 export function zAtRes(cfg, pPsi) {
   const pc = gasPseudoCriticals({ gasSg: cfg.gasSg, n2: cfg.n2 ?? 0, co2: cfg.co2 ?? 0, h2s: cfg.h2s ?? 0, method: 'sour' });
@@ -94,6 +108,8 @@ export function gasPresSolver(marchCfg, ipr, rows) {
   let gp = 0;
   let cond = 0;
   let prev = null;
+  const cp = condProps(marchCfg.condApi);
+  const ge = gasEquivMscfPerStb(cp.sg, cp.mw);
   const t0 = rows.length ? toDays(rows[0].date) : 0;
   return rows.map((r) => {
     const tDays = toDays(r.date);
@@ -133,6 +149,8 @@ export function gasPresSolver(marchCfg, ipr, rows) {
       gpBscf: gp,
       qCondStbD,
       condMMstb: cond,
+      condBscf: condBscfFrom(cond, ge),
+      gpTotalBscf: gp + condBscfFrom(cond, ge),
     };
   });
 }
@@ -143,17 +161,22 @@ export function gasPresSolver(marchCfg, ipr, rows) {
 export function giipFromPz(points) {
   const n = points.length;
   if (n < 2) throw new Error('giipFromPz: need at least 2 (Gp, p/Z) points');
+  // The abscissa is Gp TOTAL -- produced gas plus condensate as gas equivalent
+  // (PZ_Ashry.xlsx "P_Z MB (new)"): the condensate came out of the tank as gas,
+  // so a fit on dry Gp under-states the depletion and the GIIP. Points without
+  // a total (older callers, dry-gas tests) fall back to gpBscf.
+  const x = (p) => (Number.isFinite(p.gpTotalBscf) ? p.gpTotalBscf : p.gpBscf);
   for (const p of points) {
-    if (!Number.isFinite(p.gpBscf) || !Number.isFinite(p.pOverZ))
+    if (!Number.isFinite(x(p)) || !Number.isFinite(p.pOverZ))
       throw new Error('giipFromPz: non-finite (Gp, p/Z) point — check the row dates and pressures');
   }
-  const mx = points.reduce((a, p) => a + p.gpBscf, 0) / n;
+  const mx = points.reduce((a, p) => a + x(p), 0) / n;
   const my = points.reduce((a, p) => a + p.pOverZ, 0) / n;
   let num = 0;
   let den = 0;
   for (const p of points) {
-    num += (p.gpBscf - mx) * (p.pOverZ - my);
-    den += (p.gpBscf - mx) ** 2;
+    num += (x(p) - mx) * (p.pOverZ - my);
+    den += (x(p) - mx) ** 2;
   }
   if (den === 0) throw new Error('giipFromPz: all points at the same Gp — no depletion observed');
   const slope = num / den; // psi/Bscf (negative)
@@ -301,6 +324,8 @@ export function sithpReserve(cfg, sithpRows, prodRows) {
     throw new Error('SITHP route needs at least 2 surveys (date + SITHP) to see depletion');
   const gp = cumGp(prodRows);
   const cond = cumCond(prodRows, cfg.cgrStbMMscf);
+  const cp = condProps(cfg.condApi);
+  const ge = gasEquivMscfPerStb(cp.sg, cp.mw);
   const t0 = toDays(sithpRows[0].date);
   const points = sithpRows.map((r) => {
     const s = staticGasMarch(cfg, { sithpPsi: r.sithpPsi, surfTempF: r.surfTempF });
@@ -314,6 +339,8 @@ export function sithpReserve(cfg, sithpRows, prodRows) {
       pOverZ: s.presPsi / s.zRes,
       gpBscf: gp.at(tDays),
       condMMstb: cond.at(tDays),
+      condBscf: condBscfFrom(cond.at(tDays), ge),
+      gpTotalBscf: gp.at(tDays) + condBscfFrom(cond.at(tDays), ge),
       gradientPsiFt: s.gradientPsiFt,
     };
   });
@@ -360,6 +387,8 @@ export function gaugeReserve(cfg, gaugeRows, prodRows) {
     throw new Error('gauge route needs at least 2 surveys (date + Pr) to see depletion');
   const gp = cumGp(prodRows);
   const cond = cumCond(prodRows, cfg.cgrStbMMscf);
+  const cp = condProps(cfg.condApi);
+  const ge = gasEquivMscfPerStb(cp.sg, cp.mw);
   const t0 = toDays(gaugeRows[0].date);
   const datumTvdFt = cfg.perfTvdM * 3.281;
   const points = gaugeRows.map((r) => {
@@ -382,6 +411,8 @@ export function gaugeReserve(cfg, gaugeRows, prodRows) {
       pOverZ: presPsi / z,
       gpBscf: gp.at(tDays),
       condMMstb: cond.at(tDays),
+      condBscf: condBscfFrom(cond.at(tDays), ge),
+      gpTotalBscf: gp.at(tDays) + condBscfFrom(cond.at(tDays), ge),
     };
   });
   return { points, fit: giipFromPz(points), lastGpBscf: gp.lastGpBscf, lastDay: gp.lastDay };
@@ -501,9 +532,15 @@ export function gasForecast({
   // condensate rides on the gas: rate = q x CGR, and its cumulative CONTINUES
   // from the history the same way Gp does, rather than restarting at zero
   let cond = startCondMMstb;
+  // The GIIP handed in was fitted on Gp TOTAL, so the depletion must run on
+  // the same basis -- driving the p/Z line with dry Gp against a total-basis
+  // GIIP would deplete too slowly and overstate EUR.
+  const cp = condProps(marchCfg.condApi);
+  const ge = gasEquivMscfPerStb(cp.sg, cp.mw);
   let status = 'max-steps';
   for (let i = 0; i < maxSteps; i++) {
-    const pzT = pziPsi * (1 - gp / giipBscf);
+    const gpTotal = gp + condBscfFrom(cond, ge);
+    const pzT = pziPsi * (1 - gpTotal / giipBscf);
     if (pzT <= 10) {
       status = 'depleted';
       break;
@@ -542,10 +579,14 @@ export function gasForecast({
       gpBscf: gp,
       qCondStbD,
       condMMstb: cond,
+      condBscf: condBscfFrom(cond, ge),
+      gpTotalBscf: gpTotal,
       onPlateau,
     });
     gp += (q * stepDays) / 1000;
     cond += (qCondStbD * stepDays) / 1e6;
   }
-  return { rows, eurBscf: gp, eurCondMMstb: cond, status, recoveryPct: (gp / giipBscf) * 100 };
+  // recovery is total gas equivalent over the total-basis GIIP
+  const eurTotal = gp + condBscfFrom(cond, ge);
+  return { rows, eurBscf: gp, eurCondMMstb: cond, eurCondBscf: condBscfFrom(cond, ge), eurTotalBscf: eurTotal, status, recoveryPct: (eurTotal / giipBscf) * 100 };
 }

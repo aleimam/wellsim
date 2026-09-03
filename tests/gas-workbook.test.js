@@ -273,3 +273,34 @@ test('condensate SG and MW reproduce the P_Z MB (new) sheet and reach both gas m
   close(fc.cond.sg, d.sg, 1e-14);
   close(fc.cond.mw, d.mw, 1e-14);
 });
+
+// ---- gas-equivalent material balance: PZ_Ashry.xlsx, sheet "P_Z MB (new)" ----
+// Condensate in Bscf = cum STB x GE, GE = 133.01*SG/MW Mscf/STB (the sheet's
+// constant; 133.00 misses its cell by 0.008%). Gp total = Gp + that, and the
+// p/Z line is fitted on Gp TOTAL. Pinned to the sheet's own cells.
+test('gas-equivalent chain reproduces the P_Z MB (new) sheet: cond Bscf, Gp total, GIIP on total', async () => {
+  const { condProps, gasEquivMscfPerStb, condBscfFrom, giipFromPz } = await import('../src/core/reserve/gas-reserve.js');
+  const c = condProps(49.3);
+  const ge = gasEquivMscfPerStb(c.sg, c.mw);
+  // the sheet's two rows: 17 MMscf/d for 3652 days, CGR 40 -> 30 (trapezoid)
+  const gp = (17 * 3652) / 1000; // 62.084 Bscf
+  const condStb = ((17 * 40 + 17 * 30) / 2) * 3652; // 2,172,940 STB
+  close(gp, 62.084, 1e-12);
+  const condBscf = condBscfFrom(condStb / 1e6, ge);
+  close(condBscf, 1.53514645623, 1e-9); // sheet G7
+  const gpTotal = gp + condBscf;
+  close(gpTotal, 63.6191464562, 1e-9); // sheet I7
+  // the sheet's own p/Z values and the fit on Gp TOTAL
+  const pts = [
+    { gpBscf: 0, gpTotalBscf: 0, pOverZ: 10500 / 1.46295 },
+    { gpBscf: gp, gpTotalBscf: gpTotal, pOverZ: 5000 / 0.97422470061 },
+  ];
+  const fit = giipFromPz(pts);
+  close(fit.pziPsi, 7177.27878601, 1e-9); // sheet J7 (b)
+  close(fit.slope, -32.144294386, 1e-8); // sheet K7 (m)
+  close(fit.giipBscf, 223.283133849, 1e-8); // sheet M7
+  // and the same points fitted on DRY Gp give the lower, old answer
+  const dry = giipFromPz(pts.map((p) => ({ gpBscf: p.gpBscf, pOverZ: p.pOverZ })));
+  assert.ok(dry.giipBscf < fit.giipBscf, 'ignoring condensate under-states GIIP');
+  close(dry.giipBscf, 217.895, 1e-3);
+});

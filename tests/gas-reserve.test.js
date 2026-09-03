@@ -42,7 +42,8 @@ test('synthetic tank round-trip: Pres solver + p/Z fit recover the true GIIP', (
     const pz = pzi * (1 - gp / G);
     const pres = presFromPz(GASCFG, pz);
     const pwf = Math.sqrt(pres ** 2 - (1000 * q) / J);
-    return { date: d, qMMscfd: q, pwfPsi: pwf, _pres: pres, _pz: pz };
+    // cgr 0: this tank was built on dry Gp, so the fit must see dry Gp
+    return { date: d, qMMscfd: q, pwfPsi: pwf, cgrStbMMscf: 0, _pres: pres, _pz: pz };
   });
   const solved = gasPresSolver(GASCFG, IPR, rows);
   solved.forEach((s, i) => {
@@ -158,7 +159,7 @@ test('SITHP route recovers a known tank via the static gas march (no IPR)', asyn
     ).root;
     return { date: d, sithpPsi: sithp, qMMscfd: 0, cgrStbMMscf: 40, wgrStbMMscf: 2.1 };
   });
-  const prodRows = days.map((d) => ({ date: d, qMMscfd: q }));
+  const prodRows = days.map((d) => ({ date: d, qMMscfd: q, cgrStbMMscf: 0 })); // dry-gas tank
   const r = sithpReserve(GASCFG, sithpRows, prodRows);
   close(r.fit.giipBscf, G, 1e-3);
   assert.equal(r.points.length, 3);
@@ -239,7 +240,7 @@ test('gauge route recovers a known tank from measured Pr (no march, no IPR)', as
   const q = 10;
   const days = [0, 150, 300];
   const truth = days.map((d) => presFromPz(GASCFG, pzi * (1 - (q * d) / 1000 / G)));
-  const prodRows = days.map((d) => ({ date: d, qMMscfd: q }));
+  const prodRows = days.map((d) => ({ date: d, qMMscfd: q, cgrStbMMscf: 0 })); // dry-gas tank
   const r = gaugeReserve(GASCFG, days.map((d, i) => ({ date: d, presPsi: truth[i] })), prodRows);
   close(r.fit.giipBscf, G, 1e-9); // exact: the tank is the input
   close(r.fit.pziPsi, pzi, 1e-9);
@@ -300,7 +301,7 @@ test('gauge datum correction: a gauge off datum is corrected through the gas col
 // the flowing/RLT solver integrates rate x CGR row by row, the SITHP and gauge
 // routes interpolate the cumulative at each survey date off the prod table.
 // The p/Z fit is NOT changed by any of this -- GIIP stays dry-gas.
-test('every reserve route carries condensate rate/cumulative alongside Gp, without moving GIIP', async () => {
+test('every reserve route carries condensate rate/cumulative and Gp total; the p/Z fit runs on the total', async () => {
   const { cumCond, sithpReserve, gaugeReserve } = await import('../src/core/reserve/gas-reserve.js');
   const q = 10;
   const days = [0, 100, 200, 300];
@@ -319,8 +320,21 @@ test('every reserve route carries condensate rate/cumulative alongside Gp, witho
     if (i > 0) stb += ((days[i] - days[i - 1]) * (q * cgr[i] + q * cgr[i - 1])) / 2;
     close(s.condMMstb, stb / 1e6, 1e-12);
   });
-  // and the fit is untouched by the extra fields: still the true 90 Bscf
-  close(giipFromPz(solved).giipBscf, 90, 1e-4);
+  // the fit runs on Gp TOTAL. These rows carry condensate, so the abscissa
+  // is larger than dry Gp and the GIIP comes out ABOVE the dry-gas 90 -- that
+  // is the point of the gas-equivalent balance, not a regression. Fitting the
+  // same p/Z values on dry Gp still returns exactly 90.
+  const onTotal = giipFromPz(solved).giipBscf;
+  assert.ok(onTotal > 90, `total-basis GIIP ${onTotal} must exceed the dry-gas 90`);
+  close(giipFromPz(solved.map((p) => ({ gpBscf: p.gpBscf, pOverZ: p.pOverZ }))).giipBscf, 90, 1e-4);
+  // and the rows carry the gas-equivalent bookkeeping
+  const { condProps, gasEquivMscfPerStb } = await import('../src/core/reserve/gas-reserve.js');
+  const cp0 = condProps(GASCFG.condApi);
+  const ge = gasEquivMscfPerStb(cp0.sg, cp0.mw);
+  for (const p of solved) {
+    close(p.condBscf, p.condMMstb * ge, 1e-12);
+    close(p.gpTotalBscf, p.gpBscf + p.condBscf, 1e-12);
+  }
 
   // cumCond.at() interpolates between rows and holds flat outside, like cumGp.at()
   const c = cumCond(rows, GASCFG.cgrStbMMscf);

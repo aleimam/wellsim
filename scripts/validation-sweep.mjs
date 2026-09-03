@@ -132,7 +132,7 @@ add('5 Gas reserve', 'a SITHP static march', 'SHEET*',
     const rws = days.map((d) => {
       const pz = pzi * (1 - (q * d) / 1000 / G);
       const pres = presFromPz(GAS, pz);
-      return { date: d, qMMscfd: q, pwfPsi: Math.sqrt(pres ** 2 - (1000 * q) / J) };
+      return { date: d, qMMscfd: q, cgrStbMMscf: 0, pwfPsi: Math.sqrt(pres ** 2 - (1000 * q) / J) }; // dry-gas tank: no condensate, so the fit sees dry Gp
     });
     const fit = giipFromPz(gasPresSolver(GAS, IPR, rws));
     add('5 Gas reserve', `${'bcde'[i]} p/Z tank G=${G}`, 'ANALYTIC', fit.giipBscf, G, 0.05);

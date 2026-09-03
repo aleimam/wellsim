@@ -628,9 +628,23 @@ input uncertainty.
 API: SG = 141.5 / (131.5 + API) — the same value the gas march uses — and
 MW = 42.43·SG / (1.008 − SG). On the `P_Z MB (new)` sheet's API of 49.3 these
 are 0.78263274336 and 147.346636758 exactly. They appear on the reserve
-summary line and the forecast summary line. They are the first two links of
-the gas-equivalent chain (GE = 133 000·SG / MW scf/STB); the chain itself is
-not applied to the p/Z fit — see the note below.
+summary line and the forecast summary line. They feed the gas-equivalent
+chain below.
+
+**The material balance runs on total gas, not dry gas.** Following the
+`P_Z MB (new)` sheet: **GE = 133.01·SG / MW** (Mscf per STB — the sheet's
+constant; 133.00 misses its cell by 0.008%), **condensate in Bscf** = cumulative
+MMstb × GE, **Gp total** = Gp + that, and the **p/Z line is fitted on Gp total**.
+The condensate came out of the tank as gas, so a fit on dry Gp under-states the
+depletion and the GIIP. On the sheet's own two rows the difference is
+217.9 → 223.3 Bscf (+2.5%); on other wells it scales with the CGR history.
+Every reserve route reports **Cond Bscf** and **Gp total Bscf** beside Gp, the
+p/Z chart's abscissa is Gp total, and the GIIP is on that basis on all four
+routes. Because the forecast is handed a total-basis GIIP, its p/Z depletion
+also runs on Gp total — driving it with dry Gp would deplete too slowly and
+overstate EUR — and its summary reports EUR as gas + condensate equivalent =
+total, with recovery on the total basis. A well with no condensate API
+degrades to the dry-gas balance exactly.
 
 **Condensate on every reserve route.** Each route now reports condensate the
 same way it reports Gp. On routes 1 and 3 (prod data, reservoir limit) every
@@ -639,9 +653,8 @@ well's base CGR if the row has none) and a **cumulative** (MMstb) built by the
 same trapezoid Gp uses. On routes 2 and 4 (SITHP, memory gauges) a survey has
 no rate, so its row carries the cumulative **interpolated at the survey date**
 off the prod table, exactly as its Gp is. These appear as table columns on all
-four routes and are carried into the forecast's history. **GIIP is unchanged**:
-the p/Z fit still runs on dry gas. Putting condensate into the material balance
-as gas equivalent is a separate decision, not made here.
+four routes and are carried into the forecast's history, and they are the
+input to the gas-equivalent balance described above.
 
 ## 6. Gas — Forecast (Module 3)
 
