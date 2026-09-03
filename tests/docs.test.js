@@ -326,3 +326,59 @@ test('all four gas reserve tables carry the condensate columns', () => {
     assert.equal(headerLine.includes("'Cond STB/d'"), want.rate, `${title} rate column ${want.rate ? 'missing' : 'should not be there (survey rows have no rate)'}`);
   }
 });
+
+// A changed precached asset MUST come with a changed cache stamp.
+//
+// The guard above only asserts that index.html and sw.js agree with each
+// other; both staying still also satisfies it. On 3 Sep 2026 help.html's
+// test count was edited and the stamp was not, and the whole suite stayed
+// green -- returning browsers would have kept the stale manual forever,
+// which is the precise failure the stamp exists to prevent.
+//
+// This compares the WORKING TREE against HEAD, so it fires while the change
+// is still uncommitted and can simply be fixed. A clean tree says nothing
+// and is skipped, as is a checkout with no git available.
+test('editing a precached asset also bumps the cache stamp', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+
+  let changed;
+  try {
+    changed = git(['diff', '--name-only', 'HEAD']).split(/\r?\n/).filter(Boolean);
+  } catch {
+    return; // no git, or no HEAD yet — nothing to compare against
+  }
+  if (changed.length === 0) return; // clean tree: the question does not arise
+
+  // the precache list is the source of truth, so a new asset is covered too
+  const sw = read('src/ui/sw.js');
+  const precache = [...sw.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]);
+  const fileFor = (url) => (url === '/' ? 'src/ui/index.html' : `src/ui${url}`);
+  const guarded = precache
+    .map(fileFor)
+    .filter((p) => fs.existsSync(path.join(root, p)));
+
+  const touched = changed.filter((f) => guarded.includes(f.replace(/\\/g, '/')));
+  if (touched.length === 0) return; // nothing cached was edited
+
+  // the stamp lives in both files and they are already asserted equal above,
+  // so it is enough that ONE of them moved
+  const stampMoved = ['src/ui/index.html', 'src/ui/sw.js'].some((f) => {
+    let head;
+    try {
+      head = git(['show', `HEAD:${f}`]);
+    } catch {
+      return true; // new file — treat as moved rather than fail on it
+    }
+    const now = read(f);
+    const re = f.endsWith('sw.js') ? /CACHE_VERSION\s*=\s*'([^']+)'/ : /app\.js\?v=([0-9a-z-]+)/;
+    return (head.match(re)?.[1] ?? null) !== (now.match(re)?.[1] ?? null);
+  });
+
+  assert.ok(
+    stampMoved,
+    `these precached assets changed but the cache stamp did not: ${touched.join(', ')}. ` +
+      'Bump ?v= in src/ui/index.html and CACHE_VERSION in src/ui/sw.js, or a returning ' +
+      'browser keeps serving the cached copies.'
+  );
+});
