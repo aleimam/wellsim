@@ -1,9 +1,42 @@
 # WellSim — standalone portable program
 
-**Build 1.4 — 2 September 2026**, from commit `ea1418c` of the main project.
+**Build 1.5 — 3 September 2026**, from commit `4c53d22` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 294
 tests and the 43/43 validation sweep both passing there. Changes since build
-1.3 (31 Aug):
+1.4 (2 Sep):
+
+- **Gas condensate is now in the material balance, not just the tables.** A gas
+  condensate well produces liquid that was gas in the reservoir, so the p/Z
+  balance is written on TOTAL gas. From the condensate API the program derives
+  the condensate specific gravity and molecular weight, then the gas equivalent
+  `GE = 133.01·SG/MW` (Mscf/STB); the condensate cumulative is converted through
+  it and added to Gp. **All four reserve routes** — prod-data solver, SITHP,
+  reservoir limit and memory gauges — report condensate rate, condensate
+  cumulative, Cond Bscf and **Gp total**, and the p/Z line is fitted on Gp total,
+  so the GIIP is on a total-gas basis. A well with no condensate API is
+  unaffected: the gas equivalent is zero and the dry-gas balance is what you get.
+- **The gas forecast runs on the same basis.** It takes a **forecast CGR**, grey
+  by default at the latest CGR from the production data and editable, and reports
+  condensate rate and cumulative for every step. Depletion is driven by Gp total
+  rather than dry Gp — driving it dry drains the tank too slowly and overstates
+  the EUR — and the summary carries EUR condensate (MMstb and Bscf), EUR total
+  and recovery on the total basis.
+- **Four ESP pump catalogues, 123 pumps, chosen in two steps.** Pick the
+  catalogue, then the pump, so a long list never hides the one you want:
+  *Original catalogue* (the 69 oil + water ESP pumps as before), *Borets 2015*
+  (13), *SLB REDA 2020* (24) and *Novomet* (17). The three vendor catalogues were
+  recovered from the geometry of the published curves, and every pump was
+  cross-checked against evidence the tracer never read — Borets against the pumps
+  it shares model names with, SLB and Novomet against each page’s own printed
+  Recommended Operating Range. **Pumps that failed the check were left out rather
+  than shipped unproven.** Manual ΔP and Custom pump remain available in every
+  catalogue, and a case saved before catalogues existed still restores its pump —
+  the catalogue is worked out from the pump name, never stored.
+- **The built-in manual was brought up to date** with all of the above: the
+  condensate equations, the pump catalogues and their provenance, and the
+  per-layer IPR behaviour introduced in 1.4.
+
+Changes in build 1.4 (2 Sep), kept for reference:
 
 - **Multi-layer IPR now shows every layer, not just their sum.** Each layer is
   drawn on the IPR/VLP chart beside the total, dashed and labelled with its own
