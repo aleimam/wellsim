@@ -194,7 +194,7 @@ inputs are required; there is no input THT.
    | Water — injector | injection THP · injected-water temperature · tubing ID |
 
    **ESP frequency**: with a pump selected (oil *or* water — both tabs read
-   the same 68-pump database), each set's coupled pump ΔP is re-solved per
+   the same 69-pump database), each set's coupled pump ΔP is re-solved per
    rate at that frequency, affinity-scaled curve and intake state included;
    on **Manual ΔP** the quoted ΔP is scaled by the affinity law (f/f₀)².
    Above the pump's flow range the head is zero, so the frequency curves
@@ -252,7 +252,7 @@ inputs are required; there is no input THT.
    trajectory (vertical to the kick-off, then the deviation angle), the
    same conversion used for the perforations. Cases saved before this
    change still load: a stored TVD pump depth is honoured as-is.
-   The **68-pump database runs in the
+   The **69-pump database runs in the
    background** (WD/WG/WE/FLEX/ESP-B families from ESP_DataBase): pick a pump
    from the dropdown, **add a new pump** as a custom per-stage curve (up to 11
    head/rate points at a reference frequency), or fall back to Manual ΔP.
@@ -381,7 +381,7 @@ future-pressure IPR sensitivities keep J constant (water μ·B do not change
 with pressure). No gas/oil-PVT inputs appear (no GOR, API, Rsi, Pb, WC, oil
 viscosity — the liquid viscosity collapses to the sheets' hardcoded 0.5 cp
 water value). Defaults: FTHP 200 psi (producer) · 2000 bbl/d · Pri 4800 psi.
-**Water ESP** runs on the **same 68-pump database as the oil tab** — pick a
+**Water ESP** runs on the **same 69-pump database as the oil tab** — pick a
 pump from the dropdown and the ΔP is *solved* from its curve (stages ×
 affinity × wear) instead of typed, with head and the down-thrust/BEP/
 up-thrust window reported at the operating point; *Match stages* solves the

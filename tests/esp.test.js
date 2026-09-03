@@ -41,8 +41,8 @@ const OPTS = { stages: 145, freqHz: 50, wearFactor: 0, sepEffPct: 95 };
 // the workbook's PI-input IPR: PI 2.7 bbl/d/psi at constant Pres 2650
 const IPR = createOilIpr({ jTest: 2.7, priPsi: 2650, pbPsi: 1911.80724408471, prPsi: 2650 });
 
-test('catalog: 68 pumps, demo curve verbatim, thrust markers', () => {
-  assert.equal(ESP_PUMPS.length, 68);
+test('catalog: 69 pumps, demo curve verbatim, thrust markers', () => {
+  assert.equal(ESP_PUMPS.length, 69);
   assert.ok(PUMP, 'demo pump present');
   assert.equal(PUMP.refFreqHz, 60);
   assert.deepEqual(PUMP.points[0], { headFt: 64, rateBpd: 0 });
@@ -303,4 +303,25 @@ test('the off-curve check stays silent when the pump can pass the rate', () => {
   const m = matchStages(CFG, IPR, big, { freqHz: 50, sepEffPct: 95, testQOilStbD: 2100 });
   assert.ok(m.stages > 0, `WG 5200 should match, got ${JSON.stringify(m)}`);
   assert.equal(m.designOk, true);
+});
+
+// The workbook gained a fourth vendor group (Novomet) after the original
+// 68-pump extract, and the app never picked it up -- found on 2 Sep 2026 by
+// reading ESP_DataBase back and diffing it against this catalog, which
+// reproduced the other 68 pumps with zero numeric mismatches. The rates are
+// the workbook's own m3/day -> BPD conversion (943.4716 BPD = 150 m3/d), kept
+// unrounded so this file stays a verbatim copy of the sheet.
+test('the Novomet 50 Hz pump from the workbook is in the catalog', () => {
+  const p = ESP_PUMPS.find((x) => x.name === 'NB(630-1000)H');
+  assert.ok(p, 'NB(630-1000)H must be present');
+  assert.equal(p.refFreqHz, 50);
+  assert.equal(p.points.length, 11);
+  assert.deepEqual(p.points[0], { headFt: 13.1, rateBpd: 0 });
+  assert.equal(p.points[10].headFt, 0);
+  close(p.points[10].rateBpd, 943.4716155648157);
+  // thrust markers must land on a sane, increasing window
+  const [down, bep, up] = [p.points[3].rateBpd, p.points[5].rateBpd, p.points[7].rateBpd];
+  assert.ok(down < bep && bep < up, `window ${down} < ${bep} < ${up}`);
+  // and head must fall across that window, or it is not a pump curve
+  assert.ok(p.points[3].headFt > p.points[7].headFt);
 });

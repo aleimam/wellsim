@@ -232,7 +232,7 @@ const OIL_ESP_MANUAL_FIELDS = [
   ['pumpDpPsi', 'Pump ΔP (manual)', 'psi', 1325.16],
   ['tubingGasScfD', 'Tubing gas (blank = formation)', 'scf/d', ''],
 ];
-// water ESP: the same 68-pump database as oil (a pump curve is fluid-blind;
+// water ESP: the same 69-pump database as oil (a pump curve is fluid-blind;
 // water simply has no free gas, so no separator/intake-gas block). With a
 // pump selected the dP is solved from the curve; Manual dP keeps the typed
 // value and a frequency sensitivity scales it by the affinity law (f/f0)^2.
@@ -1524,7 +1524,7 @@ function switchEspTab() {
   applyOilRows();
 }
 
-/** Fill the oil and water pump selectors from the shared 68-pump database
+/** Fill the oil and water pump selectors from the shared 69-pump database
  *  (the water tab has no custom-curve builder, so no "add new" option). */
 async function loadEspPumps() {
   const oil = document.getElementById('oil-espPumpSel');
@@ -3546,7 +3546,7 @@ function switchTab(which) {
   resizeVisibleCharts();
 }
 
-// The 68-pump catalog is fetched async at startup, but oilForm()/waterForm()
+// The 69-pump catalog is fetched async at startup, but oilForm()/waterForm()
 // read the pump NAME synchronously — so any ESP action firing before the
 // fetch lands sent an empty name and the user saw
 //   pump "" not in the database

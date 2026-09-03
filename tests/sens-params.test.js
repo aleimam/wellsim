@@ -138,7 +138,7 @@ test('vlpSensitivityEsp is exported and splits freqHz out of march overrides', (
   assert.equal(typeof vlpSensitivityEsp, 'function');
 });
 
-// ---- water ESP driven by the shared 68-pump database ----
+// ---- water ESP driven by the shared 69-pump database ----
 const WATER_ESP = {
   ...WATER_BASE, liftType: 'esp', espPumpMode: 'db', espPumpName: 'ESP B 538-3600',
   espSepEffPct: 0, pumpTvdM: 2985, pumpDpPsi: 1325.16, espFreqHz: 50,
