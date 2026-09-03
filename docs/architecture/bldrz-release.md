@@ -2,6 +2,14 @@
 
 ## Shared repository boundary
 
+The full handoff for both devices is
+[Two-device workflow](two-device-workflow.md). The agreed mapping is:
+
+| Development line | Branch | Deployment target |
+| --- | --- | --- |
+| Other Windows device/developer | `main` | `wellsim.app`, `/opt/wellsim/app`, `wellsim.service` |
+| This comparison task | `codex/v2-foundation` | `bldrz.net`, `/opt/bldrz/app`, `bldrz.service` |
+
 Keep this comparison line on `codex/v2-foundation`. The other developer's
 subsequent `main` work is not automatically merged into it. Fetch before each
 push, inspect remote movement, and use a normal fast-forward push: no force
@@ -9,6 +17,11 @@ push, branch reset or automatic merge. A separate repository is not required.
 Coordinate branch ownership and use reviewed PRs/cherry-picks for features
 chosen for the eventual combined version. Branch separation is not a security
 boundary against administrators who have access to both deployments.
+In particular, the other-device SSH key currently grants root access to the
+whole shared server. Separate app runtime users already exist, but per-app SSH
+deployment-account restrictions and branch-enforced deployments are not yet
+configured. The owner will forward the handoff; it has not been independently
+communicated to or acknowledged by the other device/developer.
 
 The release target is exclusively `bldrz.net`, `/opt/bldrz`, `bldrz.service`
 and database `bldrz`. Never use the old WellSim deploy script or restart
