@@ -1251,7 +1251,10 @@ export function gasForecastApi(f) {
   if (!rsv.error) {
     // thpPsi is the MEASURED wellhead pressure of each prod row, so the chart
     // can run the FTHP history into the forecast FTHP as one line
-    history = rsv.rows.map((r) => ({ tDays: r.tDays, qMMscfd: r.qMMscfd, presPsi: r.presPsi, thpPsi: r.thpPsi, gpBscf: r.gpBscf }));
+    history = rsv.rows.map((r) => ({
+      tDays: r.tDays, qMMscfd: r.qMMscfd, presPsi: r.presPsi, thpPsi: r.thpPsi, gpBscf: r.gpBscf,
+      qCondStbD: r.qCondStbD, condMMstb: r.condMMstb,
+    }));
     if (rsv.fit.giipBscf != null) {
       giip = giip ?? rsv.fit.giipBscf;
       pzi = pzi ?? rsv.fit.pziPsi;

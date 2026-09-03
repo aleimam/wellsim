@@ -305,3 +305,24 @@ test('the pump selector filters by catalogue and can recover any pump', () => {
     'applyCase must re-point both pump selectors from the saved name'
   );
 });
+
+// Every gas reserve route's table declares the condensate columns. The values
+// are pinned in gas-reserve.test.js; this pins that the UI actually SHOWS
+// them on all four routes, since each route builds its table by hand and one
+// was easy to miss. Rate columns only where a row has a rate (prod, RLT).
+test('all four gas reserve tables carry the condensate columns', () => {
+  const app = fs.readFileSync(path.join(root, 'src/ui/app.js'), 'utf8');
+  const tables = {
+    "title: 'prod_data (solver outputs)'": { cum: true, rate: true },
+    "title: 'Reservoir limit'": { cum: true, rate: true },
+    "title: 'SITHP → Pres → p/Z'": { cum: true, rate: false },
+    "title: 'Memory gauges → p/Z'": { cum: true, rate: false },
+  };
+  for (const [title, want] of Object.entries(tables)) {
+    const i = app.indexOf(title);
+    assert.ok(i >= 0, `${title} must exist`);
+    const headerLine = app.slice(i, app.indexOf('\n', i));
+    assert.ok(headerLine.includes("'Cond cum MMstb'"), `${title} must show the condensate cumulative`);
+    assert.equal(headerLine.includes("'Cond STB/d'"), want.rate, `${title} rate column ${want.rate ? 'missing' : 'should not be there (survey rows have no rate)'}`);
+  }
+});

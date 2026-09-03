@@ -2912,8 +2912,8 @@ async function gasReserveRun() {
     });
     renderTables('gas-table-pz', [
       {
-        title: 'Reservoir limit', headers: ['dt d', 'q', 'Pwf', 'pr', 'z'],
-        rows: pts.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4)]),
+        title: 'Reservoir limit', headers: ['dt d', 'q', 'Pwf', 'pr', 'z', 'Cond STB/d', 'Cond cum MMstb'],
+        rows: pts.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3)]),
       },
     ]);
     return;
@@ -2944,17 +2944,17 @@ async function gasReserveRun() {
   renderTables('gas-table-pz', [
     r.mode === 'gauge'
       ? {
-          title: 'Memory gauges → p/Z', headers: ['dt d', 'Pr psi', 'z', 'Gp Bscf', 'p/Z psi'],
-          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.gpBscf, 3), fmt(p.pOverZ, 1)]),
+          title: 'Memory gauges → p/Z', headers: ['dt d', 'Pr psi', 'z', 'Gp Bscf', 'Cond cum MMstb', 'p/Z psi'],
+          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.gpBscf, 3), fmt(p.condMMstb, 3), fmt(p.pOverZ, 1)]),
         }
       : r.mode === 'sithp'
       ? {
-          title: 'SITHP → Pres → p/Z', headers: ['dt d', 'SITHP', 'Pres', 'z', 'p/Z', 'Gp Bscf'],
-          rows: r.rows.map((p) => [fmt(p.dtDays ?? p.tDays, 2), fmt(p.sithpPsi, 0), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3)]),
+          title: 'SITHP → Pres → p/Z', headers: ['dt d', 'SITHP', 'Pres', 'z', 'p/Z', 'Gp Bscf', 'Cond cum MMstb'],
+          rows: r.rows.map((p) => [fmt(p.dtDays ?? p.tDays, 2), fmt(p.sithpPsi, 0), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3), fmt(p.condMMstb, 3)]),
         }
       : {
-          title: 'prod_data (solver outputs)', headers: ['dt d', 'q', 'Pwf', 'dp', 'pr', 'z', 'p/Z', 'Gp Bscf'],
-          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.dpPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3)]),
+          title: 'prod_data (solver outputs)', headers: ['dt d', 'q', 'Pwf', 'dp', 'pr', 'z', 'p/Z', 'Gp Bscf', 'Cond STB/d', 'Cond cum MMstb'],
+          rows: r.rows.map((p) => [fmt(p.dtDays, 2), fmt(p.qMMscfd, 2), fmt(p.pwfPsi, 1), fmt(p.dpPsi, 1), fmt(p.presPsi, 1), fmt(p.z, 4), fmt(p.pOverZ, 1), fmt(p.gpBscf, 3), fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3)]),
         },
   ]);
 }

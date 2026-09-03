@@ -294,3 +294,48 @@ test('gauge datum correction: a gauge off datum is corrected through the gas col
   assert.ok(above.points[0].corrPsi > 100, 'a 410 m offset is worth more than 100 psi');
   assert.ok(above.fit.giipBscf > atDatum.fit.giipBscf, 'correcting up raises the fitted GIIP');
 });
+
+// ---- condensate on every reserve route ----
+// Added 3 Sep 2026. Each route reports condensate the same way it reports Gp:
+// the flowing/RLT solver integrates rate x CGR row by row, the SITHP and gauge
+// routes interpolate the cumulative at each survey date off the prod table.
+// The p/Z fit is NOT changed by any of this -- GIIP stays dry-gas.
+test('every reserve route carries condensate rate/cumulative alongside Gp, without moving GIIP', async () => {
+  const { cumCond, sithpReserve, gaugeReserve } = await import('../src/core/reserve/gas-reserve.js');
+  const q = 10;
+  const days = [0, 100, 200, 300];
+  const cgr = [60, 50, 40, 30];
+  const rows = days.map((d, i) => {
+    const pz = (3800 / zAtRes(GASCFG, 3800)) * (1 - (q * d) / 1000 / 90);
+    const pres = presFromPz(GASCFG, pz);
+    return { date: d, qMMscfd: q, pwfPsi: Math.sqrt(pres ** 2 - (1000 * q) / J), cgrStbMMscf: cgr[i] };
+  });
+
+  // flowing solver: rate = q x CGR, cumulative by trapezoid, MMstb
+  const solved = gasPresSolver(GASCFG, IPR, rows);
+  let stb = 0;
+  solved.forEach((s, i) => {
+    close(s.qCondStbD, q * cgr[i], 1e-12);
+    if (i > 0) stb += ((days[i] - days[i - 1]) * (q * cgr[i] + q * cgr[i - 1])) / 2;
+    close(s.condMMstb, stb / 1e6, 1e-12);
+  });
+  // and the fit is untouched by the extra fields: still the true 90 Bscf
+  close(giipFromPz(solved).giipBscf, 90, 1e-4);
+
+  // cumCond.at() interpolates between rows and holds flat outside, like cumGp.at()
+  const c = cumCond(rows, GASCFG.cgrStbMMscf);
+  close(c.condMMstb, stb / 1e6, 1e-12);
+  close(c.at(150), (solved[1].condMMstb + solved[2].condMMstb) / 2, 1e-12);
+  close(c.at(-50), 0, 1e-12);
+  close(c.at(999), stb / 1e6, 1e-12);
+  assert.equal(c.latestCgr, 30, 'latest CGR is the last row by date');
+
+  // survey routes read the cumulative at the survey date
+  const surveys = [{ date: 50, sithpPsi: 2000 }, { date: 250, sithpPsi: 1800 }];
+  const s = sithpReserve(GASCFG, surveys, rows);
+  close(s.points[0].condMMstb, c.at(50), 1e-12);
+  close(s.points[1].condMMstb, c.at(250), 1e-12);
+  const g = gaugeReserve(GASCFG, [{ date: 50, presPsi: 3000 }, { date: 250, presPsi: 2800 }], rows);
+  close(g.points[0].condMMstb, c.at(50), 1e-12);
+  close(g.points[1].condMMstb, c.at(250), 1e-12);
+});

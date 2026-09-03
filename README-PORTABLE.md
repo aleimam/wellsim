@@ -1,7 +1,7 @@
 # WellSim — standalone portable program
 
 **Build 1.4 — 2 September 2026**, from commit `ea1418c` of the main project.
-Identical physics to https://wellsim.app; the current source is guarded by 288
+Identical physics to https://wellsim.app; the current source is guarded by 290
 tests and the 43/43 validation sweep both passing there. Changes since build
 1.3 (31 Aug):
 
@@ -92,7 +92,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 (First time: `npm install --save-dev esbuild postject` with Node on PATH.)
 The physics is identical to the main project — after `npm install`, `node --test`
-runs the same 288 tests against this copy.
+runs the same 290 tests against this copy.
 
 ## Code signing
 

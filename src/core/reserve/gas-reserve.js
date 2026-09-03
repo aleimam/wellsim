@@ -77,6 +77,7 @@ export const toDays = (d) => {
  */
 export function gasPresSolver(marchCfg, ipr, rows) {
   let gp = 0;
+  let cond = 0;
   let prev = null;
   const t0 = rows.length ? toDays(rows[0].date) : 0;
   return rows.map((r) => {
@@ -98,7 +99,11 @@ export function gasPresSolver(marchCfg, ipr, rows) {
         : prFromTestGasJ({ qMMscfd: r.qMMscfd, pwfPsi, j: ipr.j });
     const z = zAtRes(marchCfg, presPsi);
     if (prev) gp += ((tDays - prev.tDays) * (r.qMMscfd + prev.q)) / 2 / 1000; // Bscf
-    prev = { tDays, q: r.qMMscfd };
+    // condensate rides on the gas: rate = q x CGR (the row's, else the well's),
+    // cumulative by the same trapezoid Gp uses
+    const qCondStbD = r.qMMscfd * (r.cgrStbMMscf ?? marchCfg.cgrStbMMscf ?? 0);
+    if (prev) cond += ((tDays - prev.tDays) * (qCondStbD + prev.qc)) / 2 / 1e6; // MMstb
+    prev = { tDays, q: r.qMMscfd, qc: qCondStbD };
     return {
       tDays,
       dtDays,
@@ -111,6 +116,8 @@ export function gasPresSolver(marchCfg, ipr, rows) {
       z,
       pOverZ: presPsi / z,
       gpBscf: gp,
+      qCondStbD,
+      condMMstb: cond,
     };
   });
 }
@@ -182,12 +189,29 @@ export function cumCond(prodRows, baseCgr) {
       cgr: r.cgrStbMMscf,
     }))
     .sort((a, b) => a.tDays - b.tDays);
+  const series = [];
   let stb = 0;
-  for (let i = 1; i < rows.length; i++) {
-    stb += ((rows[i].tDays - rows[i - 1].tDays) * (rows[i].qCondStbD + rows[i - 1].qCondStbD)) / 2;
+  for (let i = 0; i < rows.length; i++) {
+    if (i > 0) stb += ((rows[i].tDays - rows[i - 1].tDays) * (rows[i].qCondStbD + rows[i - 1].qCondStbD)) / 2;
+    series.push({ tDays: rows[i].tDays, condMMstb: stb / 1e6 });
   }
+  // linear interpolation between prod rows, held flat outside the record --
+  // the same convention cumGp.at() uses, so a survey's Gp and condensate
+  // cumulative are read off the same timeline
+  const at = (tDays) => {
+    if (series.length === 0) return 0;
+    if (tDays <= series[0].tDays) return series[0].condMMstb;
+    for (let i = 1; i < series.length; i++) {
+      if (tDays <= series[i].tDays) {
+        const a = series[i - 1];
+        const b = series[i];
+        return a.condMMstb + ((b.condMMstb - a.condMMstb) * (tDays - a.tDays)) / (b.tDays - a.tDays);
+      }
+    }
+    return series[series.length - 1].condMMstb;
+  };
   const latest = [...rows].reverse().find((r) => r.cgr != null);
-  return { condMMstb: stb / 1e6, latestCgr: latest ? latest.cgr : baseCgr ?? null };
+  return { at, condMMstb: stb / 1e6, latestCgr: latest ? latest.cgr : baseCgr ?? null };
 }
 
 /**
@@ -261,6 +285,7 @@ export function sithpReserve(cfg, sithpRows, prodRows) {
   if (sithpRows.length < 2)
     throw new Error('SITHP route needs at least 2 surveys (date + SITHP) to see depletion');
   const gp = cumGp(prodRows);
+  const cond = cumCond(prodRows, cfg.cgrStbMMscf);
   const t0 = toDays(sithpRows[0].date);
   const points = sithpRows.map((r) => {
     const s = staticGasMarch(cfg, { sithpPsi: r.sithpPsi, surfTempF: r.surfTempF });
@@ -273,6 +298,7 @@ export function sithpReserve(cfg, sithpRows, prodRows) {
       z: s.zRes,
       pOverZ: s.presPsi / s.zRes,
       gpBscf: gp.at(tDays),
+      condMMstb: cond.at(tDays),
       gradientPsiFt: s.gradientPsiFt,
     };
   });
@@ -318,6 +344,7 @@ export function gaugeReserve(cfg, gaugeRows, prodRows) {
   if (gaugeRows.length < 2)
     throw new Error('gauge route needs at least 2 surveys (date + Pr) to see depletion');
   const gp = cumGp(prodRows);
+  const cond = cumCond(prodRows, cfg.cgrStbMMscf);
   const t0 = toDays(gaugeRows[0].date);
   const datumTvdFt = cfg.perfTvdM * 3.281;
   const points = gaugeRows.map((r) => {
@@ -339,6 +366,7 @@ export function gaugeReserve(cfg, gaugeRows, prodRows) {
       z,
       pOverZ: presPsi / z,
       gpBscf: gp.at(tDays),
+      condMMstb: cond.at(tDays),
     };
   });
   return { points, fit: giipFromPz(points), lastGpBscf: gp.lastGpBscf, lastDay: gp.lastDay };

@@ -623,6 +623,17 @@ input uncertainty.
 
 ---
 
+**Condensate on every reserve route.** Each route now reports condensate the
+same way it reports Gp. On routes 1 and 3 (prod data, reservoir limit) every
+row carries a **condensate rate** = gas rate × that row's CGR (STB/d — the
+well's base CGR if the row has none) and a **cumulative** (MMstb) built by the
+same trapezoid Gp uses. On routes 2 and 4 (SITHP, memory gauges) a survey has
+no rate, so its row carries the cumulative **interpolated at the survey date**
+off the prod table, exactly as its Gp is. These appear as table columns on all
+four routes and are carried into the forecast's history. **GIIP is unchanged**:
+the p/Z fit still runs on dry gas. Putting condensate into the material balance
+as gas equivalent is a separate decision, not made here.
+
 ## 6. Gas — Forecast (Module 3)
 
 **FTHP and FTHT per step.** The forecast **table** carries the flowing
