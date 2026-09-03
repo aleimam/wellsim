@@ -200,3 +200,41 @@ test('a typed pump dP still works, and natural flow is untouched by the fix', ()
   assert.ok(Math.abs(natural.fit.nAvgMMstb - 861.8939) < 0.01, `natural N drifted: ${natural.fit.nAvgMMstb}`);
   assert.ok(Math.abs(fc.eurMMstb - 3.6407) < 0.001, `natural EUR drifted: ${fc.eurMMstb}`);
 });
+
+// The ESP demo well (Oil well model_ESP_V5.01: FTHP 160, WC 5, GOR 384) found
+// a SECOND failure the first ESP test did not. The forecast brackets its root
+// by probing rates far below anything the well makes -- around 10 stb/d. There
+// the coupled solve degenerates: the march returns a NaN intake pressure, dP
+// comes back NaN, and feeding that NaN back in makes validateOilCfg report a
+// MISSING pumpDpPsi -- naming an input the user never had to supply, for a
+// rate the well never sees. marchFor now falls back to the plain march when
+// the coupled solve yields nothing finite, whether it returns NaN or throws.
+test('ESP: a forecast survives the low-rate probes used to bracket its root', () => {
+  const f = {
+    thpPsi: '160', qOilStbD: '2565', wcPct: '5', gorScfStb: '384', tubingIdIn: '2.992',
+    roughness: '0.00006', topPerfAhM: '3240', devStartM: '1500', devAngleDeg: '0',
+    api: '32', gasSg: '0.812', rsiScfStb: '384', tresF: '230', oilViscCp: '6',
+    waterSg: '1.05', pbPsi: '', soilTempF: '90', htcBtu: '3', tubingOdIn: '3.5', cpBtu: '0.51',
+    priPsi: '3550', prPsi: '', permMd: '50', thicknessFt: '42.653', reFt: '1640.5',
+    rwFt: '0.5104166667', skin: '0', matchHead: '1', matchFriction: '1',
+    testQOilStbD: '2565', testThpPsi: '160', testPwfPsi: '',
+    prodRows: [
+      { date: '17-Nov-14', thpPsi: '700', qOilStbD: '2100', gorScfStb: '384', wcPct: '5', pwfPsi: '' },
+      { date: '1-Dec-14', thpPsi: '500', qOilStbD: '1700', gorScfStb: '384', wcPct: '5', pwfPsi: '' },
+      { date: '17-Dec-14', thpPsi: '300', qOilStbD: '1200', gorScfStb: '384', wcPct: '5', pwfPsi: '' },
+    ],
+    liftType: 'esp', espPumpMode: 'db', espPumpName: 'ESP B 538-3600',
+    espStages: '145', espFreqHz: '50', pumpAhM: '2985', espSepEffPct: '95',
+  };
+  const rsv = api.oilReserve({ ...f, presSource: 'prod' });
+  assert.equal(rsv.error, undefined);
+  assert.ok(rsv.fit.nAvgMMstb > 0);
+
+  // this threw "missing required input(s): pumpDpPsi" before the fallback
+  const fc = api.oilForecastApi(f);
+  assert.equal(fc.error, undefined);
+  assert.ok(fc.rows.length > 1, 'the forecast must step');
+  // and the N it reports is the one the reserve module solved, not a typed one
+  assert.ok(Math.abs(fc.nMMstb - rsv.fit.nAvgMMstb) < 1e-6, 'N must come from the reserve chain');
+  for (const r of fc.rows) assert.ok(Number.isFinite(r.pwfPsi), 'every step needs a finite Pwf');
+});

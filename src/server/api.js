@@ -1655,7 +1655,31 @@ function marchFor(f, cfg) {
   const p = buildEspPump(f);
   if (p.error || !p.pump) return oilMarch; // manual dP: the typed value stands
   const opts = espOpts(f);
-  return (c) => espSolveDp(c, p.pump, opts).march;
+  return (c) => {
+    // The forecast brackets its root by probing rates far below anything the
+    // well produces -- down to ~10 stb/d. There the coupled solve degenerates:
+    // the march returns a NaN intake pressure, dP comes back NaN, and the next
+    // iteration hands that NaN to validateOilCfg, which reports it as a
+    // MISSING pumpDpPsi. That error names an input the user never had to give,
+    // for a rate the well will never see.
+    //
+    // Below the pump's range the coupled solve has nothing to say, and these
+    // probes only bracket -- the operating point itself lands where the solve
+    // converges. So fall back to the plain march there rather than fail the
+    // whole forecast. A finite coupled result is always preferred.
+    // The NaN can surface either way: espSolveDp may return a non-finite Pwf,
+    // or feed its own NaN dP back into the march, which rejects it as a
+    // missing input and THROWS. Both mean the same thing -- no coupled answer
+    // at this rate -- so both fall back.
+    let solved = null;
+    try {
+      solved = espSolveDp(c, p.pump, opts);
+    } catch {
+      solved = null;
+    }
+    if (Number.isFinite(solved?.march?.pwfPsi)) return solved.march;
+    return oilMarch({ ...c, esp: { ...c.esp, pumpDpPsi: 0 } });
+  };
 }
 
 /** Pump from the background catalog or a custom curve; null = manual dP. */

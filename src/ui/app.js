@@ -186,10 +186,14 @@ const WATER_INJ_SENS_ROWS = [
 
 // ---- oil Reserve estimate (workbook: oil reserve estimate) ----
 // early-production window (days apart, like the workbook's prod_data)
+// GOR and W.C follow the ESP workbook demo (Oil well model_ESP_V5.01):
+// 384 scf/stb and 5% on every row, not the natural-flow case its rates and
+// THPs came from. The reserve module is reached from the ESP well model, so
+// its prod_data should open on the same stream that model is set up for.
 const OIL_PROD_DEFAULTS = [
-  { date: '17-Nov-14', thpPsi: 700, qOilStbD: 2100, gorScfStb: 5000, wcPct: 50 },
-  { date: '1-Dec-14', thpPsi: 500, qOilStbD: 1700, gorScfStb: 5000, wcPct: 55 },
-  { date: '17-Dec-14', thpPsi: 300, qOilStbD: 1200, gorScfStb: 5000, wcPct: 60 },
+  { date: '17-Nov-14', thpPsi: 700, qOilStbD: 2100, gorScfStb: 384, wcPct: 5 },
+  { date: '1-Dec-14', thpPsi: 500, qOilStbD: 1700, gorScfStb: 384, wcPct: 5 },
+  { date: '17-Dec-14', thpPsi: 300, qOilStbD: 1200, gorScfStb: 384, wcPct: 5 },
   {}, {}, {}, {}, {},
 ];
 let oilProdCount = OIL_PROD_DEFAULTS.length;
