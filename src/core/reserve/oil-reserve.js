@@ -62,7 +62,10 @@ export function prFromRowOil(ipr, pvt, { qGrossStbD, pwfPsi, prStart }) {
  * that row's THP/rate/GOR/WC. pvt: { pbPsi, rsiScfStb, gasSg, api, tempF }.
  * Gas cumulative uses Rsi above Pb, the producing GOR below (sheet W col).
  */
-export function oilPresSolver(marchCfg, ipr, pvt, rows) {
+// `march` is injectable so an ESP well can be solved: with a catalogue pump
+// the dP is not an input, it is solved from the pump curve at each row's own
+// rate. Defaults to the plain march, so natural and gas-lift are unchanged.
+export function oilPresSolver(marchCfg, ipr, pvt, rows, march = oilMarch) {
   const boi = oilFvf(ipr.priPsi, pvt);
   const t0 = rows.length ? toDays(rows[0].date) : 0;
   let np = 0; // MMstb
@@ -76,7 +79,7 @@ export function oilPresSolver(marchCfg, ipr, pvt, rows) {
     const pwfSource = r.pwfPsi != null ? 'input' : 'calculated';
     const pwfPsi =
       r.pwfPsi ??
-      oilMarch({
+      march({
         ...marchCfg,
         thpPsi: r.thpPsi ?? marchCfg.thpPsi,
         qOilStbD: r.qOilStbD,

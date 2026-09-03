@@ -1362,7 +1362,7 @@ export function oilReserve(f) {
 
   if (rows.length < (src === 'rlt' ? 3 : 2))
     return { error: `enter at least ${src === 'rlt' ? 3 : 2} production rows (date, rate, and THP or Pwf)` };
-  const solved = oilPresSolver(cfg, ipr, pvt, rows);
+  const solved = oilPresSolver(cfg, ipr, pvt, rows, marchFor(f, cfg));
 
   if (src === 'rlt') {
     let rlt;
@@ -1520,6 +1520,7 @@ export function oilForecastApi(f) {
     stepDays: num(f.stepDays) ?? 30,
     maxSteps: Math.min(num(f.maxSteps) ?? 60, 200),
     pwfMode: f.pwfMode === 'fixed' ? 'fixed' : 'vlp',
+    march: marchFor(f, cfg),
     fthpPsi: fcThp,
     fcGorScfStb: fcGor,
     minPwfPsi: num(f.minPwfPsi) ?? 500,
@@ -1639,6 +1640,22 @@ function anyPumpByName(name) {
     if (hit) return hit;
   }
   return null;
+}
+
+/**
+ * The march to use for history reconstruction and forecasting.
+ *
+ * Manual dP, natural flow and gas lift all march directly. An ESP with a
+ * real pump curve cannot: its dP depends on the rate being marched, so the
+ * coupled solve has to run at every rate. Returning oilMarch unchanged for
+ * every other case keeps those paths bit-identical.
+ */
+function marchFor(f, cfg) {
+  if (!cfg.esp) return oilMarch;
+  const p = buildEspPump(f);
+  if (p.error || !p.pump) return oilMarch; // manual dP: the typed value stands
+  const opts = espOpts(f);
+  return (c) => espSolveDp(c, p.pump, opts).march;
 }
 
 /** Pump from the background catalog or a custom curve; null = manual dP. */

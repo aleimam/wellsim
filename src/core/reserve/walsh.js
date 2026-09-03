@@ -112,6 +112,7 @@ function mobWalsh(so, swi, f) {
 export function walshForecast(opts) {
   const {
     cfg, pvt, jStbDPsi, nMMstb, priPsi,
+    march = oilMarch, // ESP: dP is solved per step, not an input
     swi = 0.15, cwPsi = 2.63e-6, cfPsi = 3.25e-6,
     stepDays = 30, maxSteps = 60,
     pwfMode = 'vlp', fthpPsi, minPwfPsi = 500,
@@ -146,7 +147,7 @@ export function walshForecast(opts) {
     const qCap = jo * (pStart - minPwfPsi);
     if (!(qCap > 1)) return { pwfPsi: minPwfPsi, dead: true };
     const vlpPwf = (q) =>
-      oilMarch({
+      march({
         ...cfg,
         thpPsi: fthpPsi ?? cfg.thpPsi,
         qOilStbD: q,
