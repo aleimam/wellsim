@@ -2982,7 +2982,7 @@ async function gasForecastRun() {
   document.getElementById('gas-fc-result').textContent =
     `EUR = ${fmt(r.eurBscf, 2)} Bscf gas + ${fmt(r.eurCondBscf, 2)} Bscf cond. equiv. = ${fmt(r.eurTotalBscf, 2)} Bscf total (${fmt(r.recoveryPct, 1)}% of GIIP ${fmt(r.giipBscf, 1)}, total basis), status: ${r.status}\n` +
     `Plateau held ${r.rows.filter((p) => p.onPlateau).length} of ${r.rows.length} steps. ` +
-    `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf, Pres ${fmt(r.startPresPsi, 0)} psi. ` +
+    `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf gas + ${fmt(r.startCondBscf, 3)} cond. equiv. = ${fmt(r.startGpTotalBscf, 3)} Bscf total, Pres ${fmt(r.startPresPsi, 0)} psi. ` +
     `Condensate at CGR ${fmt(r.forecastCgrStbMMscf, 1)} STB/MMscf: cum ${fmt(r.startCondMMstb, 3)} → ${fmt(r.eurCondMMstb, 3)} MMstb` +
     (r.cond?.sg != null ? ` (API ${fmt(r.cond.api, 1)} → SG ${fmt(r.cond.sg, 4)}, MW ${fmt(r.cond.mw, 1)})` : '') + `.\n` +
     // the workbook's Forecast sheet derives its start state from the
@@ -3015,21 +3015,24 @@ async function gasForecastRun() {
       { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.qMMscfd), name: 'Rate (history)', mode: 'lines+markers', line: { color: '#2C7048', width: 2 } },
       { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.presPsi), name: 'Pres (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#00636D', width: 2 } },
       { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.thpPsi), name: 'FTHP (history)', yaxis: 'y2', mode: 'lines+markers', line: { color: '#7038b0', width: 2 } },
-      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.gpBscf), name: 'Gp (history)', mode: 'lines', line: { color: '#C2540B', width: 2 } }
+      // Gp TOTAL (gas + condensate equivalent): the basis the p/Z line and the
+      // GIIP are on, so the cumulative the chart shows is the one the depletion
+      // actually follows
+      { x: hist.map((p) => ax(p.tDays)), y: hist.map((p) => p.gpTotalBscf ?? p.gpBscf), name: 'Gp total (history)', mode: 'lines', line: { color: '#C2540B', width: 2 } }
     );
   }
   traces.push(
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.qMMscfd), name: 'F Rate', mode: 'lines', line: { color: '#2C7048', width: 3, dash: 'dash' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.presPsi), name: 'F Pres', yaxis: 'y2', mode: 'lines', line: { color: '#00636D', width: 2, dash: 'dot' } },
     { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.fthpPsi), name: 'F FTHP', yaxis: 'y2', mode: 'lines', line: { color: '#7038b0', width: 2, dash: 'dash' } },
-    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gpBscf), name: 'Cum gas', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
+    { x: r.rows.map((p) => ax(p.tDays)), y: r.rows.map((p) => p.gpTotalBscf ?? p.gpBscf), name: 'F Gp total', mode: 'lines', line: { color: '#C2540B', width: 2, dash: 'dash' } }
   );
   plot('gas-chart-fc', traces, {
     ...LAYOUT(),
     margin: { ...LAYOUT().margin, r: window.innerWidth < 640 ? 40 : 55 },
     title: 'Gas forecast — history + forecast (p/Z tank + nodal)',
     xaxis: { title: useDates ? 'Date' : 'Time, days' },
-    yaxis: { title: 'Rate MMscf/d · Gp Bscf', rangemode: 'tozero' },
+    yaxis: { title: 'Rate MMscf/d · Gp total Bscf', rangemode: 'tozero' },
     yaxis2: { title: 'Pres · FTHP, psi', overlaying: 'y', side: 'right', showgrid: false, titlefont: { color: '#00636D' }, tickfont: { color: '#00636D' } },
   });
   mobileShowResults();

@@ -304,3 +304,39 @@ test('gas-equivalent chain reproduces the P_Z MB (new) sheet: cond Bscf, Gp tota
   assert.ok(dry.giipBscf < fit.giipBscf, 'ignoring condensate under-states GIIP');
   close(dry.giipBscf, 217.895, 1e-3);
 });
+
+// ---- forecast start state and depletion on the Gp-total basis ----
+// The GIIP handed to the forecast is fitted on Gp total, so every place the
+// forecast reports a cumulative must be on that basis too: the start state
+// (gas + cond equiv = total), each row's gpTotalBscf continuing from it, and
+// the history overlay the chart draws.
+test('forecast reports its start state and cumulative on the Gp-total basis', async () => {
+  const { condProps, gasEquivMscfPerStb } = await import('../src/core/reserve/gas-reserve.js');
+  const base = {
+    ...GAS_FORM, prodRows: GAS_PROD_ROWS,
+    stepDays: '30', forecastFthpPsi: '300', minRateMMscfd: '1', maxSteps: '4', plateauMMscfd: '',
+    startDate: '', startGpBscf: '', startPresPsi: '', giipBscf: '', pziPsi: '',
+  };
+  const r = handlers['gas/forecast'](base);
+  assert.ok(!r.error, r.error);
+  const cp = condProps(Number(GAS_FORM.condApi));
+  const ge = gasEquivMscfPerStb(cp.sg, cp.mw);
+  // start: cond Bscf is the history cumulative x GE; total is gas + that
+  close(r.startCondBscf, r.startCondMMstb * ge, 1e-12);
+  close(r.startGpTotalBscf, r.startGpBscf + r.startCondBscf, 1e-12);
+  // and the history overlay ends exactly where the forecast starts, on both bases
+  const hLast = r.history.at(-1);
+  close(hLast.gpBscf, r.startGpBscf, 1e-9);
+  close(hLast.gpTotalBscf, r.startGpTotalBscf, 1e-9);
+  // first row starts at the start total; each row's total = gas + cond x GE
+  close(r.rows[0].gpTotalBscf, r.startGpTotalBscf, 1e-9);
+  for (const p of r.rows) {
+    close(p.condBscf, p.condMMstb * ge, 1e-12);
+    close(p.gpTotalBscf, p.gpBscf + p.condBscf, 1e-12);
+  }
+  // EUR total is the last total plus the last step's gas and condensate
+  const L = r.rows.at(-1);
+  close(r.eurTotalBscf, L.gpTotalBscf + (L.qMMscfd * 30) / 1000 + ((L.qCondStbD * 30) / 1e6) * ge, 1e-9);
+  // recovery is on the total basis
+  close(r.recoveryPct, (r.eurTotalBscf / r.giipBscf) * 100, 1e-9);
+});

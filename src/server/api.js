@@ -74,6 +74,8 @@ import {
   toDays,
   cumCond,
   condProps,
+  gasEquivMscfPerStb,
+  condBscfFrom,
 } from '../core/reserve/gas-reserve.js';
 import {
   oilPresSolver,
@@ -1308,6 +1310,9 @@ export function gasForecastApi(f) {
     giipBscf: giip,
     pziPsi: pzi,
     startGpBscf: startGp ?? 0,
+    // the start state on the SAME basis the GIIP and the depletion use
+    startCondBscf: condBscfFrom(hc.condMMstb, gasEquivMscfPerStb(condProps(cfg.condApi).sg, condProps(cfg.condApi).mw)),
+    startGpTotalBscf: (startGp ?? 0) + condBscfFrom(hc.condMMstb, gasEquivMscfPerStb(condProps(cfg.condApi).sg, condProps(cfg.condApi).mw)),
     startDay: startDay ?? 0,
     startPresPsi: startPres ?? null,
   };

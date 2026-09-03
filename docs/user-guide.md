@@ -642,8 +642,11 @@ Every reserve route reports **Cond Bscf** and **Gp total Bscf** beside Gp, the
 p/Z chart's abscissa is Gp total, and the GIIP is on that basis on all four
 routes. Because the forecast is handed a total-basis GIIP, its p/Z depletion
 also runs on Gp total — driving it with dry Gp would deplete too slowly and
-overstate EUR — and its summary reports EUR as gas + condensate equivalent =
-total, with recovery on the total basis. A well with no condensate API
+overstate EUR. Its summary reports the start state and EUR as gas + condensate
+equivalent = total, with recovery on the total basis; its chart's cumulative
+traces (*Gp total (history)*, *F Gp total*) and y-axis are on Gp total, so the
+cumulative you see is the one the depletion follows; the table keeps dry Gp,
+Cond Bscf and Gp total side by side. A well with no condensate API
 degrades to the dry-gas balance exactly.
 
 **Condensate on every reserve route.** Each route now reports condensate the
