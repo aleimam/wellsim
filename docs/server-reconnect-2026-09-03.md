@@ -67,7 +67,8 @@ and is **not** being requested today.
 | Services | `wellsim.service` (PORT=3355), `caddy.service`, `wellsim-backup.timer` (02:30 UTC) |
 | Firewall | ufw — OpenSSH, 80/tcp, 443/tcp only |
 | Also hosted | `thepwf.net`, static, same Caddy, `/opt/thepwf` — do not disturb it |
-| Production runs | branch `codex/v2-foundation`, containment release `6807e738f93119d8459a688ea92894f3831f2d9b` |
+| Production runs | wellsim.app serves the containment release `6807e738f93119d8459a688ea92894f3831f2d9b` off `codex/v2-foundation` (asset stamp `2026-09-02a`, re-confirmed 3 Sep) |
+| Work split | Agreed 3 Sep: this workstation owns `main` -> **wellsim.app**; the second machine owns `codex/v2-foundation` -> **bldrz.net**. See [work-structure-2026-09-03.md](work-structure-2026-09-03.md) |
 
 **Host key fingerprints — compare on first connection from your machine:**
 
@@ -268,12 +269,23 @@ The primary workstation holds **43 commits** on `merge/gas-forecast-into-v2`
 
 Two things are already established and worth knowing before anyone weighs in:
 
-- **That branch contains the containment release**
-  (`6807e738f93119d8459a688ea92894f3831f2d9b` is an ancestor of `1e9dc77`), and
-  the legacy case store is still **off by default** in the code —
-  `legacyCaseStoreEnabled()` returns true only when
-  `WELLSIM_ENABLE_LEGACY_CASE_STORE === '1'`. So deploying this branch would
-  **not** silently undo the 2 September containment.
+- **That branch carries the containment gate; `main` does not.** The gate is
+  code, not configuration: `legacyCaseStoreEnabled()` in
+  `src/server/accounts.js` returns true only when
+  `WELLSIM_ENABLE_LEGACY_CASE_STORE === '1'`. It arrived in **`27ea04e`**,
+  which is on `codex/v2-foundation` and on `1e9dc77`, and is **not on
+  `main`** (verified 3 Sep). Beware the SHA the audit calls "the containment
+  release", `6807e738...` — that commit touches documentation only. It is the
+  release that shipped the containment, not the change that implements it.
+
+- **Which makes the new work split a live hazard.** This workstation is now
+  assigned `main` -> wellsim.app, and `main` is precisely the branch missing
+  the gate. Deploying `main` to wellsim.app today would restore public
+  registration and the shared case store. `main` must contain `27ea04e`'s
+  gate first — by advancing `main` to the tested working branch (a strict
+  superset of both lines, 294 tests green), or by a reviewed cherry-pick,
+  which the agreement permits where automatic merging of the two lines does
+  not. That choice is the owner's.
 - **`.env.local` on the primary workstation sets that variable to 1** for local
   work. It is gitignored and `git archive` ships only the committed tree, so it
   cannot travel — but if anyone ever deploys by copying a directory instead,

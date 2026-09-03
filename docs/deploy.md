@@ -19,7 +19,7 @@ GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  �
 | TLS / proxy | **Caddy v2**, `/etc/caddy/Caddyfile` — automatic Let's Encrypt, renews itself |
 | Firewall | ufw: OpenSSH, 80/tcp, 443/tcp only |
 | DNS | Cloudflare (both domains) |
-| Also on this box | **thepwf.net** — a static site served by the same Caddy from `/opt/thepwf` |
+| Also on this box | **thepwf.net** — a static site served by the same Caddy from `/opt/thepwf` · **bldrz.net** — the second machine's comparison app, `/opt/bldrz/app`, `bldrz.service`, its own `bldrz` database and runtime user (confirmed live 3 Sep 2026). **Not ours to touch.** |
 | Access | SSH key only, password auth disabled. **`wellsim_hetzner` (`wellsim-deploy`) was RETIRED on 2 Sep 2026** — the server rejects it. The working identity is the Ed25519 recovery key installed that day through the Hetzner console (`wellsim-ops-2026-09-02` in the project); it is NOT on the original deploy workstation. Every `-i ~/.ssh/wellsim_hetzner` below needs replacing with it. |
 | Host keys | ED25519 `SHA256:bkTKZB/FixF9hI99Mp+634XNa/3Ohud4AK9kdl6ntI0` · RSA `SHA256:tHM+HmqYYOUok++pJ+bx9WgAzsZZ6HAKWIesnhxc0hg` (recorded 31 Aug 2026 — compare on any first connection from a new machine) |
 | Key backup | `F:\WellSim-Backup-2026-08-29\ssh-key\` — passphrase-protected; passphrase in the password manager |
@@ -164,10 +164,43 @@ www.thepwf.net {
 
 ## Deploy a new version
 
-> **Check what production is running first.** Since 2 Sep 2026 it serves
-> `codex/v2-foundation` (the containment release), not `main`. Deploying
-> `main` over it re-enables the legacy web account/case store that release
-> deliberately disabled.
+> **Check what production is running first, and know which site is yours.**
+>
+> Since 3 Sep 2026 the owner has agreed a two-device split, recorded in
+> [work-structure-2026-09-03.md](work-structure-2026-09-03.md):
+>
+> | | this workstation | the second machine |
+> |---|---|---|
+> | Branch | `main` | `codex/v2-foundation` |
+> | Site | **wellsim.app** | **bldrz.net** |
+> | App dir | `/opt/wellsim/app` | `/opt/bldrz/app` |
+> | Service | `wellsim.service` | `bldrz.service` |
+>
+> Neither party deploys its branch to the other's site.
+>
+> **`main` IS NOT SAFE TO DEPLOY TO wellsim.app YET.** The legacy web
+> account/case store is disabled in production by a *code* gate —
+> `legacyCaseStoreEnabled()` in `src/server/accounts.js`, which reads
+> `WELLSIM_ENABLE_LEGACY_CASE_STORE`. That gate arrived in commit `27ea04e`
+> on the `codex/v2-foundation` line and **is not on `main`** (verified
+> 3 Sep 2026). Deploying `main` as it stands would restore public
+> registration and the shared case store, undoing a deliberate containment
+> action. Note that `6807e73` — the SHA the audit records as "the
+> containment release" — touches documentation only; it is the release that
+> *shipped* the containment, not the commit that implements it.
+>
+> Observed on 3 Sep 2026: wellsim.app serves asset stamp `2026-09-02a` and
+> `GET /api/accounts/status` returns `enabled:false, registrationEnabled:false`
+> — i.e. production is still running the containment release and nothing has
+> been deployed over it. The branch/site table above is the intended
+> contract, not a description of what is deployed today.
+>
+> Before anything goes from `main` to wellsim.app, `main` must contain that
+> gate. Options, in the owner's gift and not to be taken unilaterally:
+> advance `main` to the tested working branch (which already contains both
+> lines), or port the containment across as a reviewed cherry-pick — the
+> second machine's agreement permits porting "with reviewed pull requests or
+> cherry-picks" but not automatic merging of the two lines.
 
 From a clean working tree on `main`, after `node --test` passes:
 
