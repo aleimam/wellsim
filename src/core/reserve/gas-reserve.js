@@ -26,6 +26,21 @@ import {
 } from '../ipr/gas-ipr.js';
 import { gasOperatingPoint } from '../nodal/nodal.js';
 import { brent } from '../solvers/brent.js';
+import { oilSpecificGravity } from '../pvt/oil.js';
+
+/**
+ * Condensate properties from its API gravity -- PZ_Ashry.xlsx, sheet
+ * "P_Z MB (new)" B2:B3. SG is the march's own oilSpecificGravity (141.5 /
+ * (131.5 + API)); MW is the Cragoe/Standing form 42.43*SG/(1.008-SG). On the
+ * sheet's API 49.3 these are 0.78263274336 and 147.346636758 exactly. They
+ * are the first two links of the gas-equivalent chain (GE = 133000*SG/MW
+ * scf/STB); the chain itself is not applied to the p/Z fit here.
+ */
+export function condProps(api) {
+  if (api == null || !Number.isFinite(api)) return { api: null, sg: null, mw: null };
+  const sg = oilSpecificGravity(api);
+  return { api, sg, mw: (42.43 * sg) / (1.008 - sg) };
+}
 
 /** Z at reservoir temperature for this well's gas (sour route, explicit). */
 export function zAtRes(cfg, pPsi) {

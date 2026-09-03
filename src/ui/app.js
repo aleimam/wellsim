@@ -2864,8 +2864,11 @@ async function gasReserveRun() {
     : r.mode === 'gauge' ? '4: measured Pr (memory gauges)'
     : r.mode === 'rlt' ? `3: reservoir limit (all ${r.rows.length} rows, workbook method)`
     : '1: prod data & macro (Pres solver)';
+  const condTxt = r.cond?.sg != null
+    ? `Condensate: API ${fmt(r.cond.api, 1)} → SG ${fmt(r.cond.sg, 4)}, MW ${fmt(r.cond.mw, 1)}\n`
+    : '';
   document.getElementById('gas-reserve-result').textContent =
-    `Minimum connected GIIP = ${giipTxt}  [selection ${routeTxt}]\n` +
+    `Minimum connected GIIP = ${giipTxt}  [selection ${routeTxt}]\n` + condTxt +
     (r.mode === 'rlt'
       ? `m = ${fmt(r.rlt.slopePsiDay, 4)} psi/day, q avg = ${fmt(r.rlt.qAvgMMscfd, 2)} MMscf/d\n` +
         `Cg = ${r.rlt.cg.toExponential(4)}, Ct = ${r.rlt.ct.toExponential(4)} 1/psi, Bg = ${r.rlt.bg1.toExponential(4)} cf/scf\n` +
@@ -2978,7 +2981,8 @@ async function gasForecastRun() {
     `EUR = ${fmt(r.eurBscf, 2)} Bscf (${fmt(r.recoveryPct, 1)}% of GIIP ${fmt(r.giipBscf, 1)}), status: ${r.status}\n` +
     `Plateau held ${r.rows.filter((p) => p.onPlateau).length} of ${r.rows.length} steps. ` +
     `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf, Pres ${fmt(r.startPresPsi, 0)} psi. ` +
-    `Condensate at CGR ${fmt(r.forecastCgrStbMMscf, 1)} STB/MMscf: cum ${fmt(r.startCondMMstb, 3)} → ${fmt(r.eurCondMMstb, 3)} MMstb.\n` +
+    `Condensate at CGR ${fmt(r.forecastCgrStbMMscf, 1)} STB/MMscf: cum ${fmt(r.startCondMMstb, 3)} → ${fmt(r.eurCondMMstb, 3)} MMstb` +
+    (r.cond?.sg != null ? ` (API ${fmt(r.cond.api, 1)} → SG ${fmt(r.cond.sg, 4)}, MW ${fmt(r.cond.mw, 1)})` : '') + `.\n` +
     // the workbook's Forecast sheet derives its start state from the
     // PROD-DATA sheet, so this chain ignores whichever reserve selection is
     // on screen. On the demo that is 182 Bscf vs ~120 from SITHP/gauges —

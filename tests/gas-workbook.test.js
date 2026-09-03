@@ -244,3 +244,32 @@ test('forecast condensate: CGR defaults to the latest prod row, rate = q x CGR, 
   assert.equal(r2.forecastCgrStbMMscf, 35);
   close(r2.rows[0].qCondStbD, r2.rows[0].qMMscfd * 35, 1e-12);
 });
+
+// ---- condensate specific gravity and molecular weight ----
+// PZ_Ashry.xlsx, sheet "P_Z MB (new)": SG = 141.5/(131.5+API) and
+// MW = 42.43*SG/(1.008-SG). Pinned to the sheet's own cells for its API 49.3,
+// and reported by both reserve and forecast for the well's condApi.
+test('condensate SG and MW reproduce the P_Z MB (new) sheet and reach both gas modules', async () => {
+  const { condProps } = await import('../src/core/reserve/gas-reserve.js');
+  const c = condProps(49.3);
+  close(c.sg, 0.78263274336, 1e-10); // sheet B2
+  close(c.mw, 147.346636758, 1e-10); // sheet B3
+  // the demo well (condApi 48.7): pure arithmetic, no fitting
+  const d = condProps(48.7);
+  close(d.sg, 141.5 / (131.5 + 48.7), 1e-14);
+  close(d.mw, (42.43 * d.sg) / (1.008 - d.sg), 1e-14);
+
+  const base = { ...GAS_FORM, prodRows: GAS_PROD_ROWS };
+  const rsv = handlers['gas/reserve']({ ...base, presSource: 'prod' });
+  assert.ok(!rsv.error, rsv.error);
+  close(rsv.cond.sg, d.sg, 1e-14);
+  close(rsv.cond.mw, d.mw, 1e-14);
+  assert.equal(rsv.cond.api, 48.7);
+  const fc = handlers['gas/forecast']({
+    ...base, stepDays: '30', forecastFthpPsi: '300', minRateMMscfd: '1', maxSteps: '2', plateauMMscfd: '',
+    startDate: '', startGpBscf: '', startPresPsi: '', giipBscf: '', pziPsi: '',
+  });
+  assert.ok(!fc.error, fc.error);
+  close(fc.cond.sg, d.sg, 1e-14);
+  close(fc.cond.mw, d.mw, 1e-14);
+});

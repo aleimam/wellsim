@@ -36,7 +36,7 @@ Database use is off by default; see `db/README.md` for the bldrz boundary.
 node --test
 ```
 
-290 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+291 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries, plus
 PostgreSQL company and personal-workspace isolation for reads, writes, links and exports. Run

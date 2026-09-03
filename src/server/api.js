@@ -73,6 +73,7 @@ import {
   zAtRes,
   toDays,
   cumCond,
+  condProps,
 } from '../core/reserve/gas-reserve.js';
 import {
   oilPresSolver,
@@ -1050,6 +1051,13 @@ function interpGp(solved, tDays) {
  *   'flowing' — route 2 (default): Pres solver back-calculation from
  *               flowing data with the frozen calibrated IPR. */
 export function gasReserve(f) {
+  const r = gasReserveInner(f);
+  // condensate SG / MW from the well model's condApi, on every route
+  if (r && !r.error) r.cond = condProps(num(f.condApi));
+  return r;
+}
+
+function gasReserveInner(f) {
   const cfg = buildGasCfg(f);
   const rows = (f.prodRows ?? [])
     .filter((r) => dateVal(r.date) != null && num(r.qMMscfd) != null)
@@ -1296,6 +1304,7 @@ export function gasForecastApi(f) {
     history,
     forecastCgrStbMMscf: forecastCgr,
     startCondMMstb: hc.condMMstb,
+    cond: condProps(cfg.condApi),
     giipBscf: giip,
     pziPsi: pzi,
     startGpBscf: startGp ?? 0,

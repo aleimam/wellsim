@@ -183,7 +183,7 @@ pre.eq code { background: none; padding: 0; }
   <h1>WellSim Manual</h1>
   <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a zero-dependency web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
   <div class="statusrow">
-    <span class="chip"><b>290</b> regression and security tests passing</span>
+    <span class="chip"><b>291</b> regression and security tests passing</span>
     <span class="chip"><b>43/43</b> sheet-parity sensitivities</span>
     <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
     <span class="chip">port 3355 &middot; optional PostgreSQL</span>
@@ -208,7 +208,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-node --test                             # 290 tests
+node --test                             # 291 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is produced from this same source tree by <code>build.ps1</code>.</p>
 
@@ -338,7 +338,7 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 
 <h2 id="gas-forecast"><span class="sect">Gas</span> &mdash; Forecast</h2>
 <p>p/Z tank coupled to the nodal model, <b>chained off the end of history</b>: start date / start Gp / start Pres are grey input-or-calculated (last prod date, cumulative, minimum solved Pres). Defaults: step 30 d &middot; FTHP 300 psi &middot; plateau 12 MMscf/d &middot; abandonment 1 MMscf/d &middot; max 60 steps &middot; GIIP &amp; p&#7522;/Z&#7522; grey = from the reserve fit.</p>
-<div class="note"><b>Where GIIP comes from</b> &mdash; blank every reserve route (prod data, SITHP, reservoir limit, gauges) reports a condensate cumulative beside Gp &mdash; and a condensate rate where a row has one &mdash; without touching the p/Z fit; a grey <b>Forecast CGR</b> (blank = latest CGR in the prod table, override by typing) gives a condensate rate = q &times; CGR and a condensate cumulative that continues from the history, both as forecast-table columns; GIIP and pi/Zi chain off Reserve <b>selection 1 (prod data)</b>, the workbook&rsquo;s own chain. It does NOT follow the reserve selection currently shown: on the demo that is 182.26&nbsp;Bscf from prod data vs ~120&nbsp;Bscf from SITHP or the gauges. The field label and the result line both say so; type a value to override.</div>
+<div class="note"><b>Where GIIP comes from</b> &mdash; blank condensate SG = 141.5/(131.5+API) and MW = 42.43&middot;SG/(1.008&minus;SG) are reported on the reserve and forecast summaries (the first two links of the gas-equivalent chain, not applied to the p/Z fit); every reserve route (prod data, SITHP, reservoir limit, gauges) reports a condensate cumulative beside Gp &mdash; and a condensate rate where a row has one &mdash; without touching the p/Z fit; a grey <b>Forecast CGR</b> (blank = latest CGR in the prod table, override by typing) gives a condensate rate = q &times; CGR and a condensate cumulative that continues from the history, both as forecast-table columns; GIIP and pi/Zi chain off Reserve <b>selection 1 (prod data)</b>, the workbook&rsquo;s own chain. It does NOT follow the reserve selection currently shown: on the demo that is 182.26&nbsp;Bscf from prod data vs ~120&nbsp;Bscf from SITHP or the gauges. The field label and the result line both say so; type a value to override.</div>
 <p>Each step: Pr from the p/Z line (first step anchors on start Pres) &rarr; Darcy IPR at Pr &rarr; nodal operating point at forecast FTHP &rarr; q = min(op, plateau) &rarr; Gp advances. Terminates on abandonment / depletion / dead well / max steps, reporting EUR and recovery %. The chart overlays history + forecast on a calendar-date axis; the results table sits below it.</p>
 
 <hr class="sect">

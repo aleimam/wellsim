@@ -623,6 +623,15 @@ input uncertainty.
 
 ---
 
+**Condensate properties.** Both gas modules report the condensate's
+**specific gravity** and **molecular weight** from the well model's condensate
+API: SG = 141.5 / (131.5 + API) — the same value the gas march uses — and
+MW = 42.43·SG / (1.008 − SG). On the `P_Z MB (new)` sheet's API of 49.3 these
+are 0.78263274336 and 147.346636758 exactly. They appear on the reserve
+summary line and the forecast summary line. They are the first two links of
+the gas-equivalent chain (GE = 133 000·SG / MW scf/STB); the chain itself is
+not applied to the p/Z fit — see the note below.
+
 **Condensate on every reserve route.** Each route now reports condensate the
 same way it reports Gp. On routes 1 and 3 (prod data, reservoir limit) every
 row carries a **condensate rate** = gas rate × that row's CGR (STB/d — the
