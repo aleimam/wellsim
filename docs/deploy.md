@@ -13,7 +13,7 @@ GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  �
 | | |
 |---|---|
 | Host | Hetzner VPS, **91.98.23.255**, Ubuntu 24.04 LTS |
-| Runtime | Node **v22** at `/usr/bin/node` — no npm install, the app has zero dependencies |
+| Runtime | Node **v22** at `/usr/bin/node`. **The app is no longer dependency-free.** `713ce46` (2 Sep 2026) added an unconditional `import pg` to `src/server/database.js`, which `server.js` imports at startup, so `pg` must be present in `/opt/wellsim/app/node_modules` or the service dies on `Cannot find package 'pg'`. The deployed release `6807e73` predates that import, which is why production runs today and would break on the next release. |
 | App path | `/opt/wellsim/app`, owned by the `wellsim` service user |
 | Service | systemd `wellsim.service`, `PORT=3355`, `Restart=always` |
 | TLS / proxy | **Caddy v2**, `/etc/caddy/Caddyfile` — automatic Let's Encrypt, renews itself |
@@ -209,12 +209,21 @@ git archive --format=tar.gz -o /tmp/wellsim-src.tar.gz HEAD
 scp -i ~/.ssh/wellsim_hetzner /tmp/wellsim-src.tar.gz root@91.98.23.255:/root/
 ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 \
   'tar -xzf /root/wellsim-src.tar.gz -C /opt/wellsim/app \
+   && cd /opt/wellsim/app && npm install --omit=dev --no-audit --no-fund \
    && chown -R wellsim:wellsim /opt/wellsim/app \
    && systemctl restart wellsim && systemctl is-active wellsim'
 ```
 
 `git archive` ships **exactly the committed tree**, so gitignored material
 (`data/`, the Excel workbooks, training slides) never leaves the machine.
+That is also why the `npm install` above is **not optional**: `node_modules`
+is not in the archive, and since `713ce46` the server cannot start without
+`pg`. `--omit=dev` keeps esbuild, postject and pglite off the server; they
+are only needed to build the portable and to run the tests.
+
+> **Check this before you deploy.** `ssh … 'ls /opt/wellsim/app/node_modules/pg'`
+> — if it is missing and you skip the install, the restart will fail and the
+> site will be down until you run it.
 
 **Bump the asset stamp whenever `app.js`, `style.css` or `index.html`
 changes.** Both are versioned by a query string in `src/ui/index.html`
