@@ -64,10 +64,13 @@ schema compatibility require a separate reviewed plan.
 
 ## What deployment does not enable
 
-The last deployed release is `d5187b4` with schema 0001–0005. The local
-administrator-MFA candidate is not deployed. Its 0005 → 0006 qualification and
-activation procedure is in [Auth0 administrator MFA](auth0-administrator-mfa.md);
-do not rerun the original 0003 → 0005 procedure on the current database.
+The last deployed release is `85befc18ef87f3cd18398eaf83fca866dc5ac77b`
+with schema 0001–0005. Its multi-page static help center is live. The portal,
+authentication and onboarding flags remain off, so the deployed administrator
+and membership-request code is dormant. Migrations 0006–0007 are not applied.
+The 0005 → 0006 qualification and activation procedure is in
+[Auth0 administrator MFA](auth0-administrator-mfa.md); do not rerun the
+original 0003 → 0005 procedure on the current database.
 
 The release includes company/private-workspace UI and the secure backend, but
 deploying them does not authorize a public identity service or signup. Choose

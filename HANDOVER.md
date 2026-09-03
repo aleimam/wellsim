@@ -10,8 +10,9 @@ account/case store is DISABLED there: `/api/accounts/status` reports
 Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
-**Comparison release:** `codex/v2-foundation`, 325 tests passing and 43/43
-validation sweep. Earlier `main` work was merged; subsequent `main` commits
+**Comparison release:** `85befc18ef87f3cd18398eaf83fca866dc5ac77b` on
+`codex/v2-foundation`, deployed only to bldrz.net on 3 September 2026 UTC, with
+325 tests passing and 43/43 validation sweep. Earlier `main` work was merged; subsequent `main` commits
 remain the other developer's separate line of work. The active comparison
 database includes migrations `0001`–`0005`; the branch carries `0006` MFA and
 `0007` portal/help work for a separately gated upgrade. Sign-in, onboarding
