@@ -37,7 +37,7 @@ Database use is off by default; see `db/README.md` for the bldrz boundary.
 node --test
 ```
 
-318 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
+325 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
 (gas march bit-exact; oil march within documented drift bands), IPR/nodal/calibration
 round trips, ESP stack, reserve and forecast synthetic-tank recoveries, plus
 PostgreSQL company and personal-workspace isolation for reads, writes, links and exports. Run
@@ -66,7 +66,7 @@ src/core/reserve/     gas-reserve (Pres solver, p/Z, SITHP march, gauge p/Z, res
 src/core/solvers/     brent
 src/server/           server.js (built-in http), api.js (form -> core mapping),
                       accounts.js (disabled-by-default legacy case-store compatibility)
-src/ui/               index.html, style.css, app.js, export.js, help.html (in-app manual)
+src/ui/               engineering UI plus help/, portal/ and admin/ web areas
 tests/                node:test suites
 scripts/              validation-sweep.mjs (43-case module-vs-workbook sweep)
 docs/                 user-guide.md, equations.md, deploy.md
@@ -91,8 +91,8 @@ when a supported case store reports itself available:
   portable program still exposes its local case folder through this link.
 - **Visitor use stays complete** — every calculation, browser autosave, Save as,
   Open, Export and Print/PDF workflow works without an account.
-- **Help** — the full in-app manual at `/help.html` (user guide + every
-  equation, constant and workbook deviation).
+- **Help** — the multi-page help center at `/help/` plus the detailed
+  engineering equations, constants and workbook deviations.
 
 ## Documentation
 

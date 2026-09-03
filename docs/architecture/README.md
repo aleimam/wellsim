@@ -166,4 +166,5 @@ A platform milestone is not complete until all applicable gates pass:
 - [Module contract](module-contract.md)
 - [Export, reporting and data portability](export-service.md)
 - [Security and tenancy](security-tenancy.md)
+- [Portals, join requests and help publishing](portals-and-help.md)
 - [Migration plan](migration-plan.md)

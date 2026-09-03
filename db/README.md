@@ -12,6 +12,14 @@ Authentication is off by default; provider approval, backup qualification and
 controlled activation are documented in
 [verified authentication](../docs/architecture/identity-authentication.md).
 
+Local migrations `0006_administrator_mfa.sql` and
+`0007_portals_help_and_join_requests.sql` add MFA-gated administration,
+opt-in organization discovery, join requests, separate platform
+administrators, and versioned help publishing. The portal migration grants no
+direct table access to the runtime role; four fixed security-definer functions
+are the only application boundary. See
+[portals and help publishing](../docs/architecture/portals-and-help.md).
+
 ## Migration order
 
 Apply `db/migrations/*.sql` once, in lexical order, with a dedicated migration

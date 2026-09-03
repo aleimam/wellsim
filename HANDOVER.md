@@ -1,7 +1,7 @@
 # WellSim — handover
 
 **Live:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
-**Repo:** https://github.com/aleimam/wellsim · **Manual:** https://wellsim.app/help.html
+**Repo:** https://github.com/aleimam/wellsim · **Manual:** https://bldrz.net/help/
 
 **Live production revision:** 2 September 2026 — the containment release
 `6807e73` from `codex/v2-foundation`, deployed 00:14:57 UTC. The legacy web
@@ -10,11 +10,12 @@ account/case store is DISABLED there: `/api/accounts/status` reports
 Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
-**Comparison release:** `codex/v2-foundation`, 318 tests passing and 43/43
+**Comparison release:** `codex/v2-foundation`, 325 tests passing and 43/43
 validation sweep. Earlier `main` work was merged; subsequent `main` commits
-remain the other developer's separate line of work. This release includes
-migrations `0001`–`0005`, least-privilege roles and a bounded PostgreSQL pool.
-Sign-in and onboarding remain explicitly disabled pending operational gates.
+remain the other developer's separate line of work. The active comparison
+database includes migrations `0001`–`0005`; the branch carries `0006` MFA and
+`0007` portal/help work for a separately gated upgrade. Sign-in, onboarding
+and portals remain explicitly disabled pending operational gates.
 Check `/opt/bldrz/DEPLOYED_REVISION` for the active commit; follow
 [the bldrz-only release procedure](docs/architecture/bldrz-release.md), not
 the WellSim production deployment commands below.
@@ -37,7 +38,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 36 test files.
+`nodal`, `reserve`, `solvers`), 37 test files.
 
 ## 2. Running it
 
@@ -51,7 +52,7 @@ The web server uses Node built-ins, `pg` for opt-in PostgreSQL, and
 external asset, from a CDN.
 
 ```bash
-node --test                       # 318 unit, regression and security tests
+node --test                       # 325 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -94,9 +95,9 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
                      (0.9/0.8/0.7 x Pr) — the one place a pump is solved on a
                      depleted reservoir
 src/server/server.js static file serving, security headers, case database, auth
-src/ui/              index.html · app.js · style.css · help.html (the manual)
+src/ui/              engineering UI · help/ · portal/ · admin/
 docs/                deploy.md · user-guide.md · equations.md
-tests/               36 files — workbook cell pins, physics regressions, and
+tests/               37 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)

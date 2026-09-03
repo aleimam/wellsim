@@ -16,6 +16,7 @@ EnvironmentFile=/etc/bldrz/postgresql.env
 Environment=WELLSIM_DATABASE_ENABLED=1
 Environment=WELLSIM_AUTH_ENABLED=0
 Environment=WELLSIM_ONBOARDING_ENABLED=0
+Environment=WELLSIM_PORTAL_ENABLED=0
 Environment=WELLSIM_DB_LOGIN_ROLE=bldrz_app
 Environment=WELLSIM_DB_RUNTIME_ROLE=bldrz_runtime
 Environment=WELLSIM_DB_POOL_MAX=10

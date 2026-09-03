@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="refresh" content="0; url=/help/" />
+<link rel="canonical" href="/help/" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>WellSim Manual</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -208,7 +210,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-node --test                             # 318 tests
+node --test                             # 325 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses Node built-ins, <code>pg</code> for optional PostgreSQL, and <code>openid-client</code> for gated sign-in; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is produced from this same source tree by <code>build.ps1</code>.</p>
 

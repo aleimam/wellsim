@@ -60,6 +60,7 @@ async function fixture(override = {}, { badSignature = false, missingToken = fal
 
 test('OIDC configuration is disabled by default and rejects unsafe origins, issuers and legacy auth', () => {
   assert.deepEqual(authConfigFromEnv({}), { enabled: false });
+  assert.throws(() => authConfigFromEnv({ WELLSIM_PORTAL_ENABLED: '1' }), /Portals require/);
   assert.equal(settings.issuer, env.WELLSIM_OIDC_ISSUER, 'issuer trailing slash must not be rewritten');
   for (const changes of [
     { WELLSIM_DATABASE_ENABLED: '0' }, { WELLSIM_ENABLE_LEGACY_CASE_STORE: '1' },

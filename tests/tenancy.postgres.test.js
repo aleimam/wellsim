@@ -21,6 +21,7 @@ const WORKSPACE_SCOPED_TABLES = Object.freeze([
   'file_object',
   'membership',
   'organization',
+  'organization_join_request',
   'project',
   'project_well',
   'reservoir',
@@ -280,6 +281,7 @@ test('PostgreSQL migrations enable RLS and a non-bypass runtime role', async () 
     '0004_verified_sessions',
     '0005_controlled_onboarding',
     '0006_administrator_mfa',
+    '0007_portals_help_and_join_requests',
   ]);
 
   const role = await db.query(
@@ -416,6 +418,13 @@ test('Company A can read its own records but cannot read or modify Company B', a
   assert.deepEqual(hiddenIdentity.rows, []);
 
   for (const table of WORKSPACE_SCOPED_TABLES) {
+    if (table === 'organization_join_request') {
+      await expectDatabaseError(
+        runAs(ID.userA, ID.workspaceA, () => db.query(`SELECT workspace_id FROM app.${table}`)),
+        '42501',
+      );
+      continue;
+    }
     const visible = await runAs(ID.userA, ID.workspaceA, () => db.query(
       `SELECT workspace_id FROM app.${table}`,
     ));

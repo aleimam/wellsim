@@ -466,11 +466,12 @@ test('HTTP MFA cannot switch accounts, omit assurance or resurrect a revoked bro
   assert.equal((await db.query('SELECT count(*)::int AS n FROM app.app_user')).rows[0].n, 3);
 });
 
-test('service worker never intercepts authentication, API or workspace-page requests', async () => {
+test('service worker never intercepts authentication, API or private portal requests', async () => {
   const listeners = {};
   const source = await fs.readFile(new URL('../src/ui/sw.js', import.meta.url), 'utf8');
   vm.runInNewContext(source, { self: { location: { origin }, addEventListener(type, handler) { listeners[type] = handler; } }, URL });
-  for (const route of ['/auth/session', '/auth/callback?code=secret', '/api/v2/members', '/workspace.html', '/workspace.js', '/workspace.css']) {
+  for (const route of ['/auth/session', '/auth/callback?code=secret', '/api/v2/members', '/workspace.html',
+    '/workspace.js', '/workspace.css', '/portal/', '/portal/personal.html', '/portal/portal.js', '/admin/', '/admin/admin.js']) {
     let intercepted = false;
     listeners.fetch({ request: { method: 'GET', url: origin + route }, respondWith() { intercepted = true; } });
     assert.equal(intercepted, false, route);

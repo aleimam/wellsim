@@ -13,6 +13,9 @@ function secureUrl(value, name) {
 }
 
 export function authConfigFromEnv(env = process.env) {
+  if (env.WELLSIM_PORTAL_ENABLED === '1' && env.WELLSIM_ONBOARDING_ENABLED !== '1') {
+    throw new Error('Portals require controlled onboarding');
+  }
   if (env.WELLSIM_ONBOARDING_ENABLED === '1' && env.WELLSIM_AUTH_ENABLED !== '1') {
     throw new Error('Onboarding requires verified authentication');
   }
@@ -32,6 +35,7 @@ export function authConfigFromEnv(env = process.env) {
     throw new Error('OIDC client credentials are required');
   }
   return Object.freeze({ enabled: true, onboardingEnabled: env.WELLSIM_ONBOARDING_ENABLED === '1',
+    portalEnabled: env.WELLSIM_PORTAL_ENABLED === '1',
     origin: origin.origin, issuer: env.WELLSIM_OIDC_ISSUER,
     clientId, clientSecret, redirectUri: `${origin.origin}/auth/callback` });
 }

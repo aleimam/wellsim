@@ -20,11 +20,11 @@ const digest = (value) => createHash('sha256').update(value).digest('hex');
 
 // Do not accept parsed req.body, unlimited streams, compressed bodies, or an
 // unbounded wait for a slow client. Authentication/CSRF precede body parsing.
-export async function readOnboardingBody(req) {
+export async function readJsonBody(req, maximumBytes = 8192) {
   if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(req.headers['content-type'] ?? '')
     || (req.headers['content-encoding'] && req.headers['content-encoding'] !== 'identity')) throw invalid(415);
   if (req.headers['content-length'] && (!/^\d+$/.test(req.headers['content-length'])
-    || Number(req.headers['content-length']) > 8192)) throw invalid(413);
+    || Number(req.headers['content-length']) > maximumBytes)) throw invalid(413);
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
@@ -35,7 +35,7 @@ export async function readOnboardingBody(req) {
     };
     const data = (chunk) => {
       size += Buffer.byteLength(chunk);
-      if (size > 8192) finish(invalid(413)); else chunks.push(Buffer.from(chunk));
+      if (size > maximumBytes) finish(invalid(413)); else chunks.push(Buffer.from(chunk));
     };
     const end = () => {
       try {
@@ -51,6 +51,8 @@ export async function readOnboardingBody(req) {
     req.on('data', data); req.on('end', end); req.on('error', fail); req.on('aborted', aborted);
   });
 }
+
+export const readOnboardingBody = (req) => readJsonBody(req, 8192);
 
 export async function runOnboardingRequest(req, pathname, hash, repository, origin) {
   const body = req.method === 'POST' ? await readOnboardingBody(req) : {};

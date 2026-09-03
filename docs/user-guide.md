@@ -29,7 +29,7 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
 - **Header bar** (final layout): the **Oil Well | Water Well | Gas Well** tabs,
   then **Save as · Open · Export · Print / PDF · Help**. A server-case link is shown
   only when the deployment reports a supported case store. Help opens the full
-  in-app manual (`/help.html` — user guide + every equation and deviation).
+  multi-page help center (`/help/` — accounts, workspaces, exports and engineering guides).
 - **Print / PDF** (header): prints the results only — charts, tables, summary
   cards and banners on a clean white page (inputs, navigation and buttons hide).
   Use the browser dialog's "Save as PDF" for a shareable report.

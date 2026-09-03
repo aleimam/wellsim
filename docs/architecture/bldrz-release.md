@@ -31,7 +31,7 @@ Keep secrets, user data, backups and generated dependencies out of Git.
 
 ## Qualification and rollout
 
-1. Confirm a clean worktree and fetch the remote. Run all 318 tests and the
+1. Confirm a clean worktree and fetch the remote. Run all 325 tests and the
    43-check engineering sweep. Inspect the exact branch/commit to be released.
 2. Take a fresh encrypted bldrz-only backup, copy it off-server and verify all
    checksums and local decryption. Keep the recovery identity off the VPS.

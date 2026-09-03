@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { authConfigFromEnv, createOidcProvider } from './oidc.js';
 import { onboardingRoutes, runOnboardingRequest } from './onboarding-http.js';
+import { publicHelpRoutes, portalRoutes, runPortalRequest, runPublicHelpRequest } from './portal-http.js';
 
 const SESSION = '__Host-bldrz_session';
 const FLOW = '__Host-bldrz_login';
@@ -31,7 +32,8 @@ export function createAuthHttp({ settings, provider, database }) {
   let inFlight = 0;
   return async function handle(req, res) {
     const rawPath = req.url.split('?')[0];
-    if (!rawPath.startsWith('/auth/') && !rawPath.startsWith('/api/v2/')) return false;
+    if (!rawPath.startsWith('/auth/') && !rawPath.startsWith('/api/v2/')
+      && !rawPath.startsWith('/api/help/')) return false;
     res.setHeader('cache-control', 'no-store');
     res.setHeader('pragma', 'no-cache');
     res.setHeader('referrer-policy', 'no-referrer');
@@ -45,11 +47,16 @@ export function createAuthHttp({ settings, provider, database }) {
       if (url.origin !== settings.origin) { send(res, 400, { error: 'invalid_request' }); return true; }
       const methods = { '/auth/login': 'GET', '/auth/callback': 'GET', '/auth/session': 'GET',
         '/auth/logout': 'POST', '/auth/step-up': 'POST', '/api/v2/workspaces': 'GET', '/api/v2/workspace': 'GET',
-        ...(settings.onboardingEnabled ? onboardingRoutes : {}) };
+        ...(settings.onboardingEnabled ? onboardingRoutes : {}),
+        ...(settings.portalEnabled ? publicHelpRoutes : {}),
+        ...(settings.portalEnabled ? portalRoutes : {}) };
       const method = methods[url.pathname];
       if (!method) { send(res, 404, { error: 'not_found' }); return true; }
       if (req.method !== method) {
         res.setHeader('allow', method); send(res, 405, { error: 'method_not_allowed' }); return true;
+      }
+      if (settings.portalEnabled && Object.hasOwn(publicHelpRoutes, url.pathname)) {
+        send(res, 200, await runPublicHelpRequest(url, database.portal)); return true;
       }
       if (url.pathname === '/auth/login') {
         const { flow, url: location } = await provider.start();
@@ -83,7 +90,7 @@ export function createAuthHttp({ settings, provider, database }) {
         if (!userId) { send(res, 403, { error: 'access_not_provisioned' }); return true; }
         res.setHeader('set-cookie', [cookie(FLOW, '', 0), cookie(SESSION, sessionToken, 28800)]);
         // Fixed same-origin destination. No returnTo/open redirect parameter.
-        redirect(res, settings.onboardingEnabled ? '/workspace.html' : '/'); return true;
+        redirect(res, settings.portalEnabled ? '/portal/' : settings.onboardingEnabled ? '/workspace.html' : '/'); return true;
       }
       const browserToken = readCookie(req, SESSION);
       const hash = browserToken && tokenHash(browserToken);
@@ -111,14 +118,20 @@ export function createAuthHttp({ settings, provider, database }) {
         send(res, 200, await runOnboardingRequest(req, url.pathname, hash, database.onboarding, settings.origin));
         return true;
       }
+      if (settings.portalEnabled && Object.hasOwn(portalRoutes, url.pathname)) {
+        send(res, 200, await runPortalRequest(req, url, hash, database.portal)); return true;
+      }
       if (url.pathname === '/auth/logout') {
         await database.auth.revokeSession(hash);
         res.setHeader('set-cookie', cookie(SESSION, '', 0));
         send(res, 200, { signedOut: true }); return true;
       }
       if (url.pathname === '/auth/session') {
+        const portal = settings.portalEnabled ? await database.portal.context(hash) : undefined;
         send(res, 200, { user: { id: session.userId, displayName: session.displayName },
           csrfToken: session.csrfToken, onboardingEnabled: settings.onboardingEnabled === true,
+          portalEnabled: settings.portalEnabled === true,
+          platformAdministrator: portal?.platformAdministrator === true,
           mfaExpiresAt: session.mfaExpiresAt });
       } else if (url.pathname === '/api/v2/workspaces') {
         send(res, 200, { workspaces: await database.auth.listWorkspaces(hash) });
@@ -153,6 +166,7 @@ export async function initializeAuthentication(database, env = process.env) {
     if (!database.enabled || !database.auth) throw new Error('Database required');
     await database.auth.ready();
     if (settings.onboardingEnabled) await database.onboarding.ready();
+    if (settings.portalEnabled) await database.portal.ready();
     const provider = await createOidcProvider(settings);
     return createAuthHttp({ settings, provider, database });
   } catch { throw new Error('Verified authentication startup failed'); }

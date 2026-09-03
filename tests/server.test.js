@@ -104,7 +104,10 @@ test('static serving stays inside src/ui, and every real asset still loads', asy
 
     // and the guard must not have cost us the app: every asset index.html
     // actually asks for has to come back
-    for (const asset of ['/', '/app.js', '/export.js', '/style.css', '/help.html', '/favicon.svg', '/sw.js', '/manifest.webmanifest']) {
+    for (const asset of ['/', '/app.js', '/export.js', '/style.css', '/help.html', '/help/',
+      '/help/getting-started.html', '/help/companies.html', '/help/help.js', '/help/help.css',
+      '/portal/', '/portal/personal.html', '/portal/company.html', '/portal/team.html',
+      '/portal/portal.js', '/admin/', '/admin/admin.js', '/favicon.svg', '/sw.js', '/manifest.webmanifest']) {
       const res = await rawGet(port, asset);
       assert.equal(res.status, 200, `${asset} must be served, got ${res.status}`);
       assert.ok(res.body.length > 0, `${asset} came back empty`);
@@ -112,7 +115,8 @@ test('static serving stays inside src/ui, and every real asset still loads', asy
 
     // the stamped form the browser really requests
     assert.equal((await rawGet(port, '/app.js?v=2026-08-30k')).status, 200);
-    for (const asset of ['/workspace.html', '/workspace.js', '/workspace.css']) {
+    for (const asset of ['/workspace.html', '/workspace.js', '/workspace.css', '/portal/',
+      '/portal/personal.html', '/portal/portal.js', '/admin/', '/admin/admin.js']) {
       const res = await rawGet(port, asset);
       assert.equal(res.status, 200);
       assert.equal(res.headers['cache-control'], 'no-store');
@@ -121,6 +125,7 @@ test('static serving stays inside src/ui, and every real asset still loads', asy
     }
     assert.equal((await rawGet(port, '/auth/session')).status, 404);
     assert.equal((await rawGet(port, '/api/v2/members')).status, 404);
+    assert.equal((await rawGet(port, '/api/help/catalog')).status, 404);
   } finally {
     child.kill();
   }

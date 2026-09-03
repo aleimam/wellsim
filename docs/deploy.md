@@ -46,6 +46,13 @@ applied to the separate `bldrz` comparison database. The web service now loads
 the application credential and verifies the database security boundary before
 listening. No authenticated v2 data route is exposed yet.
 
+The checked-in unit explicitly keeps `WELLSIM_AUTH_ENABLED`,
+`WELLSIM_ONBOARDING_ENABLED` and `WELLSIM_PORTAL_ENABLED` at `0`. Portal code
+and the static multi-page help center may be deployed while those services
+remain dormant; do not enable the portal before migrations `0006` and `0007`,
+Auth0 MFA attachment, credential installation and recovery qualification all
+pass.
+
 The comparison source tree is owned by root and is read-only to the `bldrz`
 service user. Only `/opt/bldrz/app/data` and
 `/opt/bldrz/app/data-backups` are writable by that process; neither path is
@@ -187,7 +194,8 @@ ssh -i ~/.ssh/wellsim_hetzner root@91.98.23.255 \
 changes.** Both are versioned by a query string in `src/ui/index.html`
 (`?v=YYYY-MM-DD<letter>`); browsers cache those assets for 5 minutes and will
 otherwise serve a stale bundle. HTML itself is sent `no-cache` and always
-revalidates, so `help.html` needs no stamp.
+revalidates. `/help.html` is a compatibility redirect to the multi-page
+`/help/` directory; help HTML also revalidates.
 
 ### Two caveats of the tar deploy
 

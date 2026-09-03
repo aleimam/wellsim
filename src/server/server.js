@@ -120,7 +120,7 @@ const server = http.createServer(async (req, res) => {
     // The portable was fixed on 30 Aug 2026 (5349c2b); the website was not,
     // and its own access log caught it the hour logging was switched on.
     const q = req.url.split('?')[0];
-    let p = q === '/' || q === '' ? '/index.html' : q;
+    let p = q === '/' || q === '' ? '/index.html' : q.endsWith('/') ? `${q}index.html` : q;
     const file = path.resolve(path.join(UI_DIR, p));
     // startsWith(UI_DIR) on its own is a STRING test, so it also passes for a
     // SIBLING whose name merely begins with "ui" (src/ui-old, src/uix) — and
@@ -132,12 +132,14 @@ const server = http.createServer(async (req, res) => {
     }
     const data = await readFile(file);
     const ext = path.extname(file);
-    if (p.startsWith('/workspace.')) {
+    const sensitive = p.startsWith('/workspace.') || p.startsWith('/portal/') || p.startsWith('/admin/');
+    const strictCsp = sensitive || p.startsWith('/help/');
+    if (strictCsp) {
       res.setHeader('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     }
     res.writeHead(200, {
       'content-type': MIME[ext] ?? 'application/octet-stream',
-      'cache-control': p.startsWith('/workspace.') ? 'no-store' : ext === '.html' ? 'no-cache' : 'public, max-age=300',
+      'cache-control': sensitive ? 'no-store' : ext === '.html' ? 'no-cache' : 'public, max-age=300',
     });
     res.end(data);
   } catch (e) {

@@ -6,6 +6,7 @@ DECLARE
   versions text[];
   identity_enabled boolean;
   mfa_enabled boolean := false;
+  portal_enabled boolean := false;
 BEGIN
   IF current_database() NOT IN ('bldrz', 'bldrz_restore_probe',
       'bldrz_pool_probe', 'bldrz_restore_security') THEN
@@ -24,6 +25,13 @@ BEGIN
       '0005_controlled_onboarding', '0006_administrator_mfa']::text[] THEN
     identity_enabled := true;
     mfa_enabled := true;
+  ELSIF versions IS NOT DISTINCT FROM ARRAY['0001_platform_foundation', '0002_tenant_isolation',
+      '0003_personal_workspace_integrity', '0004_verified_sessions',
+      '0005_controlled_onboarding', '0006_administrator_mfa',
+      '0007_portals_help_and_join_requests']::text[] THEN
+    identity_enabled := true;
+    mfa_enabled := true;
+    portal_enabled := true;
   ELSE
     RAISE EXCEPTION 'unexpected migration history';
   END IF;
@@ -78,7 +86,7 @@ BEGIN
   SELECT count(*) INTO found_count FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'app' AND c.relrowsecurity;
-  IF found_count <> (CASE WHEN identity_enabled THEN 25 ELSE 22 END) OR (SELECT count(*) FROM pg_policy p
+  IF found_count <> (CASE WHEN portal_enabled THEN 30 WHEN identity_enabled THEN 25 ELSE 22 END) OR (SELECT count(*) FROM pg_policy p
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'app') <> 54
     OR EXISTS (SELECT FROM pg_policy p
@@ -115,6 +123,26 @@ BEGIN
             OR EXISTS (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
               WHERE a.grantee=0))) THEN
       RAISE EXCEPTION 'identity function privileges or fixed search path were not preserved';
+    END IF;
+  END IF;
+  IF portal_enabled THEN
+    IF EXISTS (SELECT FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='app' AND c.relname IN ('organization_join_request','platform_administrator',
+          'help_page','help_revision','platform_audit_event')
+          AND (has_table_privilege('bldrz_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
+            OR has_any_column_privilege('bldrz_runtime',c.oid,'SELECT,INSERT,UPDATE,REFERENCES'))) OR
+      (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='app' AND p.proname IN
+          ('help_catalog','help_read','portal_command','platform_help_command')) <> 4 OR
+      EXISTS (SELECT FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='app' AND p.proname IN
+          ('help_catalog','help_read','portal_command','platform_help_command')
+          AND (NOT p.prosecdef OR p.proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog']::text[]
+            OR NOT has_function_privilege('bldrz_runtime',p.oid,'EXECUTE')
+            OR has_function_privilege('bldrz_app',p.oid,'EXECUTE')
+            OR EXISTS (SELECT FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+              WHERE a.grantee=0))) THEN
+      RAISE EXCEPTION 'portal table or function boundary was not preserved';
     END IF;
   END IF;
 END

@@ -3,6 +3,7 @@
 import pg from 'pg';
 import { createAuthRepository, runAuthStatement } from './auth-repository.js';
 import { createOnboardingRepository } from './onboarding-repository.js';
+import { createPortalRepository } from './portal-repository.js';
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -213,6 +214,8 @@ export async function initializeDatabase(env = process.env, {
     auth: createAuthRepository((text, values) =>
       admit(() => runAuthStatement(pool, config, text, values))),
     onboarding: createOnboardingRepository((text, values) =>
+      admit(() => runAuthStatement(pool, config, text, values))),
+    portal: createPortalRepository((text, values) =>
       admit(() => runAuthStatement(pool, config, text, values))),
     async withTenantTransaction(context, operation) {
       return admit(() => runTenantTransaction(pool, config, context, operation));
