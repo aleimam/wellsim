@@ -18,6 +18,7 @@ import {
 } from '../src/core/vlp/esp.js';
 import { createOilIpr } from '../src/core/ipr/oil-ipr.js';
 import { deriveOilFlow } from '../src/core/vlp/oil-march.js';
+import * as api from '../src/server/api.js';
 
 function close(actual, expected, rel = 1e-9) {
   assert.ok(
@@ -471,4 +472,53 @@ test('Novomet catalogue is well-formed, 60 Hz, and physically sane', async () =>
   const r = espPumps();
   assert.ok(r.bySource.some((s) => s.source === 'novomet'), 'Novomet must be offered as a catalogue');
   assert.equal(r.pumps.length, r.bySource.reduce((a, g) => a + g.pumps.length, 0));
+});
+
+// ---- an ESP failure must name the thing that is actually wrong ----
+// The solve reported BOTH of its failure modes with one message, and when
+// the IPR was degenerate every number in it was NaN:
+//   "no traverse match found (closest residual NaN psi at NaN stb/d) —
+//    check PI/Pres, stages or frequency"
+// A NaN open-flow potential makes the whole rate grid NaN, so the "closest"
+// residual was picked out of an all-NaN array -- and the advice pointed at
+// the pump when the well simply had no IPR yet. Found 3 Sep 2026 while
+// sweeping the pump catalogue: it cost real time chasing pumps.
+const ESP_WELL = {
+  thpPsi: '160', wcPct: '5', gorScfStb: '384', tubingIdIn: '2.992', roughness: '0.00006',
+  topPerfAhM: '3240', devStartM: '1500', devAngleDeg: '0', api: '32', gasSg: '0.812',
+  rsiScfStb: '384', tresF: '230', oilViscCp: '6', waterSg: '1.05', pbPsi: '',
+  soilTempF: '90', htcBtu: '3', tubingOdIn: '3.5', cpBtu: '0.51', priPsi: '3550',
+  iprMode: 'pi', userPresPsi: '2650', userJ: '2.7', matchHead: '1', matchFriction: '1',
+  liftType: 'esp', espPumpMode: 'db', espStages: '145', espFreqHz: '50',
+  pumpAhM: '2985', espSepEffPct: '95', testThpPsi: '160', testPwfPsi: '',
+};
+const GEOM = { prPsi: '2650', permMd: '50', thicknessFt: '42.653', reFt: '1640.5', rwFt: '0.5104166667', skin: '0' };
+
+test('a degenerate IPR is reported as such, not as a NaN pump mismatch', () => {
+  const r = api.oilEsp({ ...ESP_WELL, espPumpName: 'WD 150', qOilStbD: '150', testQOilStbD: '150' });
+  assert.ok(r.error, 'this case must fail');
+  assert.doesNotMatch(r.error, /NaN/, 'no NaN may reach the user');
+  assert.match(r.error, /IPR could not be evaluated/);
+  // and it must NOT blame the pump, which is not the problem here
+  assert.match(r.error, /not the problem here/);
+});
+
+test('a real traverse mismatch still reports its residual, with finite numbers', () => {
+  const r = api.oilEsp({ ...ESP_WELL, ...GEOM, espPumpName: 'WD 150', qOilStbD: '150', testQOilStbD: '150' });
+  assert.ok(r.error);
+  assert.doesNotMatch(r.error, /NaN/);
+  // pull the two numbers out without a regex: the point is that they are
+  // finite, and an escaped pattern here is just another thing to get wrong
+  const after = r.error.split('residual ')[1] ?? '';
+  const resid = Number.parseFloat(after);
+  const rate = Number.parseFloat(after.split(' at ')[1] ?? '');
+  assert.ok(Number.isFinite(resid), 'residual must be finite: ' + r.error);
+  assert.ok(Number.isFinite(rate), 'rate must be finite: ' + r.error);
+});
+
+test('a pump that suits the well is unaffected by the message change', () => {
+  const r = api.oilEsp({ ...ESP_WELL, ...GEOM, espPumpName: 'ESP B 538-3600', qOilStbD: '2565', testQOilStbD: '2565' });
+  assert.equal(r.error, undefined);
+  assert.ok(r.op.qOilStbD > 2000);
+  assert.equal(r.point.thrust, 'ok');
 });

@@ -1720,8 +1720,21 @@ export function oilEsp(f) {
   if (!bp.pump) return { error: 'select a pump from the database or enter a custom curve (Manual ΔP uses Solve well)' };
   const opts = espOpts(f);
   const op = espOperatingPoint(cfg, ipr, bp.pump, opts);
+  if (op.status === 'no-ipr')
+    return {
+      error:
+        'the IPR could not be evaluated, so there is nothing for the pump to match — ' +
+        'check reservoir pressure, and either the PI (User PI basis) or permeability, ' +
+        'thickness, Re and Rw (Darcy basis). The pump, stages and frequency are not the problem here.',
+      opStatus: op.status,
+    };
   if (op.status !== 'ok')
-    return { error: `no traverse match found (closest residual ${op.minAbsR?.toFixed(1)} psi at ${op.atQ?.toFixed(0)} stb/d) — check PI/Pres, stages or frequency`, opStatus: op.status };
+    return {
+      error:
+        `no traverse match found (closest residual ${op.minAbsR.toFixed(1)} psi at ${op.atQ.toFixed(0)} stb/d) — ` +
+        'the pump cannot meet this well at any rate: check stages, frequency, or whether the pump suits the well’s rate',
+      opStatus: op.status,
+    };
   const freqs = [30, 35, 40, 45, 50, 55, 60];
   const family = freqs.map((hz) => ({
     freqHz: hz,

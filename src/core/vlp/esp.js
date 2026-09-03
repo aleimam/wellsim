@@ -233,6 +233,10 @@ export function espOperatingPoint(cfg, ipr, pump, opts) {
     return { r: sol.march.intakePsi - sol.pipIprPsi, sol, pwfIpr, pipIpr: sol.pipIprPsi };
   };
   const qMax = Math.min(qMaxGross(ipr) * oilFrac * 0.98, 12000);
+  // A degenerate IPR (no Pres, no PI, no geometry) gives a NaN open-flow
+  // potential. Everything downstream is then NaN, so say so here rather than
+  // reporting a NaN residual at a NaN rate and implicating the pump.
+  if (!Number.isFinite(qMax) || qMax <= 0) return { status: 'no-ipr' };
   const qMin = Math.max(qMax * 0.02, 50);
   const n = 15;
   const qs = [];
@@ -246,8 +250,12 @@ export function espOperatingPoint(cfg, ipr, pump, opts) {
     }
   }
   if (root == null) {
-    let best = 0;
-    for (let i = 1; i < rs.length; i++) if (Math.abs(rs[i]) < Math.abs(rs[best])) best = i;
+    // pick the closest residual among the FINITE ones only -- comparing NaNs
+    // silently leaves best at 0 and reports that NaN as the answer
+    let best = -1;
+    for (let i = 0; i < rs.length; i++)
+      if (Number.isFinite(rs[i]) && (best < 0 || Math.abs(rs[i]) < Math.abs(rs[best]))) best = i;
+    if (best < 0) return { status: 'no-ipr' }; // the IPR gave no flowing pressure at any rate
     return { status: 'no-match', minAbsR: rs[best], atQ: qs[best] };
   }
   const fin = R(root);

@@ -11,7 +11,7 @@ Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
 **Current working tree:** `main` merged into `codex/v2-foundation`,
-298 tests passing and 43/43 validation sweep. The separate `bldrz`
+301 tests passing and 43/43 validation sweep. The separate `bldrz`
 database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
