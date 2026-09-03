@@ -1529,45 +1529,84 @@ function switchEspTab() {
  *  water ESP alike, and every added vendor catalogue appears on both. Manual ΔP
  *  and Custom pump stay at the top of the list, before any catalogue, because
  *  they are not catalogue entries and must not scroll away behind one. */
-async function loadEspPumps() {
-  const oil = document.getElementById('oil-espPumpSel');
-  const water = document.getElementById('water-espPumpSel');
-  oil.innerHTML =
+// Every catalogue the server offers, cached so switching catalogues does not
+// re-fetch. Shape: [{ source, pumps: [name] }].
+let ESP_SOURCES = [];
+
+const CATALOG_LABEL = {
+  workbook: 'Original catalogue (oil + water ESP)',
+  'borets-2015': 'Borets 2015 (from vendor curves, ~3% on head)',
+};
+const catalogLabel = (s) => CATALOG_LABEL[s] ?? s;
+
+/** Which catalogue holds a pump, or null for Manual dP / Custom pump. */
+function catalogOfPump(name) {
+  if (!name || name.startsWith('__')) return null;
+  return ESP_SOURCES.find((s) => s.pumps.includes(name))?.source ?? null;
+}
+
+/** Rebuild one tab's pump list from the catalogue currently chosen there.
+ *  Manual dP and Custom pump are NOT catalogue entries and stay at the top of
+ *  every list, whichever catalogue is selected. */
+function fillPumpSel(prefix, wantName) {
+  const cat = document.getElementById(`${prefix}-espCatalogSel`);
+  const sel = document.getElementById(`${prefix}-espPumpSel`);
+  if (!sel) return;
+  const source = ESP_SOURCES.find((s) => s.source === cat?.value) ?? ESP_SOURCES[0];
+  const keep = wantName ?? sel.value;
+  sel.innerHTML =
     '<option value="__manual">Manual ΔP (no pump model)</option>' +
     '<option value="__custom">Custom pump (add new)…</option>';
-  if (water) water.innerHTML = '<option value="__manual">Manual ΔP (no pump model)</option>' + '<option value="__custom">Custom pump (add new)…</option>';
+  for (const name of source?.pumps ?? []) {
+    const o = document.createElement('option');
+    o.value = name;
+    o.textContent = name;
+    sel.appendChild(o);
+  }
+  // keep the previous choice when it survives the switch; otherwise fall back
+  // to Manual rather than silently landing on whatever sorts first
+  sel.value = [...sel.options].some((o) => o.value === keep) ? keep : '__manual';
+}
+
+/** Point both selectors at a pump, switching catalogue if that is where it
+ *  lives. This is what makes a case saved before catalogues existed restore. */
+function setPumpSelection(prefix, name) {
+  const cat = document.getElementById(`${prefix}-espCatalogSel`);
+  const source = catalogOfPump(name);
+  if (source && cat) cat.value = source;
+  fillPumpSel(prefix, name);
+}
+
+async function loadEspPumps() {
+  const cats = ['oil', 'water']
+    .map((p) => document.getElementById(`${p}-espCatalogSel`))
+    .filter(Boolean);
   try {
     const r = await api('esp/pumps', {});
-    // Group by catalogue. A pump recovered from a vendor PDF is not the same
-    // kind of number as one transcribed from the workbook, and the person
-    // picking it should be able to see which they are choosing.
-    const LABEL = {
-      workbook: 'Original catalogue (oil + water ESP)',
-      'borets-2015': 'Borets 2015 catalogue (from vendor curves, ~3% on head)',
-    };
-    const groups = r.bySource ?? [{ source: 'workbook', pumps: r.pumps }];
-    for (const g of groups) {
-      for (const sel of [oil, water]) {
-        if (!sel) continue;
-        const grp = document.createElement('optgroup');
-        grp.label = LABEL[g.source] ?? g.source;
-        for (const name of g.pumps) {
-          const o = document.createElement('option');
-          o.value = name;
-          o.textContent = name;
-          grp.appendChild(o);
-        }
-        sel.appendChild(grp);
-      }
-    }
-    oil.value = 'ESP B 538-3600'; // demo default from the workbook
-    if (water) water.value = 'ESP B 538-3600';
+    ESP_SOURCES = r.bySource ?? [{ source: 'workbook', pumps: r.pumps ?? [] }];
   } catch {
-    oil.value = '__manual';
-    if (water) water.value = '__manual';
+    ESP_SOURCES = [];
+  }
+  for (const c of cats) {
+    c.innerHTML = '';
+    for (const s of ESP_SOURCES) {
+      const o = document.createElement('option');
+      o.value = s.source;
+      o.textContent = `${catalogLabel(s.source)} — ${s.pumps.length}`;
+      c.appendChild(o);
+    }
+    c.onchange = () => {
+      fillPumpSel(c.id.split('-')[0]);
+      switchEspPump();
+    };
+  }
+  for (const p of ['oil', 'water']) fillPumpSel(p);
+  // the demo default lives in the original catalogue
+  if (ESP_SOURCES.length) {
+    setPumpSelection('oil', 'ESP B 538-3600');
+    setPumpSelection('water', 'ESP B 538-3600');
   }
   switchEspPump();
-  switchWaterEspPump();
 }
 
 // ---- Water Well tab: the oil marches at their limiting case (API 10,
@@ -3229,6 +3268,13 @@ function applyCase(c) {
   switchOilPresSource();
   switchMl('oil');
   switchMl('gas');
+  // the generic loop above sets selects with el.value = v, which does nothing
+  // when the saved pump is not in the catalogue currently listed -- re-point
+  // both selectors from the saved pump name, which also picks its catalogue
+  for (const p of ['oil', 'water']) {
+    const saved = c.selects?.[`${p}-espPumpSel`];
+    if (saved) setPumpSelection(p, saved);
+  }
   switchEspPump();
   switchEspTab();
   switchWaterType();

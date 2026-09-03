@@ -268,3 +268,40 @@ test('no proprietary vendor material is tracked by git', async () => {
     `vendor documents and workbooks must not be tracked: ${badExt.join(', ')}`
   );
 });
+
+// Pump selection is two-step: pick a catalogue, then pick from THAT catalogue.
+// The catalogue is DERIVED from the pump name, never stored in the case — so a
+// case saved before catalogues existed still restores. That derivation is
+// load-bearing: applyCase sets selects with `el.value = v`, and assigning a
+// value that is not among the current options leaves the select EMPTY rather
+// than erroring, so the pump would vanish silently. Added 3 Sep 2026.
+test('the pump selector filters by catalogue and can recover any pump', () => {
+  const html = read('src/ui/index.html');
+  const app = read('src/ui/app.js');
+
+  for (const prefix of ['oil', 'water']) {
+    assert.match(html, new RegExp(`id="${prefix}-espCatalogSel"`), `${prefix} needs a catalogue selector`);
+    assert.match(html, new RegExp(`id="${prefix}-espPumpSel"`), `${prefix} needs a pump selector`);
+  }
+
+  // the pump list is built from ONE catalogue, not all of them
+  assert.match(app, /function fillPumpSel\(/, 'fillPumpSel must exist');
+  assert.match(
+    app,
+    /ESP_SOURCES\.find\(\(s\) => s\.source === cat\?\.value\)/,
+    'the pump list must come from the selected catalogue only'
+  );
+
+  // Manual dP and Custom pump are not catalogue entries and must survive a switch
+  const fill = app.slice(app.indexOf('function fillPumpSel('));
+  assert.match(fill.slice(0, 1200), /__manual/, 'Manual dP must stay available in every catalogue');
+  assert.match(fill.slice(0, 1200), /__custom/, 'Custom pump must stay available in every catalogue');
+
+  // restoring a case must re-point the selectors from the saved pump name
+  assert.match(app, /function setPumpSelection\(/, 'setPumpSelection must exist');
+  assert.match(
+    app,
+    /const saved = c\.selects\?\.\[`\$\{p\}-espPumpSel`\];\s*\n\s*if \(saved\) setPumpSelection\(p, saved\);/,
+    'applyCase must re-point both pump selectors from the saved name'
+  );
+});
