@@ -11,7 +11,7 @@ against the original workbook cells.
 
 | Module | Oil | Gas |
 |---|---|---|
-| **1 — Well model** (nodal analysis) | Natural flow ✔ · Gas lift ✔ · **ESP full stack** ✔ (69-pump database, shared with water) · **Water Well tab** ✔ (producer + injector, ESP on the same catalog) | Natural ✔ |
+| **1 — Well model** (nodal analysis) | Natural flow ✔ · Gas lift ✔ · **ESP full stack** ✔ (123 pumps in 4 catalogues, shared with water) · **Water Well tab** ✔ (producer + injector, ESP on the same catalog) | Natural ✔ |
 | **2 — Reserve estimate** (minimum connected volume) | ✔ 3 methods: Havlena–Odeh MB on prod data · MB on measured static pressures (memory gauge) · reservoir limit | ✔ 4 methods: p/Z on prod data · p/Z from SITHP statics · reservoir limit · p/Z from measured memory-gauge pressures |
 | **3 — Forecast** | ✔ Tarner · Walsh generalized-MB with Rv (saturation-tracking MB + nodal) | ✔ p/Z tank + nodal, history + forecast chart |
 
@@ -55,7 +55,7 @@ workbooks — 43/43 pass.
 src/core/pvt/         constants, oil (Standing-metric family), gas (B&B Z, CKB+Dempsey mu), water
 src/core/vlp/         wellpath, common (Chen friction, Ramey T), ashry factor,
                       oil-march (modified Griffith), gas-march (modified Gray),
-                      water-injector, esp (pump stack), esp-catalog (69-pump database)
+                      water-injector, esp (pump stack), esp-catalog + 3 vendor catalogues (123 pumps)
 src/core/ipr/         oil-ipr (composite Vogel + Darcy J), gas-ipr (Darcy Pr^2 + C&n),
                       multilayer, inflow, skin-guidance
 src/core/nodal/       nodal (operating point), calibrate (get_Pwf), sensitivity, gaslift

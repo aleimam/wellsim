@@ -17,6 +17,8 @@ scf/stb, ft — with the workbooks' metric-intermediate PVT steps preserved).
 | π (trajectory cosine) | **22/7** (Excel legacy, preserved) |
 | π (areas) | 3.14 |
 | Pb calibration constant | 2.1045604254721 |
+| Condensate MW form (Cragoe) | 42.43 over (1.008 − SG) |
+| Condensate gas-equivalent constant | 133.01 (Mscf/STB basis) |
 
 ---
 
@@ -169,6 +171,59 @@ effective-roughness friction term with **base roughness 0.0021 in** (tuned), loc
 Tpr for Z/μ. Bit-parity with the workbook: BHP!D51 = 3598.66511095252 at 1e-8, and
 three real get_Pwf points (3414.02 / 2913.97 / 2647.82 psi) pinned in tests.
 
+### 4.3 ESP pump curves & catalogues
+
+A pump is 11 head/rate points **per stage** at a reference frequency. The
+operating curve applies the affinity laws, the stage count and a wear factor:
+
+```
+q(f) = q₀·(f/f₀)                          rate scales linearly
+H(f) = H₀·stages·(f/f₀)²·(1 − wear)       head scales with the square
+H(q) : linear interpolation between points (the sheet's fraction interp),
+       end-segment extrapolation floored at zero
+```
+
+Points **3 / 5 / 7** are structural, not decorative — down-thrust limit, BEP,
+up-thrust limit. The thrust window scales with f/f₀ like everything else, and
+the physics reads those fixed indices of whatever curve is supplied, which is
+why the custom-pump table colours exactly those rows.
+
+**Catalogues — 123 pumps in four**, chosen in two steps (catalogue, then pump):
+
+| Catalogue | Pumps | Provenance |
+|---|---|---|
+| Original (oil + water ESP) | 69 | `ESP_DataBase` workbook — WD/WG/WE/FLEX/ESP-B families |
+| Borets 2015 | 13 | traced from vendor curves, ~3 % on head |
+| SLB REDA 2020 | 24 | traced from vendor curves, BEP cross-checked |
+| Novomet | 17 | traced from vendor curves, BEP cross-checked |
+
+The three vendor catalogues were recovered from the PDF **vector geometry**
+rather than transcribed, so each pump had to be checked against evidence the
+tracer never read. Borets shares model names with the workbook and was checked
+against those pumps directly. SLB and Novomet share none, so each was checked
+against its own page's printed Recommended Operating Range: the peak of the
+recovered *efficiency* curve must fall inside it, and the rate axis is
+calibrated without reading that range, so the check stays independent. Pumps
+that failed are not in the catalogues.
+
+That is why Novomet ships 17 of 42 model+design pairs. Eleven of the failures
+are unrecoverable in principle: their axis digits were converted to vector
+outlines before the PDF was written, leaving 4–6 numeric labels on a page where
+a typed page carries 24–34, and calibrating pixels to bpd and feet needs at
+least two known numbers per axis. Three guards decide the rest, and each exists
+because loosening it silently corrupted a pump: the BEP must fall **strictly
+inside** the printed range to be built (the ±10 % cross-check tolerance answers
+*did we read the right chart*, which is a different question from where point 5
+sits between the thrust limits at 3 and 7); rates that collide under integer
+rounding are separated only when **exactly** equal; and the head and efficiency
+axes are told apart **by position, not magnitude**, since some pumps read
+efficiency 60 against head 50.
+
+**Manual ΔP** and **Custom pump** are not catalogue entries and stay available
+in every catalogue. The catalogue a pump belongs to is *derived from its name*,
+never stored in the case, so a case saved before catalogues existed still
+restores its pump.
+
 ---
 
 ## 5. IPR
@@ -225,6 +280,13 @@ Per-layer composite-Vogel/Darcy rates at a common Pwf; total = Σ; crossflow
 warnings when a layer takes fluid; equivalent single record: oil = solution-point J,
 gas exact: J_t = ΣJ_i, Pr_avg = √(ΣJ_i·Pr_i²/ΣJ_i). Oil Pr_avg solves ΣQ_i = 0 (Brent).
 
+Per-layer curves and their sum come from **one** rate evaluation per grid point,
+so they add up by construction rather than by agreement of two code paths. A layer
+whose Pr sits below the flowing pressure takes fluid IN and its rate goes negative —
+reported and plotted, never clipped. Oil’s summed curve and the collapsed equivalent
+coincide only at the solution point; gas’s coincide everywhere, because that collapse
+is exact — visible daylight between them on gas means something is wrong.
+
 ---
 
 ## 6. Nodal analysis
@@ -241,18 +303,48 @@ gas exact: J_t = ΣJ_i, Pr_avg = √(ΣJ_i·Pr_i²/ΣJ_i). Oil Pr_avg solves ΣQ
 
 ## 7. Reserves — gas (Module 2)
 
+**Condensate and the gas-equivalent balance — all four selections.** A gas
+condensate well produces liquid that was gas in the reservoir, so the material
+balance is written on **total** gas. From the condensate API (`PZ_Ashry.xlsx`,
+sheet `P_Z MB (new)` B2:B3):
+
+```
+SG_c = 141.5 / (131.5 + API_c)               (the march's own oilSpecificGravity)
+MW_c = 42.43·SG_c / (1.008 − SG_c)           (Cragoe/Standing form)
+GE   = 133.01·SG_c / MW_c        [Mscf/STB]  (sheet constant; 133.00 lands 0.008 % off its cell)
+```
+
+On the sheet's API 49.3 these are 0.78263274336 and 147.346636758 exactly.
+
+```
+q_c     = q_gas·CGR                [STB/d]   q_gas in MMscf/d, CGR in STB/MMscf
+N_p,c   = trapezoid of q_c·dt / 10⁶ [MMstb]  a row without its own CGR takes the well's base CGR
+G_p,c   = N_p,c·GE                 [Bscf]    MMstb × Mscf/STB is Bscf exactly
+G_p,tot = G_p + G_p,c              [Bscf]
+```
+
+**The p/Z line is fitted on G_p,tot on every route**, so the GIIP is total gas
+in place and the chart's abscissa is G_p,tot. Survey routes (SITHP, memory
+gauges) read the condensate cumulative off the prod-table timeline by the same
+linear interpolation `cumGp.at()` uses, held flat outside the record, so a
+survey's Gp and condensate cumulative always come from the same clock. A well
+with no condensate API gives GE = 0 and the whole chain degrades to the dry-gas
+balance rather than throwing.
+
+
 **Selection 1 — Pres solver + p/Z:** per row Pwf (input-or-march), then
 
 ```
 Pr = √(1000·q/J + Pwf²)      Z = Z_BB(Pr, Tres)      Gp by trapezoid of q·dt
-p/Z vs Gp straight line (least squares, prod points only):
+p/Z vs Gp_tot straight line (least squares, prod points only):
 GIIP [Bscf] = −(p/Z)ᵢ / slope        (minimum connected gas)
 ```
 
 **Selection 2 — SITHP statics:** static gas march from SITHP down —
 gas-head-only station march on the well-model grid, geothermal temperatures,
 per-station explicit Z (validated 1.2 % vs the workbook's Cullender–Smith 7661.9 psi
-case). Gp from the prod-table cumulative; then the same p/Z fit on the survey points.
+case). Gp and the condensate cumulative from the prod-table timeline; then the same
+p/Z-vs-Gp_tot fit on the survey points.
 
 **Selection 3 — reservoir limit (verbatim):**
 
@@ -302,21 +394,29 @@ STOIP [MMstb] = q̄ / (Ct·m) / 10⁶
 
 ## 9. Forecast — gas (Module 3)
 
-Chained off the end of history (all three grey input-or-calculated):
-start date = last prod date, start Gp = cumulative, start Pres = minimum solved Pres.
+Chained off the end of history (all grey input-or-calculated): start date = last
+prod date, start Gp = cumulative, start Pres = minimum solved Pres, start
+**condensate cumulative** = the history's, and the **forecast CGR**, which
+defaults to the CGR of the *latest* prod row and can be overridden.
 
 Per step (Δt default 30 d):
 
 ```
-(p/Z)_target = (p/Z)ᵢ·(1 − Gp/GIIP)
+G_p,tot = G_p + N_p,c·GE
+(p/Z)_target = (p/Z)ᵢ·(1 − G_p,tot/GIIP)         ← driven by TOTAL gas
 Pr: first step = start Pres; after = Brent-invert P/Z(P) = target
 IPR at Pr (Darcy) → nodal operating point at forecast FTHP
 q = min(q_op, plateau)          Pwf reported at the produced rate
-Gp += q·Δt/1000
+q_c = q·CGR                                       [STB/d]
+G_p += q·Δt/1000                N_p,c += q_c·Δt/10⁶
 ```
 
-Stops on abandonment rate, depletion, dead well, or max steps; reports EUR and
-recovery %. Chart: history + forecast, calendar-date axis, rate/Gp left, Pres right.
+Stops on abandonment rate, depletion, dead well, or max steps. Reports EUR (dry
+Gp), EUR condensate as MMstb **and** Bscf, **EUR total**, and **recovery % on
+the total basis** — depleting the tank with dry Gp alone would drain it too
+slowly and overstate the EUR, which is why the driver above is G_p,tot and not
+G_p. Chart: history + forecast, calendar-date axis, rate and G_p,tot left, Pres
+right.
 
 ---
 

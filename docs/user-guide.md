@@ -194,7 +194,7 @@ inputs are required; there is no input THT.
    | Water — injector | injection THP · injected-water temperature · tubing ID |
 
    **ESP frequency**: with a pump selected (oil *or* water — both tabs read
-   the same 69-pump database), each set's coupled pump ΔP is re-solved per
+   the same four catalogues), each set's coupled pump ΔP is re-solved per
    rate at that frequency, affinity-scaled curve and intake state included;
    on **Manual ΔP** the quoted ΔP is scaled by the affinity law (f/f₀)².
    Above the pump's flow range the head is zero, so the frequency curves
@@ -252,10 +252,23 @@ inputs are required; there is no input THT.
    trajectory (vertical to the kick-off, then the deviation angle), the
    same conversion used for the perforations. Cases saved before this
    change still load: a stored TVD pump depth is honoured as-is.
-   The **69-pump database runs in the
-   background** (WD/WG/WE/FLEX/ESP-B families from ESP_DataBase): pick a pump
-   from the dropdown, **add a new pump** as a custom per-stage curve (up to 11
-   head/rate points at a reference frequency), or fall back to Manual ΔP.
+   **Pump selection is two steps: catalogue, then pump.** The **Catalogue**
+   dropdown holds four, 123 pumps between them — *Original catalogue (oil +
+   water ESP)*, the 69 WD/WG/WE/FLEX/ESP-B pumps from `ESP_DataBase`, plus
+   *Borets 2015* (13), *SLB REDA 2020* (24) and *Novomet* (17). The three
+   vendor catalogues were recovered from the curve geometry of the vendor
+   PDFs, so every pump in them was cross-checked against evidence the tracer
+   never read — Borets against the workbook pumps it shares model names with
+   (~3 % on head), SLB and Novomet against each page's own printed Recommended
+   Operating Range — and any pump that failed was left out rather than shipped
+   unproven. The pump dropdown lists only the chosen catalogue, so a long list
+   never hides the pump you want; if it is ever empty it says why instead of
+   opening onto nothing. **Manual ΔP** and **Custom pump (add new)…** are not
+   catalogue entries and stay in the list whichever catalogue is selected —
+   add a custom per-stage curve (up to 11 head/rate points at a reference
+   frequency), or fall back to a typed ΔP. Saved cases store the *pump*, never
+   the catalogue, and the catalogue is worked out from the pump name on load,
+   so a case saved before catalogues existed still restores its pump.
    In the custom table the **thrust-marker rows are coloured** — row 4 blue
    (down-thrust limit), row 6 gold (BEP), row 8 red (up-thrust limit), with a
    legend beneath — because the physics reads those fixed rows of whatever
@@ -381,7 +394,8 @@ future-pressure IPR sensitivities keep J constant (water μ·B do not change
 with pressure). No gas/oil-PVT inputs appear (no GOR, API, Rsi, Pb, WC, oil
 viscosity — the liquid viscosity collapses to the sheets' hardcoded 0.5 cp
 water value). Defaults: FTHP 200 psi (producer) · 2000 bbl/d · Pri 4800 psi.
-**Water ESP** runs on the **same 69-pump database as the oil tab** — pick a
+**Water ESP** runs on the **same four catalogues as the oil tab** (same
+two-step catalogue-then-pump selection, same 123 pumps) — pick a
 pump from the dropdown and the ΔP is *solved* from its curve (stages ×
 affinity × wear) instead of typed, with head and the down-thrust/BEP/
 up-thrust window reported at the operating point; *Match stages* solves the
