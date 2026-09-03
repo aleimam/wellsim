@@ -204,3 +204,43 @@ test('forecast history carries the measured FTHP of every prod row', () => {
     }
   }
 });
+
+// ---- forecast condensate: CGR input, rate, cumulative ----
+// Added 3 Sep 2026. The forecast CGR is input-or-calculated: blank reads the
+// LATEST CGR in the prod table. Condensate rate is q x CGR at every step and
+// its cumulative CONTINUES from the history (trapezoid on q x CGR, like cumGp
+// on gas) rather than restarting at zero -- the same convention Gp follows.
+test('forecast condensate: CGR defaults to the latest prod row, rate = q x CGR, cum continues from history', () => {
+  const base = {
+    ...GAS_FORM,
+    prodRows: GAS_PROD_ROWS, // CGR 57 / 40 / 20, latest by date = 20
+    stepDays: '30', forecastFthpPsi: '300', minRateMMscfd: '1', maxSteps: '4', plateauMMscfd: '',
+    startDate: '', startGpBscf: '', startPresPsi: '', giipBscf: '', pziPsi: '',
+  };
+  const r = handlers['gas/forecast'](base);
+  assert.ok(!r.error, r.error);
+  assert.equal(r.forecastCgrStbMMscf, 20, 'blank CGR must read the LATEST prod row, not the first or the well base');
+
+  // rate = q x CGR on every row, in STB/d
+  for (const p of r.rows) close(p.qCondStbD, p.qMMscfd * 20, 1e-12);
+
+  // the history cumulative: trapezoid of q x CGR over the prod table, MMstb
+  const days = GAS_PROD_ROWS.map((x) => Number(handlers['gas/reserve']({ ...GAS_FORM, prodRows: GAS_PROD_ROWS, presSource: 'prod' }).rows.find((y) => Math.abs(y.qMMscfd - Number(x.qMMscfd)) < 1e-9).tDays));
+  const qc = GAS_PROD_ROWS.map((x) => Number(x.qMMscfd) * Number(x.cgrStbMMscf));
+  let stb = 0;
+  for (let i = 1; i < days.length; i++) stb += ((days[i] - days[i - 1]) * (qc[i] + qc[i - 1])) / 2;
+  close(r.startCondMMstb, stb / 1e6, 1e-9);
+  close(r.rows[0].condMMstb, r.startCondMMstb, 1e-12); // first step starts where history ended
+
+  // and advances by rate x step, ending at the reported EUR
+  for (let i = 1; i < r.rows.length; i++) {
+    close(r.rows[i].condMMstb, r.rows[i - 1].condMMstb + (r.rows[i - 1].qCondStbD * 30) / 1e6, 1e-9);
+  }
+  const last = r.rows.at(-1);
+  close(r.eurCondMMstb, last.condMMstb + (last.qCondStbD * 30) / 1e6, 1e-9);
+
+  // a typed CGR wins over the derived one
+  const r2 = handlers['gas/forecast']({ ...base, forecastCgrStbMMscf: '35' });
+  assert.equal(r2.forecastCgrStbMMscf, 35);
+  close(r2.rows[0].qCondStbD, r2.rows[0].qMMscfd * 35, 1e-12);
+});

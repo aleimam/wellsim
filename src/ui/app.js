@@ -400,6 +400,8 @@ const GAS_FC_FIELDS = [
   ['stepDays', 'Time step', 'days', 30],
   ['forecastFthpPsi', 'Forecast FTHP', 'psi', 300],
   ['plateauMMscfd', 'Plateau (constraint)', 'MMscf/d', 12],
+  // grayed: blank reads the LATEST CGR in the prod table
+  ['forecastCgrStbMMscf', 'Forecast CGR (blank = last prod)', 'STB/MMscf', ''],
   ['minRateMMscfd', 'Abandonment rate', 'MMscf/d', 1],
   ['maxSteps', 'Max steps', '-', 60],
   ['giipBscf', 'GIIP (blank = prod-data p/Z fit)', 'Bscf', ''],
@@ -2975,7 +2977,8 @@ async function gasForecastRun() {
   document.getElementById('gas-fc-result').textContent =
     `EUR = ${fmt(r.eurBscf, 2)} Bscf (${fmt(r.recoveryPct, 1)}% of GIIP ${fmt(r.giipBscf, 1)}), status: ${r.status}\n` +
     `Plateau held ${r.rows.filter((p) => p.onPlateau).length} of ${r.rows.length} steps. ` +
-    `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf, Pres ${fmt(r.startPresPsi, 0)} psi.\n` +
+    `Start: Gp ${fmt(r.startGpBscf, 3)} Bscf, Pres ${fmt(r.startPresPsi, 0)} psi. ` +
+    `Condensate at CGR ${fmt(r.forecastCgrStbMMscf, 1)} STB/MMscf: cum ${fmt(r.startCondMMstb, 3)} → ${fmt(r.eurCondMMstb, 3)} MMstb.\n` +
     // the workbook's Forecast sheet derives its start state from the
     // PROD-DATA sheet, so this chain ignores whichever reserve selection is
     // on screen. On the demo that is 182 Bscf vs ~120 from SITHP/gauges —
@@ -2990,6 +2993,7 @@ async function gasForecastRun() {
   setComputed('gas-giipBscf', r.giipBscf, 2);
   setComputed('gas-pziPsi', r.pziPsi, 1);
   setComputed('gas-startGpBscf', r.startGpBscf, 3);
+  setComputed('gas-forecastCgrStbMMscf', r.forecastCgrStbMMscf, 1);
   setComputed('gas-startPresPsi', r.startPresPsi, 1);
   setComputed('gas-startDate', dayToDateStr(r.startDay) ?? r.startDay, 'str');
   // workbook Forecast chart: history + forecast on one date axis (rate and
@@ -3025,7 +3029,7 @@ async function gasForecastRun() {
   mobileShowResults();
   renderTables('gas-table-fc', [
     {
-      title: 'Forecast', headers: ['date', 'q MMscf/d', 'Pres', 'p/Z', 'Pwf', 'FTHP', 'FTHT °F', 'Gp Bscf', 'plateau'],
+      title: 'Forecast', headers: ['date', 'q MMscf/d', 'Pres', 'p/Z', 'Pwf', 'FTHP', 'FTHT °F', 'Gp Bscf', 'Cond STB/d', 'Cond cum MMstb', 'plateau'],
       rows: r.rows.map((p) => [
         useDates ? dayToDateStr(p.tDays) : fmt(p.dtDays, 0),
         fmt(p.qMMscfd, 2), fmt(p.presPsi, 0), fmt(p.pOverZ, 0), fmt(p.pwfPsi, 0),
@@ -3034,7 +3038,9 @@ async function gasForecastRun() {
         // off plateau it is the input by construction. Flag the solved ones.
         fmt(p.fthpPsi, 0) + (p.fthpSource === 'solved' ? '*' : ''),
         fmt(p.fthtF, 1),
-        fmt(p.gpBscf, 2), p.onPlateau ? 'yes' : '',
+        fmt(p.gpBscf, 2),
+        fmt(p.qCondStbD, 0), fmt(p.condMMstb, 3),
+        p.onPlateau ? 'yes' : '',
       ]),
     },
   ]);

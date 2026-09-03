@@ -72,6 +72,7 @@ import {
   gasForecast,
   zAtRes,
   toDays,
+  cumCond,
 } from '../core/reserve/gas-reserve.js';
 import {
   oilPresSolver,
@@ -1261,6 +1262,16 @@ export function gasForecastApi(f) {
   }
   if (giip == null) return { error: 'GIIP not given and no production rows to fit it from' };
   if (pzi == null) pzi = ipr.priPsi / zAtRes(cfg, ipr.priPsi); // pzi at initial Pres
+
+  // condensate: the forecast CGR is input-or-calculated -- blank reads the
+  // LATEST CGR in the prod table (the well's base CGR if the table has none),
+  // and the cumulative starts where the history left off
+  const prodRows = (f.prodRows ?? [])
+    .filter((r) => dateVal(r.date) != null && num(r.qMMscfd) != null)
+    .map((r) => ({ date: dateVal(r.date), qMMscfd: num(r.qMMscfd), cgrStbMMscf: num(r.cgrStbMMscf) }));
+  const hc = cumCond(prodRows, cfg.cgrStbMMscf);
+  const forecastCgr = num(f.forecastCgrStbMMscf) ?? hc.latestCgr ?? cfg.cgrStbMMscf ?? 0;
+
   const fc = gasForecast({
     marchCfg: cfg,
     ipr,
@@ -1274,10 +1285,14 @@ export function gasForecastApi(f) {
     plateauMMscfd: num(f.plateauMMscfd),
     minRateMMscfd: num(f.minRateMMscfd) ?? 0.5,
     maxSteps: Math.min(num(f.maxSteps) ?? 60, 200),
+    cgrStbMMscf: forecastCgr,
+    startCondMMstb: hc.condMMstb,
   });
   return {
     ...fc,
     history,
+    forecastCgrStbMMscf: forecastCgr,
+    startCondMMstb: hc.condMMstb,
     giipBscf: giip,
     pziPsi: pzi,
     startGpBscf: startGp ?? 0,

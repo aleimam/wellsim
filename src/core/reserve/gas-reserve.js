@@ -168,6 +168,29 @@ export function cumGp(prodRows) {
 }
 
 /**
+ * Cumulative condensate from the prod table, MMstb: trapezoid on the
+ * condensate RATE (gas rate x CGR), the same integration cumGp does on gas.
+ * A row without a CGR takes the well's base CGR, as the march does.
+ * Returns the total and the CGR of the LATEST row, which is what the
+ * forecast defaults to.
+ */
+export function cumCond(prodRows, baseCgr) {
+  const rows = prodRows
+    .map((r) => ({
+      tDays: toDays(r.date),
+      qCondStbD: (r.qMMscfd ?? 0) * (r.cgrStbMMscf ?? baseCgr ?? 0),
+      cgr: r.cgrStbMMscf,
+    }))
+    .sort((a, b) => a.tDays - b.tDays);
+  let stb = 0;
+  for (let i = 1; i < rows.length; i++) {
+    stb += ((rows[i].tDays - rows[i - 1].tDays) * (rows[i].qCondStbD + rows[i - 1].qCondStbD)) / 2;
+  }
+  const latest = [...rows].reverse().find((r) => r.cgr != null);
+  return { condMMstb: stb / 1e6, latestCgr: latest ? latest.cgr : baseCgr ?? null };
+}
+
+/**
  * Static BHP from a shut-in wellhead pressure — THE SHEET'S METHOD: the
  * Cullender-Smith / average-T&Z correlation (gas deck slide 7) evaluated at
  * ZERO RATE, Pws = SITHP * exp(0.01875 * gg * TVDft / (TavgR * Zavg)) with
@@ -426,10 +449,15 @@ export function gasForecast({
   plateauMMscfd,
   minRateMMscfd = 0.5,
   maxSteps = 60,
+  cgrStbMMscf = 0,
+  startCondMMstb = 0,
 }) {
   const cfg = { ...marchCfg, thpPsi: fthpPsi };
   const rows = [];
   let gp = startGpBscf;
+  // condensate rides on the gas: rate = q x CGR, and its cumulative CONTINUES
+  // from the history the same way Gp does, rather than restarting at zero
+  let cond = startCondMMstb;
   let status = 'max-steps';
   for (let i = 0; i < maxSteps; i++) {
     const pzT = pziPsi * (1 - gp / giipBscf);
@@ -457,6 +485,7 @@ export function gasForecast({
     // flowing wellhead state: the input FTHP off plateau, back-solved when
     // the well is choked (see forecastWellhead above)
     const wh = forecastWellhead(cfg, { qMMscfd: q, pwfPsi, fthpPsi, onPlateau, presPsi });
+    const qCondStbD = q * cgrStbMMscf; // MMscf/d x STB/MMscf = STB/d
     rows.push({
       tDays: startDay + i * stepDays,
       dtDays: i * stepDays,
@@ -468,9 +497,12 @@ export function gasForecast({
       fthtF: wh.fthtF,
       fthpSource: wh.fthpSource,
       gpBscf: gp,
+      qCondStbD,
+      condMMstb: cond,
       onPlateau,
     });
     gp += (q * stepDays) / 1000;
+    cond += (qCondStbD * stepDays) / 1e6;
   }
-  return { rows, eurBscf: gp, status, recoveryPct: (gp / giipBscf) * 100 };
+  return { rows, eurBscf: gp, eurCondMMstb: cond, status, recoveryPct: (gp / giipBscf) * 100 };
 }

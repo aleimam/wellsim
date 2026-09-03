@@ -641,6 +641,18 @@ does not invert the downward one exactly). FTHT needs no inversion: the
 march temperature is the geothermal shelf with Ramey relaxation — a
 function of RATE and depth, independent of pressure.
 
+**Condensate in the forecast.** A **Forecast CGR** input (STB/MMscf) sits
+with the other forecast controls. It is grey, input-or-calculated: left blank
+it reads the **latest CGR in the prod table** under Reserve estimate — the
+last row by date, not the first and not the well model's base CGR — and shows
+that value after a run. Type your own to override. Each step then reports a
+**condensate rate** = forecast gas rate × CGR (STB/d) and a **condensate
+cumulative** (MMstb) that *continues from the history* — the trapezoid of
+q × CGR over the prod table, the same integration Gp uses on gas — rather
+than restarting at zero. Both are columns in the forecast table, and the
+summary line gives the cumulative at the start and at EUR. The CGR is held
+constant across the forecast; it does not decline with reservoir pressure.
+
 **Where GIIP comes from.** Left blank, GIIP and pi/Zi chain off the Reserve
 module’s **selection 1 (prod data & macro)** p/Z straight-line fit — the same
 chain the workbook’s Forecast sheet uses, and it does NOT follow whichever
