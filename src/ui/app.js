@@ -1288,9 +1288,23 @@ function plotSens(div, xTitle, iprFam, vlpFam, iprX, opts = {}) {
   future.forEach((m, i) =>
     traces.push({ x: m.curve.map(iprX), y: m.curve.map((p) => p.pwfPsi), name: nameOf(iprName, m.label), mode: 'lines', line: { color: FAM_BLUES[i % 3], width: 2.5 } })
   );
-  vlpFam.forEach((m, i) =>
-    traces.push({ x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi), name: nameOf(vlpName, m.label), mode: 'lines', line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' } })
-  );
+  // The pressure axis is pinned to [0, Pri] (see the layout below), so a VLP
+  // set needing more than Pri is drawn OUTSIDE the plot and the reader sees
+  // only the fragments crossing the top edge -- which looks like a corrupted
+  // curve rather than a well that cannot lift that case. Reported 3 Sep 2026
+  // for a high-water-cut set reaching 10979 psi against a 2650 psi axis. The
+  // curve is not wrong and is not redrawn; it is LABELLED, so the legend says
+  // what the eye cannot.
+  const ceiling = opts.priPsi > 0 ? opts.priPsi : Infinity;
+  vlpFam.forEach((m, i) => {
+    const off = m.curve.filter((p) => p.pwfPsi > ceiling).length;
+    const tag = off === 0 ? '' : off === m.curve.length ? ' (all above axis)' : ` (${off} pts above axis)`;
+    traces.push({
+      x: m.curve.map((p) => p.q), y: m.curve.map((p) => p.pwfPsi),
+      name: nameOf(vlpName, m.label) + tag, mode: 'lines',
+      line: { color: FAM_REDS[i % 3], width: 2.5, dash: 'dot' },
+    });
+  });
   // each set's NODAL SOLUTION against the current IPR — the same numbers the
   // table lists. Without these the reader had to infer the intersection.
   const opQ = opts.opQ;
