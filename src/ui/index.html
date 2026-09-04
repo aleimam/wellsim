@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-09-04c" />
+  <link rel="stylesheet" href="/style.css?v=2026-09-04d" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -86,6 +86,7 @@
           <label class="radio"><input type="radio" name="oil-module" value="well" checked /> Well model</label>
           <label class="radio"><input type="radio" name="oil-module" value="reserve" /> Reserve estimate</label>
           <label class="radio"><input type="radio" name="oil-module" value="forecast" /> Forecast</label>
+          <label class="radio"><input type="radio" name="oil-module" value="allift" /> Lift selection</label>
         </fieldset>
         <div id="oil-mod-well">
         <fieldset>
@@ -226,6 +227,15 @@
             <div id="oil-fc-result" class="note"></div>
           </fieldset>
         </div>
+        <div id="oil-mod-allift" style="display:none">
+          <fieldset>
+            <legend>Artificial-lift selection &mdash; technical screen + UDC economics</legend>
+            <div class="note">Screens ESP &middot; Gas Lift &middot; Sucker Rod &middot; Jet &middot; PCP against the global envelope bands across three life snapshots, then costs every method on the one-year cumulative oil from those snapshots (Initial / +6&nbsp;mo / +1&nbsp;yr) to pick the economical method. Advisory &mdash; the final choice is the analyst's.</div>
+            <div id="oil-allift-fields"></div>
+            <button id="oil-btn-allift" class="action">Run artificial-lift selection</button>
+            <div id="oil-allift-result" class="note"></div>
+          </fieldset>
+        </div>
       </div>
       <div class="results">
         <div id="oil-summary" class="summary"></div>
@@ -240,6 +250,7 @@
         <div class="chartrow stack" id="oil-cr-fc" style="display:none"><div id="oil-chart-fc" class="chart"></div><div id="oil-table-fc" class="datatable"></div></div>
         <div class="chartrow stack" id="oil-cr-espsens" style="display:none"><div id="oil-chart-espsens" class="chart"></div><div id="oil-table-espsens" class="datatable"></div></div>
         <div class="chartrow" id="oil-cr-esptrav" style="display:none"><div id="oil-chart-esptrav" class="chart"></div><div id="oil-table-esptrav" class="datatable"></div></div>
+        <div class="chartrow stack" id="oil-cr-allift" style="display:none"><div id="oil-allift-output" class="datatable" style="width:100%"></div></div>
       </div>
     </section>
 
@@ -450,7 +461,7 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/export.js?v=2026-09-04c"></script>
-  <script src="/app.js?v=2026-09-04c"></script>
+  <script src="/export.js?v=2026-09-04d"></script>
+  <script src="/app.js?v=2026-09-04d"></script>
 </body>
 </html>

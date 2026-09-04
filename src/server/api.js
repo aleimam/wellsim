@@ -18,11 +18,15 @@ import {
   iprCurve,
   qMaxGross,
   pwfAtQGross,
+  qGrossAtPwf,
   withCurrentPr,
   permFromJOil,
   jDarcyOil,
   jFromTest,
 } from '../core/ipr/oil-ipr.js';
+import { screenLifecycle, sideGates } from '../core/allift/screen.js';
+import { economicScreen, trapezoidCumStb } from '../core/allift/economics.js';
+import { defaultLimits, METHODS as ALLIFT_METHODS } from '../core/allift/limits.js';
 import { getPwfOil } from '../core/nodal/calibrate.js';
 import { ESP_PUMPS, pumpByName, THRUST } from '../core/vlp/esp-catalog.js';
 import { BORETS_2015_PUMPS } from '../core/vlp/esp-catalog-borets-2015.js';
@@ -1850,6 +1854,91 @@ export function skinGuidance() {
   return { guidance: SKIN_GUIDANCE };
 }
 
+// Artificial-lift selection — screens 5 lift methods against the global
+// envelope bands across 3 life snapshots, then costs them on the one-year
+// cumulative oil from those snapshots (workbook: initial / +6mo / +1yr) to pick
+// the economical method. No physics here: Qgross reuses the composite Vogel.
+function alliftSnapshotPoint(s) {
+  const j = num(s.j);
+  const prPsi = num(s.prPsi);
+  const pbPsi = num(s.pbPsi);
+  const pwfPsi = num(s.pwfPsi);
+  const qGrossStbD = qGrossAtPwf(pwfPsi, { j, prPsi, pbPsi });
+  const wcPct = num(s.wcPct) ?? 0;
+  return {
+    point: {
+      qGrossStbD,
+      depthFt: num(s.depthFt),
+      glr: num(s.glr),
+      whpPsi: num(s.whpPsi),
+      wcPct,
+      gorScfStb: num(s.gorScfStb),
+      devDeg: num(s.devDeg),
+      dogLegDeg: num(s.dogLegDeg),
+    },
+    qGrossStbD,
+    oilRateStbD: qGrossStbD * (1 - wcPct / 100),
+  };
+}
+
+export function alliftSelect(f) {
+  const snaps = Array.isArray(f.snapshots) ? f.snapshots : [];
+  if (snaps.length < 1) return { error: 'at least one snapshot (well point) is required' };
+
+  const built = snaps.map(alliftSnapshotPoint);
+  const points = built.map((b) => b.point);
+
+  const limits = defaultLimits();
+  const bands = structuredClone(limits.bands);
+  const overrides = f.limitOverrides || {};
+  for (const m of Object.keys(overrides)) if (bands[m]) Object.assign(bands[m], overrides[m]);
+
+  const screen = screenLifecycle(points, bands);
+
+  // one common one-year cum from the snapshots' oil rate (workbook trapezoid);
+  // a per-method paste may override it
+  const oneYearCumStb = trapezoidCumStb(built.map((b) => b.oilRateStbD));
+  const pasted = f.cumStbByMethod || {};
+  const cumByMethod = {};
+  for (const { key: m } of ALLIFT_METHODS) {
+    if (Number.isFinite(num(pasted[m]))) cumByMethod[m] = { value: num(pasted[m]), source: 'analyst-input' };
+    else if (oneYearCumStb != null) cumByMethod[m] = { value: oneYearCumStb, source: 'prod-data' };
+    else cumByMethod[m] = { value: null, source: 'missing' };
+  }
+
+  const capexUsd = f.capexUsd || {};
+  const econ = economicScreen({
+    methods: ALLIFT_METHODS.map((m) => m.key),
+    applicable: screen.technicallyApplicable,
+    capexUsdByMethod: capexUsd,
+    opexUsdPerBbl: num(f.opexUsdPerBbl) ?? 0,
+    udcLimitUsdPerBbl: num(f.udcLimitUsdPerBbl) ?? Infinity,
+    cumByMethod,
+  });
+
+  return {
+    limits: { version: limits.version, provenance: limits.provenance, overrides, bands },
+    snapshots: built.map((b, i) => ({ index: i, qGrossStbD: b.qGrossStbD, oilRateStbD: b.oilRateStbD, ...b.point })),
+    screen,
+    economics: econ,
+    cumBasis: {
+      source: oneYearCumStb != null ? 'prod-data' : 'none',
+      horizon: 'oneYear',
+      oneYearCumStb: oneYearCumStb ?? null,
+      note: 'trapezoid of oil rate at Initial / +6 mo / +1 yr',
+    },
+    gateNotes: sideGates(f.gates || {}),
+    recommendation: econ.cheapestApplicable,
+    warnings: [
+      ...(oneYearCumStb == null ? ['One-year cumulative needs oil rate at 2+ snapshots.'] : []),
+      ...(screen.technicallyApplicable.length === 0 ? ['No method passes the technical screen across the well life.'] : []),
+    ],
+    disclaimer:
+      'First-pass screening advisory. Bands are heuristic, not physical limits; the final ' +
+      'method is the analyst\'s decision. Passing the screen does not guarantee a feasible design.',
+  };
+}
+
 export const handlers = {
   'oil/nodal': oilNodal,
   'oil/calibrate': oilCalibrate,
@@ -1871,4 +1960,5 @@ export const handlers = {
   'gas/reserve': gasReserve,
   'gas/forecast': gasForecastApi,
   'skin-guidance': skinGuidance,
+  'allift/select': alliftSelect,
 };

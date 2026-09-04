@@ -1840,6 +1840,7 @@ function applyOilRows() {
   set('oil-cr-rsv1', m === 'reserve');
   set('oil-cr-rsv2', m === 'reserve');
   set('oil-cr-fc', m === 'forecast');
+  set('oil-cr-allift', m === 'allift');
   // conditionally-drawn rows: hide when they cannot apply, never force-show
   // the gas-lift row is shared with the ESP pump curve: it belongs to those
   // two lifts, and must be SHOWN again when one of them comes back
@@ -1857,7 +1858,9 @@ function switchOilModule() {
   document.getElementById('oil-mod-well').style.display = m === 'well' ? '' : 'none';
   document.getElementById('oil-mod-reserve').style.display = m === 'reserve' ? '' : 'none';
   document.getElementById('oil-mod-forecast').style.display = m === 'forecast' ? '' : 'none';
+  document.getElementById('oil-mod-allift').style.display = m === 'allift' ? '' : 'none';
   document.getElementById('panel-oil').classList.toggle('mode-reserve', m === 'reserve');
+  if (m === 'allift') alliftEnsureForm();
   applyOilRows();
   resizeVisibleCharts();
 }
@@ -3882,6 +3885,178 @@ document.getElementById('print-report').onclick = (e) => {
 document.getElementById('water-btn-solve').onclick = guard(waterSolve);
 document.getElementById('water-btn-calibrate').onclick = guard(waterCalibrate);
 document.getElementById('water-btn-sens').onclick = guard(waterSens);
+/* ===== Artificial-lift selection (Oil tab · "Lift selection" module) =====
+ * Screens the 5 lift methods against the global envelope bands across 3 life
+ * snapshots and costs them on the one-year cum from those snapshots. Compute is
+ * server-side (api 'allift/select'); this only builds the form and renders. */
+const ALLIFT_M = [
+  { k: 'ESP', label: 'ESP', engine: true, c: '#0f6e8c' },
+  { k: 'GL', label: 'Gas Lift', engine: true, c: '#c98a1a' },
+  { k: 'SRP', label: 'Sucker Rod', engine: false, c: '#7a5ea8' },
+  { k: 'JET', label: 'Jet Pump', engine: false, c: '#2f8f5b' },
+  { k: 'PCP', label: 'PCP', engine: false, c: '#b4443a' },
+];
+const ALLIFT_P = [
+  { k: 'qGrossStbD', label: 'Gross rate', u: 'stb/d' }, { k: 'depthFt', label: 'Depth', u: 'ft' },
+  { k: 'glr', label: 'GLR', u: 'scf/stb' }, { k: 'whpPsi', label: 'WHP', u: 'psi' },
+  { k: 'wcPct', label: 'Water cut', u: '%' }, { k: 'gorScfStb', label: 'GOR', u: 'scf/stb' },
+  { k: 'devDeg', label: 'Deviation', u: 'deg' }, { k: 'dogLegDeg', label: 'Dog-leg', u: 'deg/100ft' },
+];
+const ALLIFT_L = [
+  { level: 1, title: 'Depth + Gross Rate', x: 'qGrossStbD', y: 'depthFt', xt: 'log', yt: 'linear', xd: [10, 10000], yd: [500, 4500] },
+  { level: 2, title: 'WHP + GLR', x: 'glr', y: 'whpPsi', xt: 'log', yt: 'log', xd: [1, 2000], yd: [10, 5000] },
+  { level: 3, title: 'Water-Cut + GOR', x: 'wcPct', y: 'gorScfStb', xt: 'linear', yt: 'log', xd: [0, 100], yd: [100, 200000] },
+  { level: 4, title: 'Deviation + Dog-Leg', x: 'devDeg', y: 'dogLegDeg', xt: 'linear', yt: 'linear', xd: [0, 80], yd: [0, 16] },
+];
+const ALLIFT_ED = [
+  ['pwfPsi', 'Pwf', 'psi'], ['prPsi', 'Res. P', 'psi'], ['pbPsi', 'Bubble P', 'psi'], ['j', 'PI (J)', ''],
+  ['depthFt', 'Depth', 'ft'], ['glr', 'GLR', 'scf/stb'], ['whpPsi', 'WHP', 'psi'], ['wcPct', 'Water cut', '%'],
+  ['gorScfStb', 'GOR', 'scf/stb'], ['devDeg', 'Deviation', 'deg'], ['dogLegDeg', 'Dog-leg', '°/100ft'],
+];
+const ALLIFT_CAP = { ESP: 500000, GL: 150000, SRP: 300000, JET: 292000, PCP: 400000 };
+const ALLIFT_DEFAULT = [
+  { pwfPsi: 2000, prPsi: 5200, pbPsi: 2000, j: 0.7, depthFt: 3200, glr: 392, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 3500, pbPsi: 2000, j: 0.7, depthFt: 3200, glr: 320, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 2500, pbPsi: 2000, j: 0.7, depthFt: 3200, glr: 200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+];
+const ALLIFT_LABELS = ['Initial', '+6 mo', '+1 yr'];
+const labelAllift = (k) => (ALLIFT_M.find((m) => m.k === k) || {}).label || k;
+
+function alliftVogel(pwf, j, pr, pb) {
+  if (pr >= pb) { if (pwf >= pb) return j * (pr - pwf); return j * (pr - pb) + (j * pb / 1.8) * (1 - 0.2 * (pwf / pb) - 0.8 * (pwf / pb) ** 2); }
+  return (j * pr / 1.8) * (1 - 0.2 * (pwf / pr) - 0.8 * (pwf / pr) ** 2);
+}
+
+let alliftBuilt = false;
+function alliftEnsureForm() {
+  if (alliftBuilt) return;
+  const host = document.getElementById('oil-allift-fields');
+  if (!host) return;
+  let h = '<table class="sens" style="width:100%"><thead><tr><th style="text-align:left">Parameter</th>' +
+    ALLIFT_LABELS.map((l) => `<th>${l}</th>`).join('') + '</tr></thead><tbody>';
+  h += '<tr><td style="text-align:left;color:#0f6e8c">Qgross (Vogel) stb/d</td>' +
+    ALLIFT_DEFAULT.map((_, i) => `<td id="al-q-${i}" style="text-align:right;color:#0f6e8c;font-weight:600">&mdash;</td>`).join('') + '</tr>';
+  for (const [k, label, u] of ALLIFT_ED) {
+    h += `<tr><td style="text-align:left">${label}${u ? ` <span class="note" style="margin:0">${u}</span>` : ''}</td>` +
+      ALLIFT_DEFAULT.map((s, i) => `<td><input id="al-${k}-${i}" type="number" step="any" value="${s[k]}" style="width:5.5em;text-align:right"></td>`).join('') + '</tr>';
+  }
+  h += '</tbody></table>';
+  h += '<div class="senshead">Estimated cost per method, $ (capex + hookup)</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px">';
+  for (const m of ALLIFT_M) h += `<label style="display:flex;justify-content:space-between;gap:6px;align-items:center"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${m.c};margin-right:5px"></span>${m.label}</span><input id="al-cap-${m.k}" type="number" step="any" value="${ALLIFT_CAP[m.k]}" style="width:6.5em;text-align:right"></label>`;
+  h += '</div>';
+  h += '<div class="frow" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:8px"><label>Opex, $/bbl <input id="al-opex" type="number" step="any" value="3" style="width:5em;text-align:right"></label><label>UDC limit, $/bbl <input id="al-limit" type="number" step="any" value="11" style="width:5em;text-align:right"></label></div>';
+  h += '<div class="senshead">Other conditions</div><div style="display:flex;flex-wrap:wrap;gap:14px"><label class="radio"><input type="checkbox" id="al-natural" checked> Flows naturally</label><label class="radio"><input type="checkbox" id="al-gascomp" checked> Near gas compression</label><label class="radio"><input type="checkbox" id="al-sour"> High H2S/CO2</label></div>';
+  host.innerHTML = h;
+  const upd = () => {
+    for (let i = 0; i < ALLIFT_DEFAULT.length; i++) {
+      const g = (id) => parseFloat(document.getElementById('al-' + id + '-' + i)?.value);
+      const q = alliftVogel(g('pwfPsi'), g('j'), g('prPsi'), g('pbPsi'));
+      const c = document.getElementById('al-q-' + i);
+      if (c) c.textContent = Number.isFinite(q) ? Math.round(q).toLocaleString() : '—';
+    }
+  };
+  host.querySelectorAll('input[type="number"]').forEach((inp) => inp.addEventListener('input', upd));
+  upd();
+  alliftBuilt = true;
+  alliftRun().catch(() => {});
+}
+
+function alliftReadForm() {
+  const n = (id) => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) ? v : undefined; };
+  const snapshots = ALLIFT_DEFAULT.map((_, i) => { const o = {}; for (const [k] of ALLIFT_ED) o[k] = n('al-' + k + '-' + i); return o; });
+  const capexUsd = {}; for (const m of ALLIFT_M) capexUsd[m.k] = n('al-cap-' + m.k);
+  return {
+    snapshots, capexUsd, opexUsdPerBbl: n('al-opex'), udcLimitUsdPerBbl: n('al-limit'),
+    gates: {
+      naturalFlow: document.getElementById('al-natural')?.checked,
+      nearGasCompression: document.getElementById('al-gascomp')?.checked,
+      sourGasHigh: document.getElementById('al-sour')?.checked,
+    },
+  };
+}
+
+async function alliftRun() {
+  const r = await api('allift/select', alliftReadForm());
+  document.getElementById('oil-allift-result').textContent = r.recommendation
+    ? `Economical method: ${labelAllift(r.recommendation)} — UDC ${fmt(r.economics.byMethod[r.recommendation].udcUsdPerBbl, 2)} $/bbl (one-year cum ${fmt(r.cumBasis.oneYearCumStb, 0)} bbl).`
+    : 'No method passes both the technical and economic screens.';
+  alliftRenderInto(document.getElementById('oil-allift-output'), r);
+  applyOilRows();
+  mobileShowResults();
+}
+
+function alliftScale(t, d, r0, r1) {
+  if (t === 'log') { const l0 = Math.log10(d[0]), l1 = Math.log10(d[1]); return (v) => { const vv = Math.max(v, d[0] * 0.999); return r0 + (Math.log10(Math.max(vv, 1e-6)) - l0) / (l1 - l0) * (r1 - r0); }; }
+  return (v) => r0 + (v - d[0]) / (d[1] - d[0]) * (r1 - r0);
+}
+function alliftTicks(t, d) {
+  if (t === 'log') { const o = []; let x = Math.pow(10, Math.floor(Math.log10(d[0]))); while (x <= d[1] * 1.0001) { if (x >= d[0] * 0.999) o.push(x); x *= 10; } return o; }
+  const o = []; for (let i = 0; i <= 4; i++) o.push(d[0] + (d[1] - d[0]) * i / 4); return o;
+}
+const alliftTickLbl = (v) => (v >= 1000 ? v / 1000 + 'k' : '' + v);
+
+function alliftChartSVG(lv, r) {
+  const W = 320, H = 230, ml = 44, mr = 10, mt = 8, mb = 32, x0 = ml, x1 = W - mr, y0 = H - mb, y1 = mt;
+  const sx = alliftScale(lv.xt, lv.xd, x0, x1), sy = alliftScale(lv.yt, lv.yd, y0, y1);
+  const cx = (v, d) => Math.min(Math.max(v, d[0]), d[1]);
+  const P = (v) => ALLIFT_P.find((p) => p.k === v);
+  let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" role="img">`;
+  for (const tv of alliftTicks(lv.xt, lv.xd)) { const X = sx(tv); s += `<line x1="${X}" y1="${y1}" x2="${X}" y2="${y0}" stroke="#dce3e8" stroke-width="0.5"/><text x="${X}" y="${y0 + 13}" text-anchor="middle" font-size="9" fill="#8695a3" font-family="monospace">${alliftTickLbl(tv)}</text>`; }
+  for (const tv of alliftTicks(lv.yt, lv.yd)) { const Y = sy(tv); s += `<line x1="${x0}" y1="${Y}" x2="${x1}" y2="${Y}" stroke="#dce3e8" stroke-width="0.5"/><text x="${x0 - 4}" y="${Y + 3}" text-anchor="end" font-size="9" fill="#8695a3" font-family="monospace">${alliftTickLbl(tv)}</text>`; }
+  s += `<text x="${(x0 + x1) / 2}" y="${H - 3}" text-anchor="middle" font-size="9" fill="#5c6b7a" font-family="monospace">${P(lv.x).label} (${P(lv.x).u})</text>`;
+  s += `<text x="11" y="${(y0 + y1) / 2}" text-anchor="middle" font-size="9" fill="#5c6b7a" font-family="monospace" transform="rotate(-90 11 ${(y0 + y1) / 2})">${P(lv.y).label} (${P(lv.y).u})</text>`;
+  for (const m of ALLIFT_M) {
+    const b = r.limits.bands[m.k], bx = b[lv.x], by = b[lv.y];
+    const X1 = sx(cx(bx[0], lv.xd)), X2 = sx(cx(bx[1], lv.xd)), Y1 = sy(cx(by[1], lv.yd)), Y2 = sy(cx(by[0], lv.yd));
+    s += `<rect x="${Math.min(X1, X2)}" y="${Math.min(Y1, Y2)}" width="${Math.abs(X2 - X1)}" height="${Math.abs(Y2 - Y1)}" fill="${m.c}" fill-opacity="0.07" stroke="${m.c}" stroke-opacity="0.6" stroke-width="1" rx="2"/>`;
+  }
+  const pts = r.snapshots.map((p) => ({ x: sx(p[lv.x]), y: sy(p[lv.y]) }));
+  if (pts.length > 1) s += `<polyline points="${pts.map((p) => p.x + ',' + p.y).join(' ')}" fill="none" stroke="#16222e" stroke-width="1.6" stroke-opacity="0.85"/>`;
+  pts.forEach((p, i) => { s += `<circle cx="${p.x}" cy="${p.y}" r="${i === 0 ? 4 : 3}" fill="#16222e" stroke="#fff" stroke-width="1.3"/>`; });
+  return s + '</svg>';
+}
+
+function alliftRenderInto(el, r) {
+  if (!el) return;
+  const num0 = (v) => (v == null ? '—' : fmt(v, 0));
+  const PASS = 'background:#e2f0e8;color:#2f8f5b', FAIL = 'background:#f6e2df;color:#b4443a', PART = 'background:#f7edd8;color:#b07d16';
+  const pills = ALLIFT_M.map((m) => { const inSet = r.screen.technicallyApplicable.includes(m.k);
+    return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 9px;border-radius:999px;margin:0 6px 6px 0;${inSet ? 'background:#e2f0e8;color:#2f8f5b' : 'color:#8a97a2;text-decoration:line-through'}"><span style="width:8px;height:8px;border-radius:2px;background:${m.c}"></span>${m.label}</span>`;
+  }).join('');
+  let mtx = '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th>' +
+    ALLIFT_P.map((p) => `<th>${p.label}</th>`).join('') + '<th>Verdict</th></tr></thead><tbody>';
+  for (const m of ALLIFT_M) { const agg = r.screen.byMethod[m.k].paramAgg;
+    mtx += `<tr><td style="text-align:left;white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${m.c};margin-right:5px"></span>${m.label} <span class="note" style="margin:0;font-size:10px">${m.engine ? 'engine' : 'clipboard'}</span></td>`;
+    for (const p of ALLIFT_P) { const a = agg[p.k], st = a === 'pass' ? PASS : a === 'fail' ? FAIL : PART, g = a === 'pass' ? '✓' : a === 'fail' ? '✕' : '◐';
+      mtx += `<td><span style="display:inline-block;min-width:20px;padding:2px 4px;border-radius:4px;${st}">${g}</span></td>`; }
+    const inSet = r.screen.technicallyApplicable.includes(m.k);
+    mtx += `<td style="font-weight:700;color:${inSet ? '#2f8f5b' : '#b4443a'}">${inSet ? 'PASS' : 'out'}</td></tr>`;
+  }
+  mtx += '</tbody></table>';
+  const cum = r.cumBasis.oneYearCumStb;
+  let udc = `<div class="note" style="margin:0 0 6px">One-year cum oil (trapezoid of Initial/+6mo/+1yr) = ${num0(cum)} bbl · opex ${fmt(r.economics.opexUsdPerBbl, 0)} $/bbl · UDC limit ${fmt(r.economics.udcLimitUsdPerBbl, 0)} $/bbl</div>`;
+  udc += '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th><th>Applicable</th><th>Capex $</th><th>Cum bbl</th><th>UDC $/bbl</th><th>&le; limit</th><th>Rank</th></tr></thead><tbody>';
+  for (const m of ALLIFT_M) { const e = r.economics.byMethod[m.k]; if (!e) continue;
+    const isReco = r.recommendation === m.k, rank = r.economics.ranked.indexOf(m.k);
+    udc += `<tr style="${e.technicallyApplicable ? '' : 'opacity:.55'};${isReco ? 'background:#e7f3f6' : ''}"><td style="text-align:left">${labelAllift(m.k)}${isReco ? ' ◄ pick' : ''}</td>` +
+      `<td style="color:${e.technicallyApplicable ? '#2f8f5b' : '#b4443a'}">${e.technicallyApplicable ? '✓' : 'out'}</td>` +
+      `<td style="text-align:right">${num0(e.capexUsd)}</td><td style="text-align:right">${num0(e.cumStb)}</td>` +
+      `<td style="text-align:right">${e.udcUsdPerBbl == null ? '—' : fmt(e.udcUsdPerBbl, 2)}</td>` +
+      `<td>${e.udcUsdPerBbl == null ? 'n/a' : e.economicPass ? '✓' : '✕'}</td>` +
+      `<td>${e.technicallyApplicable && rank >= 0 ? '#' + (rank + 1) : '—'}</td></tr>`;
+  }
+  udc += '</tbody></table>';
+  const charts = ALLIFT_L.map((lv) => `<div style="flex:1 1 260px;min-width:240px"><div class="senshead">Level ${lv.level} · ${lv.title}</div>${alliftChartSVG(lv, r)}</div>`).join('');
+  const notes = [...(r.gateNotes || []).map((g) => g.text), ...(r.warnings || [])].map((t) => `<div class="note" style="margin:2px 0">• ${t}</div>`).join('');
+  el.innerHTML =
+    `<div class="senshead">Technically applicable across well life</div><div>${pills}</div>` +
+    `<div style="overflow-x:auto">${mtx}</div>` +
+    `<div class="senshead" style="margin-top:10px">Economic screen — UDC</div><div style="overflow-x:auto">${udc}</div>` +
+    (notes ? `<div style="margin-top:8px">${notes}</div>` : '') +
+    `<div class="senshead" style="margin-top:10px">Envelope charts — well design line vs method envelopes</div>` +
+    `<div style="display:flex;flex-wrap:wrap;gap:12px">${charts}</div>`;
+}
+
 document.getElementById('water-btn-gl').onclick = guard(waterGl);
 document.getElementById('oil-btn-solve').onclick = guard(oilSolve);
 document.getElementById('oil-btn-calibrate').onclick = guard(oilCalibrate);
@@ -3889,6 +4064,7 @@ document.getElementById('oil-btn-sens').onclick = guard(oilSens);
 document.getElementById('oil-btn-gl').onclick = guard(oilGl);
 document.getElementById('oil-btn-reserve').onclick = guard(oilReserveRun);
 document.getElementById('oil-btn-forecast').onclick = guard(oilForecastRun);
+document.getElementById('oil-btn-allift').onclick = guard(alliftRun);
 document.getElementById('oil-btn-espstages').onclick = guard(espStagesRun);
 document.getElementById('oil-btn-espsens').onclick = guard(espSensRun);
 document.querySelectorAll('input[name="oil-esptab"]').forEach((r) => (r.onchange = switchEspTab));
