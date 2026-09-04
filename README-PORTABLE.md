@@ -1,9 +1,33 @@
 # WellSim — standalone portable program
 
-**Build 1.6 — 4 September 2026**, from commit `8f226ec` of the main project.
+**Build 1.7 — 4 September 2026**, from commit `6c6a1f3` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 302
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Changes since build 1.5 (3 Sep):
+there. Changes since build 1.6 (4 Sep):
+
+- **A new Artificial Lift Selection module joins the Oil tab.** Alongside Well
+  model, Reserve and Forecast, a fourth choice — *Lift selection* — screens five
+  methods (ESP, gas lift, sucker rod, jet pump, PCP) for a well described at three
+  life snapshots (initial, +6 months, +1 year). Each snapshot's eight parameters —
+  the composite-Vogel gross rate, depth, GLR, wellhead pressure, water cut, GOR,
+  deviation and dog-leg — are tested against each method's envelope bands; a method
+  is applicable only if it clears every parameter across the whole life, and four
+  envelope charts draw the well's design line against every method's box. The
+  one-year cumulative oil (the trapezoid of the oil rate at the three snapshots)
+  then gives each method a UDC of capex/cum + opex, and the cheapest applicable
+  method under the UDC limit is named — reproducing the "Artificial Lift Method
+  Selection" workbook. It is a screening advisory: the bands are heuristic, not
+  physical limits, and the final choice stays with the analyst. On the demo well
+  it returns ESP + Gas Lift + Jet as applicable and Gas Lift as the economical pick
+  at 3.41 $/bbl.
+- **Its results fit any screen.** The pass/fail matrix, UDC table and four charts
+  lay out full-height on a desktop and collapse to a single column on a phone, the
+  wide matrix scrolling inside its own card rather than the page — checked at
+  1280 px and 375 px.
+- **The manual covers it** — Help gains an *Oil — Lift selection* section and a row
+  in the built-modules table.
+
+Changes in build 1.6 (4 Sep), kept for reference:
 
 - **An ESP well can now be forecast at all.** Selecting a pump used to make the
   forecast refuse to run, asking you to type a STOIIP N that the Reserve module
