@@ -3941,7 +3941,7 @@ function alliftEnsureForm() {
       ALLIFT_DEFAULT.map((s, i) => `<td><input id="al-${k}-${i}" type="number" step="any" value="${s[k]}" style="width:5.5em;text-align:right"></td>`).join('') + '</tr>';
   }
   h += '</tbody></table>';
-  h += '<div class="senshead">Estimated cost per method, $ (capex + hookup)</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px">';
+  h += '<div class="senshead">Estimated cost per method, $ (capex + hookup)</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:6px">';
   for (const m of ALLIFT_M) h += `<label style="display:flex;justify-content:space-between;gap:6px;align-items:center"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${m.c};margin-right:5px"></span>${m.label}</span><input id="al-cap-${m.k}" type="number" step="any" value="${ALLIFT_CAP[m.k]}" style="width:6.5em;text-align:right"></label>`;
   h += '</div>';
   h += '<div class="frow" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:8px"><label>Opex, $/bbl <input id="al-opex" type="number" step="any" value="3" style="width:5em;text-align:right"></label><label>UDC limit, $/bbl <input id="al-limit" type="number" step="any" value="11" style="width:5em;text-align:right"></label></div>';
@@ -4046,7 +4046,7 @@ function alliftRenderInto(el, r) {
       `<td>${e.technicallyApplicable && rank >= 0 ? '#' + (rank + 1) : '—'}</td></tr>`;
   }
   udc += '</tbody></table>';
-  const charts = ALLIFT_L.map((lv) => `<div style="flex:1 1 260px;min-width:240px"><div class="senshead">Level ${lv.level} · ${lv.title}</div>${alliftChartSVG(lv, r)}</div>`).join('');
+  const charts = ALLIFT_L.map((lv) => `<div style="min-width:0"><div class="senshead">Level ${lv.level} · ${lv.title}</div>${alliftChartSVG(lv, r)}</div>`).join('');
   const notes = [...(r.gateNotes || []).map((g) => g.text), ...(r.warnings || [])].map((t) => `<div class="note" style="margin:2px 0">• ${t}</div>`).join('');
   el.innerHTML =
     `<div class="senshead">Technically applicable across well life</div><div>${pills}</div>` +
@@ -4054,7 +4054,7 @@ function alliftRenderInto(el, r) {
     `<div class="senshead" style="margin-top:10px">Economic screen — UDC</div><div style="overflow-x:auto">${udc}</div>` +
     (notes ? `<div style="margin-top:8px">${notes}</div>` : '') +
     `<div class="senshead" style="margin-top:10px">Envelope charts — well design line vs method envelopes</div>` +
-    `<div style="display:flex;flex-wrap:wrap;gap:12px">${charts}</div>`;
+    `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px">${charts}</div>`;
 }
 
 document.getElementById('water-btn-gl').onclick = guard(waterGl);

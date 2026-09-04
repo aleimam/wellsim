@@ -163,6 +163,7 @@ pre.eq code { background: none; padding: 0; }
   <a href="#gas-reserve">Gas &mdash; reserve</a>
   <a href="#oil-forecast">Oil &mdash; forecast (Tarner | Walsh)</a>
   <a href="#gas-forecast">Gas &mdash; forecast</a>
+  <a href="#oil-allift">Oil &mdash; lift selection</a>
   <div class="tochead">Reference</div>
   <a href="#eq-const">Constants</a>
   <a href="#eq-oilpvt">Oil PVT</a>
@@ -202,6 +203,9 @@ pre.eq code { background: none; padding: 0; }
 <tr><td><b>3 &mdash; Forecast</b></td>
     <td class="ok">&check; Tarner &middot; Walsh generalized-MB (Rv) &mdash; saturation-tracking MB + nodal</td>
     <td class="ok">&check; p/Z tank + nodal, history overlay</td></tr>
+<tr><td><b>4 &mdash; Lift selection</b> (artificial lift)</td>
+    <td class="ok">&check; ESP / Gas lift / Sucker rod / Jet / PCP &mdash; life-of-well envelope screen + UDC economics</td>
+    <td>&mdash;</td></tr>
 </table></div>
 
 <p>Project-wide principles: <b>Darcy IPR is the default and dominant J</b> for both fluids (the test J calibrates a matched permeability at your judged skin); two pressure records (Pri immutable anchor, Pr working); <b>explicit physics only</b> &mdash; Brill &amp; Beggs Z everywhere, no goal-seek; well-head temperature always <em>calculated</em> (Ramey); gas impurities are inputs wherever gas properties appear.</p>
@@ -342,6 +346,12 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 <p>p/Z tank coupled to the nodal model, <b>chained off the end of history</b>: start date / start Gp / start Pres are grey input-or-calculated (last prod date, cumulative, minimum solved Pres). Defaults: step 30 d &middot; FTHP 300 psi &middot; plateau 12 MMscf/d &middot; abandonment 1 MMscf/d &middot; max 60 steps &middot; GIIP &amp; p&#7522;/Z&#7522; grey = from the reserve fit.</p>
 <div class="note"><b>Where GIIP comes from</b> &mdash; blank condensate SG = 141.5/(131.5+API) and MW = 42.43&middot;SG/(1.008&minus;SG) are reported on the reserve and forecast summaries and feed the gas-equivalent balance: GE = 133.01&middot;SG/MW Mscf/STB, condensate in Bscf = MMstb &times; GE, <b>Gp total = Gp + condensate equivalent, and the p/Z line is fitted on Gp total</b> on every route (the forecast depletes on the same basis, and its chart, start line and EUR are reported on Gp total); every reserve route (prod data, SITHP, reservoir limit, gauges) reports a condensate cumulative beside Gp &mdash; and a condensate rate where a row has one &mdash; without touching the p/Z fit; a grey <b>Forecast CGR</b> (blank = latest CGR in the prod table, override by typing) gives a condensate rate = q &times; CGR and a condensate cumulative that continues from the history, both as forecast-table columns; GIIP and pi/Zi chain off Reserve <b>selection 1 (prod data)</b>, the workbook&rsquo;s own chain. It does NOT follow the reserve selection currently shown: on the demo that is 182.26&nbsp;Bscf from prod data vs ~120&nbsp;Bscf from SITHP or the gauges. The field label and the result line both say so; type a value to override.</div>
 <p>Each step: Pr from the p/Z line (first step anchors on start Pres) &rarr; Darcy IPR at Pr &rarr; nodal operating point at forecast FTHP &rarr; q = min(op, plateau) &rarr; Gp advances. Terminates on abandonment / depletion / dead well / max steps, reporting EUR and recovery %. The chart overlays history + forecast on a calendar-date axis; the results table sits below it.</p>
+
+<h2 id="oil-allift"><span class="sect">Oil</span> &mdash; Lift selection (artificial lift)</h2>
+<p>A first-pass <b>screening advisory</b> that ranks five artificial-lift methods &mdash; <b>ESP &middot; Gas Lift &middot; Sucker Rod &middot; Jet Pump &middot; PCP</b> &mdash; for a well described at <b>three life snapshots</b> (Initial / +6 months / +1 year). It ports the &ldquo;Artificial Lift Method Selection&rdquo; workbook: a technical envelope screen, then a UDC economic screen, then the analyst&rsquo;s call. Reached from the Oil tab&rsquo;s <b>module selector</b> (Well model / Reserve / Forecast / Lift selection); it computes on open and re-runs on any edit.</p>
+<p><b>Technical screen (life-of-well).</b> Each snapshot&rsquo;s eight parameters &mdash; gross rate (composite-Vogel Q from Pwf/Pr/Pb/J), depth, GLR, WHP, water cut, GOR, deviation, dog-leg &mdash; are tested against each method&rsquo;s global Min&ndash;Max <b>envelope bands</b> (the workbook&rsquo;s <code>limits</code> sheet, version-stamped on every run). A method is <b>technically applicable</b> only when it passes every parameter at every snapshot; the matrix marks each cell pass / partial (passes at some snapshots) / fail, so a method that is fine now but marginal later stays visible. The four <b>envelope charts</b> plot the well&rsquo;s design line (the three snapshots) against every method&rsquo;s box, grouped as the workbook&rsquo;s four levels &mdash; L1 Depth+Rate, L2 WHP+GLR, L3 W.C+GOR, L4 Deviation+Dog-leg.</p>
+<p><b>Economic screen (UDC).</b> The one-year cumulative oil is the trapezoid of the oil rate (Q&middot;(1&minus;W.C)) at the three snapshots &mdash; the well&rsquo;s production, so the <b>same cumulative applies to every method</b>. Each method&rsquo;s <b>UDC = capex / cum-oil + opex</b> ($/bbl); the economical method is the cheapest that is both technically applicable and at or under the <b>UDC limit</b>. Capex is a per-method input; ESP and Gas Lift are engine-backed elsewhere in WellSim, the other three are marked &ldquo;clipboard&rdquo; (analyst figures). A per-method cumulative may be pasted to override the common one.</p>
+<div class="note"><b>Advisory, not a design.</b> Engineering-class screening: the bands are heuristic, not physical limits, and passing the screen does not guarantee a feasible detailed design &mdash; the final method is the analyst&rsquo;s (as in the workbook). Qgross reuses the same composite-Vogel IPR as the well model, so no physics is duplicated. Demo well: applicable ESP + Gas Lift + Jet, one-year cum 369,581 bbl, economical method <b>Gas Lift</b> at 3.41 $/bbl.</div>
 
 <hr class="sect">
 <h2 id="eq-const">Constants &amp; conversions</h2>
@@ -517,6 +527,7 @@ LIMIT: neither MB carries a water term &mdash; the Forecast W.C affects LIFT onl
   <li><b>Rounding artifacts preserved</b> where parity needs them: &pi; = 22/7 trajectory cosine; the <code>rouhgsc</code> artifact available as a test override.</li>
   <li><b>Oil-forecast PVT evaluation point</b>: Rs/Bo/Bg/&mu; are evaluated at the TRIAL pressure inside each step&rsquo;s solve, for both methods. The saved Tarner sheet froze PVT at initial values; the training material directs otherwise, and the Walsh Gp residual moves with pressure almost entirely through the PVT (Bg, Rs, Rv) &mdash; freezing it leaves no root.</li>
   <li><b>Walsh PVT table pressure</b>: the sheet reads its PVT table at the parallel TARNER sheet&rsquo;s pressures (a shared-table convenience of the workbook); WellSim reads it at Walsh&rsquo;s own solved pressure.</li>
+  <li><b>Lift-selection UDC term</b>: the workbook&rsquo;s <code>Cost&times;10&#8310;/CUM + Opex&times;CUM/CUM</code> carries a &times;CUM/CUM that is identically 1; WellSim drops it &mdash; UDC = capex/cum + opex.</li>
 </ol>
 
 <h2 id="trouble">Troubleshooting</h2>
