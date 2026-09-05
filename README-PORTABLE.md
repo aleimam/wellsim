@@ -1,9 +1,27 @@
 # WellSim — standalone portable program
 
-**Build 2.1 — 5 September 2026**, from commit `63adaa0` of the main project.
+**Build 2.2 — 5 September 2026**, from commit `8bba363` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 324
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Change since build 2.0 (5 Sep):
+there. Change since build 2.1 (5 Sep):
+
+- **Corrects the documentation shipped inside the package.** The copy of this
+  file inside `WellSim-2.1.zip` still described the executable as signed by
+  `CN=ThePWF WellSim`, with its private key "in the building user's
+  `CurrentUser\My` store". Both statements were wrong about the very binary
+  they shipped beside: 2.1 is signed by **CN=M. El-Ashry**, and the ThePWF key
+  had been deleted from that store. The notes were fixed in the repository
+  after 2.1 was packaged, so the zip kept the stale text.
+  **The program is byte-for-byte the same engine as 2.0 and 2.1** — no commit
+  since `0a9abcf` touches `src/`, `portable/` or `package.json`, so every
+  number this exe produces is identical. Only the packaged documentation
+  changed, and 2.1's zip hash was deliberately left alone rather than silently
+  re-cut under the same version number: a published hash that changes is worse
+  than a version number that moves.
+  **If you are holding 2.1, the exe is fine.** Read the code-signing section
+  below instead of the copy in your zip.
+
+Changes in build 2.1 (5 Sep), kept for reference:
 
 - **Signed as M. El-Ashry.** The publisher shown in the file's *Digital
   Signatures* tab is now `CN=M. El-Ashry`, where builds 1.3 through 2.0 read
