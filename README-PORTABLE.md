@@ -1,9 +1,48 @@
 # WellSim — standalone portable program
 
-**Build 1.8 — 5 September 2026**, from commit `56fab16` of the main project.
+**Build 1.9 — 5 September 2026**, from commit `eabcea1` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 321
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Changes since build 1.7 (4 Sep):
+there. Changes since build 1.8 (5 Sep):
+
+- **The lift-selection GLR is now calculated, not typed.** The GLR is gas per
+  barrel of TOTAL liquid while the GOR is gas per barrel of OIL, so one follows
+  from the other and the water cut — **GLR = GOR × (1 − W.C/100)** — and a typed
+  GLR could only ever contradict its own inputs. It now sits as a live grey row
+  beside Qgross and follows as you type. This is not a change of method: the
+  workbook's own figures are exactly this relationship (400 × 0.98 / 0.80 / 0.50
+  = 392 / 320 / 200 across the three snapshots), so deriving it reproduces the
+  sheet while removing a way to enter an inconsistent well.
+- **The well's own conditions can now rule a method out, and say why.** Three
+  checks that were advisory notes are now exclusions: **no gas compression
+  nearby** rules out **gas lift** (it has no source of injection gas — removable
+  by tying in compression); the well **still flowing naturally** rules out the
+  **sucker rod** (a rod pump belongs on a well that can no longer flow unaided);
+  and **high H2S/CO2** rules out the **sucker rod** (sour service attacks the rod
+  string by sulphide stress cracking, and the stuffing box).
+  These are not envelope bands — a method can clear every band and still be
+  undeployable on this well — so they are applied on top of the screen and stay
+  **distinguishable from it**. The verdict column now reads **PASS**, **out**
+  (outside its operating envelope) or **excluded** (clears the envelope, ruled
+  out by this well), the reasons print in a block under the matrix, and a method
+  gated only after clearing its bands is named again in the warnings. Nothing
+  disappears silently, because that gated case is usually the actionable one:
+  compression can be installed, where sour service cannot be typed away.
+- **Technical acceptance now comes first, and only survivors are costed.** A
+  method that fails the screen no longer gets a UDC row at all. It used to
+  appear greyed with an "out" flag beside the real candidates — and on the demo
+  well the **sucker rod is the cheapest of all five at 3.81 $/bbl**, so a reader
+  scanning the UDC column could land on the lowest number and miss the flag.
+  The economics now reads only what can actually be run, and the methods left
+  out are listed beneath it as *"not costed — technically rejected first"*,
+  naming which of the two reasons applied. On the demo, clearing the
+  gas-compression box moves the pick from Gas Lift (3.41) to the Jet pump
+  (3.79 $/bbl) and shows exactly why.
+- **The module has tests for the first time** — twelve, covering the GLR
+  identity (and that a typed GLR is ignored), the Vogel rates, the screen, the
+  economics and every gate.
+
+Changes in build 1.8 (5 Sep), kept for reference:
 
 - **The ESP gas separator can now be matched to a well test, instead of
   assumed.** Separator efficiency was an input pinned at 95 % — and because the
