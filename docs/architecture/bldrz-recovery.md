@@ -58,6 +58,20 @@ Each timestamped bundle contains:
 - `manifest.txt`: environment/version/coverage metadata; and
 - `SHA256SUMS`: transfer-integrity checks for those four files.
 
+The encrypted runtime configuration also includes `/etc/bldrz/oidc.env` when
+that file has been installed. The private recovery identity remains off-server.
+
+### Portal-schema recovery
+
+The 0005–0007 upgrade is qualified with
+`verify-bldrz-restore.sh SOURCE DUMP qualify-portals`. It preserves the recovered
+source, migrates only a second synthetic database, and verifies nonempty join
+requests, separate platform-administrator roles, published/draft help revisions
+and audit events after encrypted restoration. The generic data fingerprint
+covers every app table, including all five portal tables. A current-schema
+backup uses the default `restored-schema` mode, which detects portal schema and
+runs the same portal fixtures and recovery assertions automatically.
+
 Private spool directories are root-only. `flock` prevents overlapping jobs;
 partial output is not published, and failure cleans only its own temporary
 directory. A catalog preflight rejects unexpected privilege or migration

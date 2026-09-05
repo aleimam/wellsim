@@ -9,7 +9,7 @@ DECLARE
   portal_enabled boolean := false;
 BEGIN
   IF current_database() NOT IN ('bldrz', 'bldrz_restore_probe',
-      'bldrz_pool_probe', 'bldrz_restore_security') THEN
+      'bldrz_pool_probe', 'bldrz_restore_security', 'bldrz_portal_probe') THEN
     RAISE EXCEPTION 'unexpected recovery database';
   END IF;
   SELECT array_agg(version ORDER BY version) INTO versions FROM app.schema_migration;

@@ -13,7 +13,7 @@ SET LOCAL lock_timeout='5s';
 SET LOCAL statement_timeout='60s';
 DO $guard$
 BEGIN
-  IF current_database() NOT IN ('bldrz','bldrz_pool_probe','bldrz_onboarding_probe') OR
+  IF current_database() NOT IN ('bldrz','bldrz_pool_probe','bldrz_onboarding_probe','bldrz_portal_probe') OR
     (SELECT array_agg(version ORDER BY version) FROM app.schema_migration) IS DISTINCT FROM
       ARRAY['0001_platform_foundation','0002_tenant_isolation','0003_personal_workspace_integrity',
         '0004_verified_sessions','0005_controlled_onboarding']::text[] THEN

@@ -157,6 +157,15 @@ BEGIN
     RETURN result;
   ELSIF p_action='join.cancel' THEN
     target:=(p_input->>'requestId')::uuid;
+    PERFORM 1 FROM app.organization_join_request
+      WHERE id=target AND requester_user_id=actor AND status='pending' FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
+    -- Resource locks can wait across logout, expiry or identity changes.
+    PERFORM 1 FROM app.web_session s JOIN app.app_user u ON u.id=s.user_id
+      WHERE s.token_hash=p_hash AND s.user_id=actor AND u.status='active' AND s.revoked_at IS NULL
+        AND s.expires_at>clock_timestamp() AND s.idle_expires_at>clock_timestamp()
+        AND s.verified_email=lower(u.email) FOR SHARE OF s;
+    IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
     UPDATE app.organization_join_request SET status='cancelled',reviewed_at=statement_timestamp()
       WHERE id=target AND requester_user_id=actor AND status='pending' RETURNING workspace_id INTO p_workspace;
     IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
@@ -169,6 +178,11 @@ BEGIN
     IF NOT FOUND OR EXISTS (SELECT FROM app.membership m WHERE m.workspace_id=p_workspace AND m.user_id=actor) THEN
       RAISE EXCEPTION 'not available' USING ERRCODE='42501';
     END IF;
+    PERFORM 1 FROM app.web_session s JOIN app.app_user u ON u.id=s.user_id
+      WHERE s.token_hash=p_hash AND s.user_id=actor AND u.status='active' AND s.revoked_at IS NULL
+        AND s.expires_at>clock_timestamp() AND s.idle_expires_at>clock_timestamp()
+        AND s.verified_email=lower(u.email) FOR SHARE OF s;
+    IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
     IF EXISTS (SELECT FROM app.organization_join_request r WHERE r.workspace_id=p_workspace
       AND r.requester_user_id=actor AND r.status='pending') THEN
       RAISE EXCEPTION 'not available' USING ERRCODE='42501';
@@ -186,6 +200,19 @@ BEGIN
 
   -- Remaining actions are company-administrator operations.
   PERFORM 1 FROM app.workspace w WHERE w.id=p_workspace AND w.kind='organization' AND w.status='active' FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
+  -- Acquire a reviewed request's row before checking/locking its actor session.
+  -- Cancellation may hold that row, so assurance must not be checked earlier.
+  IF p_action='company.join.review' THEN
+    target:=(p_input->>'requestId')::uuid;
+    PERFORM 1 FROM app.organization_join_request
+      WHERE workspace_id=p_workspace AND id=target AND status='pending' FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
+  END IF;
+  PERFORM 1 FROM app.web_session s JOIN app.app_user u ON u.id=s.user_id
+    WHERE s.token_hash=p_hash AND s.user_id=actor AND u.status='active' AND s.revoked_at IS NULL
+      AND s.expires_at>clock_timestamp() AND s.idle_expires_at>clock_timestamp()
+      AND s.verified_email=lower(u.email) FOR SHARE OF s;
   IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
   SELECT m.role_key INTO actor_role FROM app.membership m JOIN app.app_user u ON u.id=m.user_id
     WHERE m.workspace_id=p_workspace AND m.user_id=actor AND m.status='active' AND u.status='active'
@@ -277,6 +304,21 @@ BEGIN
   IF slug_value IS NULL OR length(slug_value)>80 OR slug_value !~ '^[a-z0-9]+(-[a-z0-9]+)*$' THEN
     RAISE EXCEPTION 'invalid request' USING ERRCODE='22023';
   END IF;
+  IF p_action IN ('save','publish','unpublish') THEN
+    -- All writes use the same page lock order. Recheck authority and MFA only
+    -- after the advisory AND existing-page locks have both been acquired.
+    PERFORM pg_advisory_xact_lock(7007,hashtext(slug_value));
+    PERFORM 1 FROM app.help_page WHERE slug=slug_value FOR UPDATE;
+    PERFORM 1 FROM app.web_session s JOIN app.app_user u ON u.id=s.user_id
+      JOIN app.platform_administrator a ON a.user_id=u.id AND a.status='active'
+      WHERE s.token_hash=p_hash AND s.user_id=actor AND u.status='active' AND s.revoked_at IS NULL
+        AND s.expires_at>clock_timestamp() AND s.idle_expires_at>clock_timestamp()
+        AND s.verified_email=lower(u.email) FOR SHARE OF s,a;
+    IF NOT FOUND THEN RAISE EXCEPTION 'not available' USING ERRCODE='42501'; END IF;
+    IF NOT app.auth_session_has_recent_mfa(p_hash) THEN
+      RAISE EXCEPTION 'fresh MFA required' USING ERRCODE='PM001';
+    END IF;
+  END IF;
   IF p_action='get' THEN
     SELECT jsonb_build_object('slug',p.slug,'section',p.section_key,'sortOrder',p.sort_order,
       'title',d.title,'summary',d.summary,'bodyMarkdown',d.body_markdown,
@@ -294,7 +336,6 @@ BEGIN
       OR coalesce((p_input->>'sortOrder')::integer,-1) NOT BETWEEN 0 AND 10000 THEN
       RAISE EXCEPTION 'invalid request' USING ERRCODE='22023';
     END IF;
-    PERFORM pg_advisory_xact_lock(7007,hashtext(slug_value));
     INSERT INTO app.help_page(slug,section_key,sort_order) VALUES(slug_value,section_value,(p_input->>'sortOrder')::integer)
       ON CONFLICT(slug) DO UPDATE SET section_key=excluded.section_key,sort_order=excluded.sort_order,
         updated_at=statement_timestamp();

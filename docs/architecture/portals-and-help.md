@@ -1,6 +1,6 @@
 # Portals, join requests and help publishing
 
-Status: implemented locally on `codex/v2-foundation`; activation remains
+Status: implemented on `codex/v2-foundation`; activation remains
 default-off behind `WELLSIM_PORTAL_ENABLED=1` and requires verified
 authentication, controlled onboarding, migration `0007`, and the existing MFA
 release gates.
@@ -98,3 +98,31 @@ cancellation, Company A/Company B listing and review isolation, fixed Engineer
 approval, MFA gates, separate platform administration, immutable publication,
 and public/draft separation. Static-server tests cover every portal and help
 entry point plus strict CSP/no-store headers for private areas.
+
+## Native qualification and recovery
+
+`deploy/verify-bldrz-portals.sh SOURCE` upgrades an empty schema/reference
+clone from the exact live 0001–0005 baseline using
+`deploy/render-bldrz-portal-upgrade.sh`. Both migrations commit atomically.
+The runner refuses an existing `bldrz_portal_probe`, uses two restricted
+application pools, and drops only the probe it created. It never copies live
+identities or company records, and checks the live migration history afterwards.
+
+Nine native groups cover startup privileges, directory opt-in, cross-company
+isolation, duplicate approvals, cancellation versus approval, logout during a
+queued join request, separate platform authority, concurrent help revisions,
+logout during help editing, MFA expiry while waiting, and public/draft separation.
+The initial run reproduced a queued join write succeeding after logout.
+Migration 0007 was corrected before its first live application: resource locks
+now precede renewed session checks, and help writes recheck administrator status
+and fresh MFA after page locks. Session locks serialize the write with logout.
+
+`deploy/verify-bldrz-restore.sh SOURCE DUMP qualify-portals` qualifies the
+0005–0007 upgrade in a private socket-only cluster. Synthetic pending requests,
+platform roles, help revisions and publishing audit events undergo an encrypted
+round trip. All app-table fingerprints must match, then company isolation,
+identity/MFA and portal/publication behavior are exercised on the restored copy.
+Use `restored-schema` (the default) for backups already at schema 0007.
+
+These are database acceptance checks. Real Auth0 email verification, authenticator
+enrollment and the same-origin two-company browser pilot are still required.

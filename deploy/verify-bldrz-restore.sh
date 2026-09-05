@@ -7,7 +7,7 @@ test "$(id -u)" = 0
 APP_DIR=${1:?absolute qualified source directory required}
 DUMP=${2:?absolute decrypted dump path required}
 MODE=${3:-restored-schema}
-case "$MODE" in restored-schema|qualify-onboarding|qualify-mfa) ;; *) echo 'Invalid drill mode' >&2; exit 1 ;; esac
+case "$MODE" in restored-schema|qualify-onboarding|qualify-mfa|qualify-portals) ;; *) echo 'Invalid drill mode' >&2; exit 1 ;; esac
 test -f "$DUMP"
 PG_BIN=/usr/lib/postgresql/16/bin
 AGE_DIR=/opt/bldrz/tools/age-v1.3.2/age
@@ -73,11 +73,19 @@ if [ "$MODE" = qualify-mfa ]; then
   bash "$APP_DIR/deploy/render-bldrz-mfa.sh" "$APP_DIR" | psql_drill -d bldrz_pool_probe
   psql_drill -d bldrz_pool_probe < "$APP_DIR/db/ops/verify-bldrz-catalog.sql"
 fi
+if [ "$MODE" = qualify-portals ]; then
+  bash "$APP_DIR/deploy/render-bldrz-portal-upgrade.sh" "$APP_DIR" | psql_drill -d bldrz_pool_probe
+  psql_drill -d bldrz_pool_probe < "$APP_DIR/db/ops/verify-bldrz-catalog.sql"
+fi
 psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/pool-probe.sql"
 psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/recovery-probe.sql"
 IDENTITY=$(psql_drill -At -d bldrz_pool_probe -c "SELECT EXISTS (SELECT FROM app.schema_migration WHERE version='0005_controlled_onboarding')")
 if [ "$IDENTITY" = t ]; then
   psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/recovery-identity.sql"
+fi
+PORTAL=$(psql_drill -At -d bldrz_pool_probe -c "SELECT EXISTS (SELECT FROM app.schema_migration WHERE version='0007_portals_help_and_join_requests')")
+if [ "$PORTAL" = t ]; then
+  psql_drill -d bldrz_pool_probe < "$APP_DIR/db/fixtures/recovery-portals.sql"
 fi
 BEFORE=$(fingerprint bldrz_pool_probe)
 # This disposable key protects SYNTHETIC test data only, and is removed with
@@ -96,5 +104,8 @@ psql_drill -d bldrz_restore_security < "$APP_DIR/db/ops/verify-bldrz-catalog.sql
 psql_drill -d bldrz_restore_security < "$APP_DIR/db/ops/verify-bldrz-recovery.sql"
 if [ "$IDENTITY" = t ]; then
   psql_drill -d bldrz_restore_security < "$APP_DIR/db/ops/verify-bldrz-identity-recovery.sql"
+fi
+if [ "$PORTAL" = t ]; then
+  psql_drill -d bldrz_restore_security < "$APP_DIR/db/ops/verify-bldrz-portal-recovery.sql"
 fi
 printf 'BLDRZ_RESTORE_DRILL_OK\n'

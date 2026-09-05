@@ -34,8 +34,11 @@ trap cleanup EXIT
 # database dump is written on the source server.
 admin pg_dump --format=custom --compress=6 --dbname=bldrz |
   "$AGE" --encrypt -R "$RECIPIENT" -o "$WORK/database.dump.age"
-tar -cf - -C / etc/bldrz/postgresql.env etc/bldrz/backup-recipient.txt \
-  etc/systemd/system/bldrz.service opt/bldrz/DEPLOYED_REVISION |
+CONFIG_FILES=(etc/bldrz/postgresql.env etc/bldrz/backup-recipient.txt
+  etc/systemd/system/bldrz.service opt/bldrz/DEPLOYED_REVISION)
+# Once configured, confidential OIDC settings belong in encrypted recovery too.
+if [ -f /etc/bldrz/oidc.env ]; then CONFIG_FILES+=(etc/bldrz/oidc.env); fi
+tar -cf - -C / "${CONFIG_FILES[@]}" |
   "$AGE" --encrypt -R "$RECIPIENT" -o "$WORK/recovery-config.tar.age"
 install -m 600 "$APP_DIR/db/ops/bldrz-recovery-roles.sql" "$WORK/roles.sql"
 {
