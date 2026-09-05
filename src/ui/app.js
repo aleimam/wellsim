@@ -3434,45 +3434,6 @@ function saveCaseAs() {
   }
 }
 
-function syncExportFormat() {
-  const format = globalThis.WellSimExport?.formats.find(
-    (candidate) => candidate.id === document.getElementById('export-format').value
-  );
-  document.getElementById('export-note').textContent = format?.description ?? '';
-}
-
-function initExportPanel() {
-  const select = document.getElementById('export-format');
-  const formats = globalThis.WellSimExport?.formatsFor('case') ?? [];
-  select.innerHTML = formats.map((format) => `<option value="${format.id}">${format.label}</option>`).join('');
-  syncExportFormat();
-}
-
-function toggleExportPanel(force) {
-  const panel = document.getElementById('export-panel');
-  const show = force ?? panel.style.display === 'none';
-  panel.style.display = show ? '' : 'none';
-  if (show) {
-    document.getElementById('acct-panel').style.display = 'none';
-    const name = document.getElementById('export-name');
-    if (!name.value.trim() || name.value === 'wellsim-case') name.value = `wellsim-${collectCase().activeTab}-case`;
-  }
-}
-
-function exportCurrentCase() {
-  try {
-    const artifact = caseExportArtifact(
-      document.getElementById('export-format').value,
-      document.getElementById('export-name').value
-    );
-    downloadArtifact(artifact);
-    toggleExportPanel(false);
-    showOk(`Downloaded ${artifact.filename}`);
-  } catch (e) {
-    showError(`could not export case: ${e.message}`);
-  }
-}
-
 function openCaseFile(file) {
   const rd = new FileReader();
   rd.onload = () => {
@@ -3884,11 +3845,6 @@ document.getElementById('mb-inputs').onclick = () => setMobileView('inputs');
 document.getElementById('mb-results').onclick = () => setMobileView('results');
 document.getElementById('save-case').onclick = (e) => { e.preventDefault(); saveCaseAs(); };
 document.getElementById('open-case').onclick = (e) => { e.preventDefault(); document.getElementById('open-case-file').click(); };
-document.getElementById('export-link').onclick = (e) => { e.preventDefault(); toggleExportPanel(); };
-document.getElementById('export-format').onchange = syncExportFormat;
-document.getElementById('export-download').onclick = exportCurrentCase;
-document.getElementById('export-close').onclick = () => toggleExportPanel(false);
-initExportPanel();
 document.getElementById('open-case-file').onchange = (e) => {
   if (e.target.files?.[0]) openCaseFile(e.target.files[0]);
   e.target.value = '';
@@ -3896,7 +3852,6 @@ document.getElementById('open-case-file').onchange = (e) => {
 document.getElementById('acct-link').onclick = (e) => {
   e.preventDefault();
   if (!acctCapabilities.enabled) return;
-  toggleExportPanel(false);
   const p = document.getElementById('acct-panel');
   p.style.display = p.style.display === 'none' ? '' : 'none';
   if (p.style.display !== 'none' && acct) acctRefresh();

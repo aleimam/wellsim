@@ -74,14 +74,11 @@ docs/                 user-guide.md, equations.md, deploy.md
 ## The website
 
 The header bar carries the three well tabs (**Oil | Water | Gas**) plus
-**Save as · Open · Export · Print / PDF · Help**. A server-case link appears only
+**Save as · Open · Print / PDF · Help**. A server-case link appears only
 when a supported case store reports itself available:
 
 - **Save as / Open** — the whole case (every input, selection and production
   table across all tabs) to/from a JSON file.
-- **Export** — download the current case as restorable WellSim JSON or its
-  inputs and production rows as spreadsheet-ready CSV. The CSV is
-  human-readable and is not a restorable case.
 - **Print / PDF** — results-only clean page (charts, tables, summaries);
   "Save as PDF" in the browser dialog makes the shareable report.
 - **Server cases** — the old JSON company store is disabled by default because
@@ -89,7 +86,7 @@ when a supported case store reports itself available:
   an invite-gated migration aid; it is not the future tenant model. The
   portable program still exposes its local case folder through this link.
 - **Visitor use stays complete** — every calculation, browser autosave, Save as,
-  Open, Export and Print/PDF workflow works without an account.
+  Open and Print/PDF workflow works without an account.
 - **Help** — the full in-app manual at `/help.html` (user guide + every
   equation, constant and workbook deviation).
 

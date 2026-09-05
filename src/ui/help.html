@@ -147,7 +147,6 @@ pre.eq code { background: none; padding: 0; }
   <span class="brand">WellSim</span>
   <span class="sub">Manual &middot; user guide &amp; equations reference</span>
   <a class="back" href="/">&larr; Open the app</a>
-  <a class="back" id="contact-link" href="mailto:muhamad.elashry@gmail.com?subject=WellSim">Contact me</a>
 </div>
 <div class="wrap">
 <nav class="toc" aria-label="Contents">
@@ -230,12 +229,11 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
   <li><b>There is no current-rate input.</b> The well model SOLVES for the rate &mdash; the operating point is the IPR/VLP intersection &mdash; so a typed rate would either be ignored or quietly contradict the answer. Rates are entered only where they are genuine data: the calibration <b>test rate</b>, the prod-data table, and the ESP/gas-lift matches.</li>
   <li><b>Production tables</b> accept clipboard paste (button or Ctrl+V in a cell); column order <code>Date, FTHP, rate, CGR|GOR, WGR|WC, Pwf</code>; header lines auto-skip; up to 200 rows.</li>
   <li><b>Dates</b>: <code>17-Nov-14</code>, <code>17-Nov-2014 13:00:00</code>, <code>05/03/2014 06:30</code>, ISO, or a day serial. Impossible dates are rejected with the row number &mdash; nothing silently rolls over. dt = days from the first row; time-of-day honoured.</li>
-  <li><b>Header bar</b>: the Oil Well | Water Well | Gas Well tabs, then <b>Save as</b> &middot; <b>Open</b> &middot; <b>Export</b> &middot; <b>Print / PDF</b> &middot; <b>Help</b>. A server-case link appears only when the deployment reports a supported case store.</li>
+  <li><b>Header bar</b>: the Oil Well | Water Well | Gas Well tabs, then <b>Save as</b> &middot; <b>Open</b> &middot; <b>Print / PDF</b> &middot; <b>Help</b>. A server-case link appears only when the deployment reports a supported case store.</li>
   <li><b>Save as / Open</b>: the whole case &mdash; every input, selection and production table across all three tabs &mdash; saves to a JSON file and restores in one click; program-filled grey cells stay program-filled.</li>
-  <li><b>Export</b>: downloads either a complete, restorable WellSim JSON case or spreadsheet-ready CSV containing case metadata, labelled inputs, units, selections and production rows. CSV is for analysis and is not a restorable case.</li>
   <li><b>Print / PDF</b>: prints the results only &mdash; charts, tables, summary cards and banners on a clean white page (inputs, navigation and buttons hide); use the browser dialog&rsquo;s &ldquo;Save as PDF&rdquo; for a shareable report.</li>
   <li><b>Server cases:</b> the legacy JSON company store is disabled by default while the secure organization/membership store is built. A typed company name is not proof of membership. When explicitly enabled for controlled migration, registration is invite-only. The portable program uses the same panel for its local <code>cases/</code> folder.</li>
-  <li><b>Visitor use stays complete:</b> every calculation, browser autosave, Save as, Open, Export and Print/PDF workflow works without an account.</li>
+  <li><b>Visitor use stays complete:</b> every calculation, browser autosave, Save as, Open and Print/PDF workflow works without an account.</li>
   <li><b>Mobile</b>: below 640&nbsp;px the layout stacks and the action button stays pinned.</li>
 </ul>
 
