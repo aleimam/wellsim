@@ -325,12 +325,30 @@ runs the same 324 tests against this copy.
 ## Code signing
 
 `WellSim.exe` is Authenticode-signed with the self-signed certificate
-**CN=ThePWF WellSim** (SHA-256, DigiCert-timestamped, valid to 2029; the
-build script re-signs automatically after every rebuild — the private key
-lives in the building user's `CurrentUser\My` store).
+**CN=M. El-Ashry** (SHA-256, DigiCert-timestamped, valid to 2031, thumbprint
+`78974137A5BE991462A896EBF7FB25F17DC6FDC6`) from build **2.1** onward. The
+build script re-signs automatically after every rebuild; the private key lives
+in the building user's `CurrentUser\My` store and is backed up
+password-protected at `F:\key\M-ElAshry-CodeSigning.pfx`.
 
-**Company machines** — to make the signature show as fully trusted, install
-`ThePWF-CodeSigning.cer` (in this folder) on each machine: double-click →
+> **Builds 1.3 – 2.0 were signed by CN=ThePWF WellSim, O=ThePWF** (thumbprint
+> `EB639FB356A4603BE341FFC7D4569EC09CE3E58B`, valid to 2029).
+> **That certificate and its private key were deleted from the build machine on
+> 5 September 2026, and the private key was never exported.** It is gone
+> permanently: no further binary can ever be signed as ThePWF WellSim, and
+> 1.3 – 2.0 cannot be re-signed under their original publisher. Do not go
+> looking for it.
+>
+> Those eight releases are unaffected. Their signatures are embedded and
+> timestamped, so they keep verifying and keep naming their signer. Only the
+> *public* certificate is needed to check them, and it is kept in
+> `ThePWF-CodeSigning.cer` — shipped in the 2.0 and 2.1 folders, inside the 2.1
+> zip, and in `F:\key`. **Do not delete that file**; it contains no secret and
+> it is the half that verification needs.
+
+**Company machines** — to make the signature show as fully trusted, install the
+matching `.cer` (`M-ElAshry-CodeSigning.cer` for 2.1+, `ThePWF-CodeSigning.cer`
+for 1.3 – 2.0) on each machine: double-click →
 *Install Certificate* → Local Machine → *Place all certificates in the
 following store* → **Trusted Root Certification Authorities** (and optionally
 also into **Trusted Publishers** to suppress publisher prompts). This is an
