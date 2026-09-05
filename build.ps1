@@ -9,12 +9,21 @@ Copy-Item "C:\Program Files\nodejs\node.exe" build\WellSim.exe -Force
 & node_modules\.bin\postject.cmd build\WellSim.exe NODE_SEA_BLOB build\sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
 # strip node.exe's stale signature pointer, then code-sign
 node portable\strip-signature.js build\WellSim.exe
-$cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Where-Object { $_.Subject -like "*ThePWF WellSim*" } | Select-Object -First 1
+# Signer preference: the publisher name that lands in the Digital Signatures
+# tab. M. El-Ashry from build 2.1 on; ThePWF WellSim signed 1.3-2.0 and stays
+# as a fallback so an older checkout still builds. BOTH ARE SELF-SIGNED, so
+# neither removes the SmartScreen warning - only a CA-issued cert does that.
+$signerPreference = @('CN=M. El-Ashry', 'CN=ThePWF WellSim, O=ThePWF')
+$cert = $null
+foreach ($subject in $signerPreference) {
+  $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Where-Object { $_.Subject -eq $subject } | Select-Object -First 1
+  if ($cert) { break }
+}
 if ($cert) {
   $s = Set-AuthenticodeSignature -FilePath build\WellSim.exe -Certificate $cert -TimestampServer "http://timestamp.digicert.com" -HashAlgorithm SHA256
   "signed with " + $cert.Subject + " (" + $s.Status + ")"
 } else {
-  "WARNING: no 'ThePWF WellSim' code-signing cert in CurrentUser\My - exe left unsigned"
+  "WARNING: none of these code-signing certs is in CurrentUser\My - exe left UNSIGNED: " + ($signerPreference -join '; ')
 }
 Copy-Item build\WellSim.exe .\WellSim.exe -Force
 "Built: " + (Get-Item WellSim.exe).FullName + " (" + [math]::Round((Get-Item WellSim.exe).Length / 1MB, 1) + " MB)"

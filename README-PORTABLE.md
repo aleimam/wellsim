@@ -1,9 +1,38 @@
 # WellSim — standalone portable program
 
-**Build 2.0 — 5 September 2026**, from commit `0a9abcf` of the main project.
+**Build 2.1 — 5 September 2026**, from commit `63adaa0` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 324
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Changes since build 1.9 (5 Sep):
+there. Change since build 2.0 (5 Sep):
+
+- **Signed as M. El-Ashry.** The publisher shown in the file's *Digital
+  Signatures* tab is now `CN=M. El-Ashry`, where builds 1.3 through 2.0 read
+  `CN=ThePWF WellSim, O=ThePWF`. **The program itself is unchanged** — 2.1 was
+  built from the same code as 2.0 (the only commits between them touch
+  documentation), so every number this exe produces is identical. Only the
+  signature differs, which is why it carries its own version and its own
+  SHA256: a differently signed binary is a different file, and a release
+  number that did not move would make the two indistinguishable in a manifest.
+- **Read this before you rely on the signature.** The certificate is
+  **self-signed** — not issued by a public certificate authority — so Windows
+  SmartScreen will still warn on first run, exactly as it did for 2.0. The
+  signature proves the file has not been altered since it was signed and
+  identifies who signed it; it does **not** buy the reputation that removes the
+  warning. Only a purchased, identity-vetted CA certificate does that.
+
+  **What "Status: Valid" actually means here.** Every release note from 1.3 to
+  2.0 recorded the signature as *"status Valid"*. That was true only on the
+  build workstation, because the signing certificate had been added to that
+  machine's trusted-root store. On any other computer the same files report
+  *"a certificate chain … terminated in a root certificate which is not
+  trusted"*. Nothing was wrong with those releases — the claim was simply
+  describing one PC rather than the release. `Get-AuthenticodeSignature` will
+  report **Valid** on a machine that trusts `M-ElAshry-CodeSigning.cer` and
+  **UnknownError** on one that does not, for the same, unaltered file. To
+  check a copy anywhere, compare the SHA256 in `WellSim-2.1.sha256.txt` and
+  the certificate thumbprint; those do not depend on the local trust store.
+
+Changes in build 2.0 (5 Sep), kept for reference:
 
 - **Sour gas now rules the PCP out as well as the sucker rod.** Ticking
   **High H2S/CO2** excludes the progressing-cavity pump with its own reason:
