@@ -38,6 +38,7 @@ import {
   espSolveDp,
   matchStages,
   matchWearAndPi,
+  matchSepEff,
   thrustStatus,
   espSolutionPoint,
 } from '../core/vlp/esp.js';
@@ -1850,6 +1851,43 @@ export function oilEspWear(f) {
   }
 }
 
+// Separator-efficiency match — the wear match's sibling. Same measured
+// Pint/Pdis, same test rate; the wear input is HELD and the separator
+// efficiency is solved (one measured dP fixes one unknown). A Pwf measured at
+// the perfs (the optional test Pwf) anchors PI and turns the back-march into a
+// consistency check. The UI writes the matched efficiency back to the
+// separator input so every downstream run uses it.
+export function oilEspSepEff(f) {
+  const cfg = buildOilCfg(f);
+  const pb = oilPb(f, cfg);
+  const ipr = buildOilIpr(f, cfg, pb);
+  const bp = buildEspPump(f);
+  if (bp.error) return bp;
+  if (!bp.pump) return { error: 'select a pump first' };
+  const pint = num(f.espMeasPintPsi);
+  const pdis = num(f.espMeasPdisPsi);
+  if (pint == null || pdis == null) return { error: 'enter the measured Pint AND Pdis' };
+  if (!(pdis > pint)) return { error: 'measured Pdis must exceed Pint' };
+  const opts = espOpts(f);
+  try {
+    const m = matchSepEff(cfg, ipr, bp.pump, {
+      stages: opts.stages,
+      freqHz: opts.freqHz,
+      wearFactor: opts.wearFactor, // HELD at the wear input (0 = new pump)
+      measPintPsi: pint,
+      measPdisPsi: pdis,
+      qOilStbD: num(f.testQOilStbD),
+      testPwfPsi: num(f.testPwfPsi) ?? null, // measured at the perfs, optional
+    });
+    const pvt = oilPvtBundle(cfg, pb);
+    const darcy = oilDarcyAtPr(f, pvt, ipr.prPsi);
+    const matchedPermMd = permFromJOil({ ...darcy, permMd: undefined, j: m.jMatched });
+    return { ...m, matchedPermMd, prPsi: ipr.prPsi, pbPsi: pb };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 export function skinGuidance() {
   return { guidance: SKIN_GUIDANCE };
 }
@@ -1954,6 +1992,7 @@ export const handlers = {
   'oil/espstages': oilEspStages,
   'oil/espsens': oilEspSens,
   'oil/espwear': oilEspWear,
+  'oil/espsepeff': oilEspSepEff,
   'gas/nodal': gasNodal,
   'gas/calibrate': gasCalibrate,
   'gas/sensitivity': gasSensitivity,

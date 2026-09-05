@@ -1845,7 +1845,7 @@ function applyOilRows() {
   // the gas-lift row is shared with the ESP pump curve: it belongs to those
   // two lifts, and must be SHOWN again when one of them comes back
   set('oil-cr-gl', well && !espView && lift !== 'natural');
-  if (!well || espView || lift !== 'esp') set('oil-cr-esptrav', false);
+  if (!well || espView || lift !== 'esp') { set('oil-cr-esptrav', false); set('oil-cr-espsep', false); }
   if (!well || lift !== 'esp') {
     set('oil-cr-senspump', false);
     set('oil-cr-senstrav', false);
@@ -2463,6 +2463,59 @@ async function espWearRun() {
     `\u0394P actual = ${fmt(r.dpMeasPsi, 1)} psi vs theoretical ${fmt(r.dpTheoPsi, 1)} \u2192 wear = ${fmt(r.wearFactor, 4)} (applied to the wear input).\n` +
     `QC only \u2014 implied PI at constant Pres ${fmt(r.prPsi, 0)} psi = ${fmt(r.jMatched, 4)} bbl/d/psi (K ${fmt(r.matchedPermMd, 2)} mD); NOT applied.`;
   document.getElementById('oil-espWearFactor').value = r.wearFactor.toFixed(4);
+}
+// separator-efficiency match: the wear match's sibling — same measured
+// Pint/Pdis, wear HELD at its input, separator efficiency solved. On success
+// the matched efficiency is written back to the separator input so every
+// downstream run uses it. The chart is the eta-sweep: pump dP vs separation,
+// the measured dP as a dashed line, the gas-locked band shaded.
+async function espSepEffRun() {
+  const r = await api('oil/espsepeff', oilForm());
+  const el = document.getElementById('oil-esp-result');
+  const head = `Separator-efficiency match from actual Pint/Pdis (wear held at ${fmt(r.wearHeld, 3)}):\n`;
+  if (r.status === 'ok') {
+    el.textContent =
+      head +
+      `ΔP actual = ${fmt(r.dpMeasPsi, 1)} psi → separator efficiency = ${fmt(r.sepEffPct, 2)} % (applied to the separator input).\n` +
+      `Free gas at intake ${fmt(r.freeGasPct, 1)} % → ${fmt(r.freeGasPctSep, 2)} % after separation` +
+      (r.intakeAbovePb ? ` (intake above Pb — no true free gas; the sensitivity is the workbook's vapour accounting).\n` : `.\n`) +
+      (r.gasLockBelowPct != null
+        ? `Gas-locked below ${fmt(r.gasLockBelowPct, 1)} % separation${r.nearGasLock ? ' — the match sits close to that threshold' : ''}.\n`
+        : '') +
+      (r.pwfCheckPsi != null
+        ? `Pwf check: back-march from Pint gives ${fmt(r.pwfBackPsi, 0)} psi vs measured ${fmt(r.testPwfPsi, 0)} psi (Δ ${fmt(r.pwfCheckPsi, 0)} psi).\n`
+        : '') +
+      `QC only — implied PI at constant Pres ${fmt(r.prPsi, 0)} psi = ${fmt(r.jMatched, 4)} bbl/d/psi (K ${fmt(r.matchedPermMd, 2)} mD); NOT applied.`;
+    document.getElementById('oil-espSepEffPct').value = r.sepEffPct.toFixed(2);
+  } else {
+    el.textContent = head + r.diagnosis;
+  }
+  const xs = r.sweep.map((p) => p.sepEffPct);
+  const ys = r.sweep.map((p) => p.dpPsi);
+  const shapes = [];
+  if (r.gasLockBelowPct != null && r.gasLockBelowPct > 0)
+    shapes.push({ type: 'rect', xref: 'x', yref: 'paper', x0: 0, x1: r.gasLockBelowPct, y0: 0, y1: 1, fillcolor: '#C2540B', opacity: 0.08, line: { width: 0 } });
+  shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: r.dpMeasPsi, y1: r.dpMeasPsi, line: { color: '#2C7048', width: 2, dash: 'dash' } });
+  const traces = [{ x: xs, y: ys, name: 'ΔP model', mode: 'lines+markers', line: { color: '#00636D', width: 3 } }];
+  if (r.status === 'ok')
+    traces.push({ x: [r.sepEffPct], y: [r.dpMeasPsi], name: 'match', mode: 'markers', marker: { color: '#2C7048', size: 12, symbol: 'star' } });
+  plot('oil-chart-espsep', traces, {
+    ...LAYOUT(),
+    title: 'Separator efficiency — pump ΔP vs separation (dashed = measured)',
+    xaxis: { title: 'Separator efficiency, %', range: [0, 100] },
+    yaxis: { title: 'ΔP across pump, psi', rangemode: 'tozero' },
+    shapes,
+  });
+  renderTables('oil-table-espsep', [
+    {
+      title: 'Separator sweep',
+      headers: ['η %', 'ΔP psi', 'Qgross@pump bpd', 'free gas %'],
+      rows: r.sweep.map((p) => [p.sepEffPct, fmt(p.dpPsi, 0), fmt(p.qGrossPumpBpd, 0), fmt(p.freeGasPctSep, 2)]),
+    },
+  ]);
+  document.getElementById('oil-cr-espsep').style.display = '';
+  resizeVisibleCharts();
+  mobileShowResults();
 }
 const waterSolve = () => (waterWellType() === 'injector' ? waterInjSolve() : liquidSolve(WATER_CTX));
 
@@ -4069,6 +4122,7 @@ document.getElementById('oil-btn-espstages').onclick = guard(espStagesRun);
 document.getElementById('oil-btn-espsens').onclick = guard(espSensRun);
 document.querySelectorAll('input[name="oil-esptab"]').forEach((r) => (r.onchange = switchEspTab));
 document.getElementById('oil-btn-espwear').onclick = guard(espWearRun);
+document.getElementById('oil-btn-espsep').onclick = guard(espSepEffRun);
 document.getElementById('gas-btn-solve').onclick = guard(gasSolve);
 document.getElementById('gas-btn-calibrate').onclick = guard(gasCalibrate);
 document.getElementById('gas-btn-sens').onclick = guard(gasSens);

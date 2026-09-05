@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="WellSim" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   <!-- the ?v= stamp busts the browser cache — bump it on every UI deploy -->
-  <link rel="stylesheet" href="/style.css?v=2026-09-04e" />
+  <link rel="stylesheet" href="/style.css?v=2026-09-04f" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body class="view-inputs">
@@ -144,7 +144,9 @@
             <div id="oil-esp-manual" style="display:none"><div id="oil-esp-manual-fields"></div></div>
             <div id="oil-esp-matchrow" style="display:none">
               <button id="oil-btn-espstages" class="action secondary">Match stages (new pump, wear 0)</button>
-              <button id="oil-btn-espwear" class="action secondary">Match wear (actual Pint/Pdis)</button>
+              <button id="oil-btn-espwear" class="action secondary">Match wear (actual Pint/Pdis &mdash; separator &eta; held)</button>
+              <button id="oil-btn-espsep" class="action secondary">Match separator efficiency (actual Pint/Pdis &mdash; wear held)</button>
+              <div class="note">One measured &Delta;P fixes one unknown: match wear with the separator efficiency held at its input, or match the separator efficiency with wear held at its input (0 = new pump) &mdash; never both from the same test. The optional test Pwf (at the perfs) anchors PI and checks the back-march.</div>
               <div class="senshead">ESP view (one active)</div>
               <label class="radio"><input type="radio" name="oil-esptab" value="match" checked /> Model match</label>
               <label class="radio"><input type="radio" name="oil-esptab" value="sens" /> Sensitivity</label>
@@ -250,6 +252,7 @@
         <div class="chartrow stack" id="oil-cr-fc" style="display:none"><div id="oil-chart-fc" class="chart"></div><div id="oil-table-fc" class="datatable"></div></div>
         <div class="chartrow stack" id="oil-cr-espsens" style="display:none"><div id="oil-chart-espsens" class="chart"></div><div id="oil-table-espsens" class="datatable"></div></div>
         <div class="chartrow" id="oil-cr-esptrav" style="display:none"><div id="oil-chart-esptrav" class="chart"></div><div id="oil-table-esptrav" class="datatable"></div></div>
+        <div class="chartrow" id="oil-cr-espsep" style="display:none"><div id="oil-chart-espsep" class="chart"></div><div id="oil-table-espsep" class="datatable"></div></div>
         <div class="chartrow stack" id="oil-cr-allift" style="display:none"><div id="oil-allift-output" style="width:100%;min-width:0"></div></div>
       </div>
     </section>
@@ -461,7 +464,7 @@
     <button id="mb-results" type="button">Results</button>
   </nav>
   <div id="error-bar" style="display:none"></div>
-  <script src="/export.js?v=2026-09-04e"></script>
-  <script src="/app.js?v=2026-09-04e"></script>
+  <script src="/export.js?v=2026-09-04f"></script>
+  <script src="/app.js?v=2026-09-04f"></script>
 </body>
 </html>

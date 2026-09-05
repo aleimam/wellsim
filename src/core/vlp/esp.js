@@ -413,3 +413,113 @@ export function matchWearAndPi(cfg, ipr, pump, {
   });
   return { wearFactor, dpMeasPsi: dpMeas, dpTheoPsi: dpTheo, pwfTargetPsi: pwfTarget, jMatched, freeGasPct: state.freeGasPct };
 }
+
+/**
+ * Separator-efficiency match from a measured Pint/Pdis couple — the wear
+ * match's sibling: the SAME observation (dP = Pdis - Pint) solving a DIFFERENT
+ * unknown. Wear is HELD (the input; 0 = new pump) and the separator efficiency
+ * eta is solved so the theoretical dP at the measured intake state reproduces
+ * the measured dP. One measured dP fixes one unknown — never both.
+ *
+ * dP is monotonic in eta (the separator's cut shrinks Qgross@pump, so the head
+ * is read lower on the curve, AND removes gas from the mixture, so the
+ * composite gradient rises; dP = head x gradient), so Brent on [0, 100] is
+ * sound; eta enters non-linearly, unlike wear's closed-form ratio.
+ *
+ * Returns the solved eta, the full sweep (dP vs eta), the gas-lock boundary
+ * (the eta below which Qgross@pump runs off the curve and the pump delivers no
+ * head), the free gas before/after separation, the PI from a Pwf measured at
+ * the perfs when given (the back-march from Pint is then a consistency check),
+ * and a plain-words diagnosis for the out-of-range cases: a measured dP above
+ * the eta = 100 curve cannot be gas (stages / frequency / PI); below the
+ * eta = 0 curve it is wear, or worse.
+ *
+ * Above bubble point the sheet's vapour accounting still yields an eta effect
+ * (quirk preserved); the match is allowed there and freeGasPct says how much
+ * TRUE free gas is present.
+ */
+export function matchSepEff(cfg, ipr, pump, {
+  stages, freqHz, wearFactor = 0, measPintPsi, measPdisPsi, qOilStbD,
+  testPwfPsi = null, sweepStepPct = 5,
+}) {
+  const c = { ...cfg, qOilStbD };
+  const dpMeas = measPdisPsi - measPintPsi;
+  // temperature at the pump from the current march settings (as the wear match)
+  const sol0 = espSolveDp(c, pump, { stages, freqHz, wearFactor, sepEffPct: 95 });
+  const pumpIdx = sol0.march.stations.findIndex((s) => s.pPsi === sol0.march.intakePsi);
+  const tPump = sol0.march.stations[pumpIdx >= 0 ? pumpIdx : sol0.march.stations.length - 3].tF;
+  const curve = pumpCurveAt(pump, { stages, freqHz, wearFactor }); // wear HELD
+  const stateAt = (eta) => espIntakeState(c, { pIntakePsi: measPintPsi, tIntakeF: tPump, sepEffPct: eta });
+  const dpAt = (eta) => { const s = stateAt(eta); return headAtRateFt(curve, s.qGrossPumpBpd) * s.gradPsiFt; };
+
+  // the sweep — the explicit view of how dP answers to eta
+  const sweep = [];
+  for (let eta = 0; eta <= 100 + 1e-9; eta += sweepStepPct) {
+    const s = stateAt(eta);
+    sweep.push({ sepEffPct: eta, dpPsi: headAtRateFt(curve, s.qGrossPumpBpd) * s.gradPsiFt, qGrossPumpBpd: s.qGrossPumpBpd, freeGasPctSep: s.freeGasPctSep });
+  }
+  const dp0 = dpAt(0), dp100 = dpAt(100);
+  const dpLo = Math.min(dp0, dp100), dpHi = Math.max(dp0, dp100);
+
+  // gas-lock boundary: the eta below which the pump delivers no head, refined by
+  // bisection between the last zero-dP sweep point and the first positive one
+  let gasLockBelowPct = null;
+  {
+    let lastZero = -1, firstPos = -1;
+    for (let i = 0; i < sweep.length; i++) { if (sweep[i].dpPsi > 1e-9) { firstPos = i; break; } lastZero = i; }
+    if (firstPos < 0) gasLockBelowPct = 100; // no head at ANY separation
+    else if (lastZero >= 0) {
+      let lo = sweep[lastZero].sepEffPct, hi = sweep[firstPos].sepEffPct;
+      for (let k = 0; k < 24; k++) { const mid = (lo + hi) / 2; if (dpAt(mid) <= 1e-9) lo = mid; else hi = mid; }
+      gasLockBelowPct = hi;
+    }
+  }
+
+  // solve, or name why it cannot
+  let status, sepEffPct = null, gapPsi = 0;
+  if (dpMeas > dpHi) { status = 'above-range'; gapPsi = dpMeas - dpHi; }
+  else if (dpMeas < dpLo) { status = 'below-range'; gapPsi = dpMeas - dpLo; }
+  else {
+    const { root } = brent((e) => dpAt(e) - dpMeas, 0, 100, { tol: 1e-6 });
+    sepEffPct = root; status = 'ok';
+  }
+  const etaUsed = sepEffPct ?? (dpMeas > dpHi ? (dp100 >= dp0 ? 100 : 0) : (dp0 <= dp100 ? 0 : 100));
+  const state = stateAt(etaUsed);
+  const nearGasLock = status === 'ok' && gasLockBelowPct != null && gasLockBelowPct < 100 && (sepEffPct - gasLockBelowPct) < 5;
+
+  // PI: Pwf* such that the bottom-up march from Pwf* reaches the measured Pint,
+  // using the matched separation for the tubing gas (as the wear match does)
+  const cE = espCfg(c, dpMeas, qOilStbD * cfg.gorScfStb * (1 - state.sepCutPct / 100));
+  const g = (pwf) => espBackMarch(cE, pwf).pipPsi - measPintPsi;
+  const { root: pwfBackPsi } = brent(g, Math.max(measPintPsi * 0.6, 60), measPintPsi * 2 + 500, { tol: 1e-7 });
+  const oilFrac = oilFraction(cfg);
+  // a Pwf measured at the perfs is the better PI anchor; the back-march then
+  // becomes a consistency check on the below-pump gradient / gauge data
+  const pwfForJ = testPwfPsi ?? pwfBackPsi;
+  const jMatched = jFromTest({ qGrossStbD: qOilStbD / oilFrac, pwfPsi: pwfForJ, priPsi: ipr.prPsi, pbPsi: ipr.pbPsi });
+
+  const f0 = (v) => Math.round(v);
+  let diagnosis =
+    status === 'ok'
+      ? `Separator efficiency ${sepEffPct.toFixed(1)} % reproduces the measured dP of ${f0(dpMeas)} psi with wear held at ${wearFactor}.`
+      : status === 'above-range'
+        ? `Even perfect separation (100 %) delivers only ${f0(dpHi)} psi against a measured ${f0(dpMeas)} psi — a ${f0(gapPsi)} psi surplus gas cannot explain. Check stages, frequency or PI, not the separator.`
+        : `Even with no separation (0 %) the pump delivers ${f0(dpLo)} psi against a measured ${f0(dpMeas)} psi — a ${f0(-gapPsi)} psi shortfall gas cannot explain. That is wear (or worse), not the separator.`;
+  if (nearGasLock)
+    diagnosis += ` Note: the match sits within 5 points of the gas-lock threshold (${gasLockBelowPct.toFixed(1)} %) — a small loss of separation would stall the pump.`;
+
+  return {
+    status, sepEffPct, wearHeld: wearFactor,
+    dpMeasPsi: dpMeas, dpAtEta0Psi: dp0, dpAtEta100Psi: dp100, gapPsi,
+    sweep, gasLockBelowPct, nearGasLock,
+    tPumpF: tPump,
+    freeGasPct: state.freeGasPct, // TRUE free gas at the intake, before separation
+    freeGasPctSep: state.freeGasPctSep, // after the matched separation
+    qGrossPumpBpd: state.qGrossPumpBpd,
+    intakeAbovePb: cfg.pbPsi != null ? measPintPsi >= cfg.pbPsi : null,
+    pwfBackPsi, testPwfPsi,
+    pwfCheckPsi: testPwfPsi != null ? pwfBackPsi - testPwfPsi : null, // back-march minus measured
+    pwfUsedForJ: pwfForJ, jMatched,
+    diagnosis,
+  };
+}

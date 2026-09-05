@@ -11,7 +11,7 @@ Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
 **Current working tree:** `main` merged into `codex/v2-foundation`,
-302 tests passing and 43/43 validation sweep. The separate `bldrz`
+309 tests passing and 43/43 validation sweep. The separate `bldrz`
 database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
@@ -33,7 +33,7 @@ place of GoalSeek loops. Both are recorded in the manual under *Workbook
 deviations*.
 
 ~8,900 lines of JavaScript across 6 core domains (`pvt`, `vlp`, `ipr`,
-`nodal`, `reserve`, `solvers`), 33 test files.
+`nodal`, `reserve`, `solvers`), 34 test files.
 
 ## 2. Running it
 
@@ -91,7 +91,7 @@ src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
 src/server/server.js static file serving, security headers, case database, auth
 src/ui/              index.html · app.js · style.css · help.html (the manual)
 docs/                deploy.md · user-guide.md · equations.md
-tests/               33 files — workbook cell pins, physics regressions, and
+tests/               34 files — workbook cell pins, physics regressions, and
                      docs.test.js, which fails when documentation drifts from
                      the code (stale counts, removed endpoints, an unversioned
                      service worker)
