@@ -13,14 +13,14 @@ GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  �
 | | |
 |---|---|
 | Host | Hetzner VPS, **91.98.23.255**, Ubuntu 24.04 LTS |
-| Runtime | Node **v22** at `/usr/bin/node`. **The app is no longer dependency-free.** `713ce46` (2 Sep 2026) added an unconditional `import pg` to `src/server/database.js`, which `server.js` imports at startup, so `pg` must be present in `/opt/wellsim/app/node_modules` or the service dies on `Cannot find package 'pg'`. The deployed release `6807e73` predates that import, which is why production runs today and would break on the next release. |
+| Runtime | Node **v22** at `/usr/bin/node`. **The app is no longer dependency-free.** `713ce46` (2 Sep 2026) added an unconditional `import pg` to `src/server/database.js`, which `server.js` imports at startup, so `pg` must be present in `/opt/wellsim/app/node_modules` or the service dies on `Cannot find package 'pg'`. **`pg` 8.23.0 was installed on the server on 5 Sep 2026** and the release carrying that import (`db95f0a`) is now deployed and running, so this is no longer a live hazard — but it stays true that a deploy onto a box without `pg` in `node_modules` will crash-loop the service. The check below is not optional. |
 | App path | `/opt/wellsim/app`, owned by the `wellsim` service user |
 | Service | systemd `wellsim.service`, `PORT=3355`, `Restart=always` |
 | TLS / proxy | **Caddy v2**, `/etc/caddy/Caddyfile` — automatic Let's Encrypt, renews itself |
 | Firewall | ufw: OpenSSH, 80/tcp, 443/tcp only |
 | DNS | Cloudflare (both domains) |
 | Also on this box | **thepwf.net** — a static site served by the same Caddy from `/opt/thepwf` · **bldrz.net** — the second machine's comparison app, `/opt/bldrz/app`, `bldrz.service`, its own `bldrz` database and runtime user (confirmed live 3 Sep 2026). **Not ours to touch.** |
-| Access | SSH key only, password auth disabled. **`wellsim_hetzner` (`wellsim-deploy`) was RETIRED on 2 Sep 2026** — the server rejects it. The working identity is the Ed25519 recovery key installed that day through the Hetzner console (`wellsim-ops-2026-09-02` in the project); it is NOT on the original deploy workstation. Every `-i ~/.ssh/wellsim_hetzner` below needs replacing with it. |
+| Access | SSH key only, password auth disabled. **`wellsim_hetzner` (`wellsim-deploy`) works again as of 5 Sep 2026** — it was removed from `authorized_keys` on 2 Sep (saved aside as `/root/.ssh/old-key`) and re-added through the Hetzner console on 5 Sep. Same key, same fingerprint `SHA256:/3IAf9gT…`; it was never "retired", only unauthorised. Three keys now open root: `wellsim-deploy`, `wellsim-ops-2026-09-02`, `wellsim-other-device-2026-09-03` — all current, none to be removed.<br>**Windows gotcha that cost days:** the private key is passphrase-protected and lives unlocked in the *Windows* ssh-agent service. Git Bash's `ssh` cannot see that agent (it wants a Unix socket; the agent is a named pipe), so it fails with `Permission denied (publickey)` even when everything is correct. Use `C:WindowsSystem32OpenSSHssh.exe`. A telling symptom: `debug1: Server accepts key` followed by `Permission denied` means the key IS authorised and only the signing step failed. |
 | Host keys | ED25519 `SHA256:bkTKZB/FixF9hI99Mp+634XNa/3Ohud4AK9kdl6ntI0` · RSA `SHA256:tHM+HmqYYOUok++pJ+bx9WgAzsZZ6HAKWIesnhxc0hg` (recorded 31 Aug 2026 — compare on any first connection from a new machine) |
 | Key backup | `F:\WellSim-Backup-2026-08-29\ssh-key\` — passphrase-protected; passphrase in the password manager |
 
@@ -32,7 +32,7 @@ directory, service, port, logs or case data.
 
 | | `wellsim.app` production | `bldrz.net` comparison |
 |---|---|---|
-| Branch | `main` | `codex/v2-foundation` |
+| Branch | `main` *(intended)* — **`merge/gas-forecast-into-v2` is what is actually deployed since 5 Sep 2026, an owner-authorised interim pending the PR** | `codex/v2-foundation` |
 | App path | `/opt/wellsim/app` | `/opt/bldrz/app` |
 | Service | `wellsim.service` | `bldrz.service` |
 | Local port | 3355 | 3356 |
@@ -189,11 +189,27 @@ www.thepwf.net {
 > containment release" — touches documentation only; it is the release that
 > *shipped* the containment, not the commit that implements it.
 >
-> Observed on 3 Sep 2026: wellsim.app serves asset stamp `2026-09-02a` and
+> **Superseded 5 Sep 2026 — what is deployed now.** wellsim.app runs
+> `db95f0a` from `merge/gas-forecast-into-v2`, deployed 12:38:20 UTC, asset
+> stamp `2026-09-05d`. The owner authorised it explicitly as an interim while
+> the pull request is prepared on the second machine. The warning above still
+> stands **for `main`**: `27ea04e` is on the deployed branch but is still not
+> on `main`, so `main` remains unsafe to deploy here.
+>
+> The containment was verified intact after that release —
 > `GET /api/accounts/status` returns `enabled:false, registrationEnabled:false`
-> — i.e. production is still running the containment release and nothing has
-> been deployed over it. The branch/site table above is the intended
-> contract, not a description of what is deployed today.
+> — and it holds two independent ways: the code gate is on the deployed
+> branch, AND `WELLSIM_ENABLE_LEGACY_CASE_STORE` is absent from
+> `wellsim.service`. Either alone keeps registration closed.
+>
+> Release evidence: 38/38 module smoke against the live site, `NRestarts=0`,
+> no startup errors. Rollback archive of the previous tree:
+> `/root/wellsim-app-pre-deploy-20260905-123648.tar.gz` — restore with
+> `tar -xzf … -C /opt/wellsim && systemctl restart wellsim`. Off-box data pull
+> taken first: `D:wellsimwellsim-data-2026-09-05-1530.tar.gz`.
+>
+> The branch/site table above is the intended contract, and until the PR
+> lands it is NOT a description of what is deployed.
 >
 > Before anything goes from `main` to wellsim.app, `main` must contain that
 > gate. Options, in the owner's gift and not to be taken unilaterally:

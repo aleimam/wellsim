@@ -3,12 +3,23 @@
 **Live:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
 **Repo:** https://github.com/aleimam/wellsim · **Manual:** https://wellsim.app/help.html
 
-**Live production revision:** 2 September 2026 — the containment release
-`6807e73` from `codex/v2-foundation`, deployed 00:14:57 UTC. The legacy web
-account/case store is DISABLED there: `/api/accounts/status` reports
+**Live production revision:** 5 September 2026 — `db95f0a` from
+`merge/gas-forecast-into-v2`, deployed 12:38:20 UTC, asset stamp `2026-09-05d`.
+Verified after the release: 38/38 module smoke against the live site,
+`NRestarts=0`, no startup errors. It replaced the 2 September containment
+release `6807e73`.
+
+**The containment survived that deploy and is still in force:**
+`/api/accounts/status` reports
 `{"enabled":false,"registrationEnabled":false,"mode":"legacy-web"}` and the
-Sign in entry is hidden. **Production does not track `main`** — check before
-you deploy, or you will roll that containment back.
+Sign in entry is hidden. It holds two ways over — the gate commit `27ea04e` is
+on the deployed branch, AND `WELLSIM_ENABLE_LEGACY_CASE_STORE` is absent from
+`wellsim.service` (`Environment=PORT=3355 NODE_ENV=production`). Either alone
+would keep registration closed.
+
+**`main` STILL MUST NOT BE DEPLOYED HERE.** `27ea04e` is not on `main`, so
+deploying it would restore public registration. Production does not track
+`main` — check before you deploy, or you will roll that containment back.
 
 **Current working tree:** `main` merged into `codex/v2-foundation`,
 324 tests passing and 43/43 validation sweep. The separate `bldrz`
@@ -16,12 +27,18 @@ database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
 **Where the work sits, 5 September 2026:** branch
-`merge/gas-forecast-into-v2` at `93f7743`, pushed to origin and in sync. It is
+`merge/gas-forecast-into-v2` at `db95f0a`, pushed to origin and in sync. It is
 ahead of both `origin/main` (`de2393c`) and `origin/codex/v2-foundation`
 (`925c7a4`) and **has not been merged into either** — no PR exists yet. The
 newest portable release is **2.0** (`D:\WellSim_2.0`, also on F:), built from
-`0a9abcf`. Nothing here has been deployed: production still serves the 2 Sep
-containment release, and a green test run is not authorisation to release.
+`0a9abcf`.
+
+**Production runs this branch, not `main`** — an interim state the owner
+authorised on 5 September, pending the pull request. Until that PR lands,
+`main` (`de2393c`) and production have DIVERGED by 64 commits, so the
+two-device branch/site contract below records the intent, not the deployment.
+A green test run is still not authorisation to release; this release was
+authorised explicitly.
 
 ---
 
@@ -54,7 +71,7 @@ The web server uses Node built-ins plus `pg` for opt-in PostgreSQL. The UI is
 plain HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 294 unit, regression and security tests
+node --test                       # 324 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
