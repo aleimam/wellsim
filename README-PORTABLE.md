@@ -1,9 +1,30 @@
 # WellSim — standalone portable program
 
-**Build 2.2 — 5 September 2026**, from commit `8bba363` of the main project.
+**Build 2.3 — 5 September 2026**, from commit `67d2e4b` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 324
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Change since build 2.1 (5 Sep):
+there. Change since build 2.2 (5 Sep):
+
+- **The header loses four controls, matching the website.** Gone are
+  **Export**, **Contact me**, **Print / PDF** and the account panel's
+  **Refresh** button, removed from the website in `eca327f`, `b8ba394` and
+  `211a96c` and carried here because the portable serves the same `src/ui`.
+  The header now reads Oil Well | Water Well | Gas Well · Save as · Open ·
+  Help · Reset.
+  **This is the first build since 2.0 whose program actually differs.** 2.1
+  changed only the signature and 2.2 only the packaged notes; 2.3 changes what
+  you see. What did NOT change is every number: no commit since `0a9abcf`
+  touches `src/core`, so the physics, the solvers and the workbook pins are
+  identical to 2.0, 2.1 and 2.2.
+- **What you have not lost.** `Save as` and `Open` still write and read the
+  complete case as JSON — they route through the same export contract the
+  Export panel used, so nothing about your files changed. Printing still
+  works: the print stylesheet ships as before, so the browser's own print
+  command (Ctrl+P) still produces the results-only page. The case list in the
+  account panel refreshes itself after every sign-in, save and delete, which
+  is what the Refresh button did by hand.
+
+Changes in build 2.2 (5 Sep), kept for reference:
 
 - **Corrects the documentation shipped inside the package.** The copy of this
   file inside `WellSim-2.1.zip` still described the executable as signed by
