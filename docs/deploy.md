@@ -190,8 +190,8 @@ www.thepwf.net {
 > *shipped* the containment, not the commit that implements it.
 >
 > **Superseded 5 Sep 2026 — what is deployed now.** wellsim.app runs
-> `db95f0a` from `merge/gas-forecast-into-v2`, deployed 12:38:20 UTC, asset
-> stamp `2026-09-05d`. The owner authorised it explicitly as an interim while
+> `eca327f` from `merge/gas-forecast-into-v2`, deployed 18:50:39 UTC, asset
+> stamp `2026-09-05e`. The owner authorised it explicitly as an interim while
 > the pull request is prepared on the second machine. The warning above still
 > stands **for `main`**: `27ea04e` is on the deployed branch but is still not
 > on `main`, so `main` remains unsafe to deploy here.
@@ -203,10 +203,13 @@ www.thepwf.net {
 > `wellsim.service`. Either alone keeps registration closed.
 >
 > Release evidence: 38/38 module smoke against the live site, `NRestarts=0`,
-> no startup errors. Rollback archive of the previous tree:
-> `/root/wellsim-app-pre-deploy-20260905-123648.tar.gz` — restore with
-> `tar -xzf … -C /opt/wellsim && systemctl restart wellsim`. Off-box data pull
-> taken first: `D:wellsimwellsim-data-2026-09-05-1530.tar.gz`.
+> no startup errors, every served UI file byte-identical to the committed tree
+> apart from CRLF, and an `oil/sensitivity` replay agreeing with the local
+> engine to 9.8e-16. Rollback archive of the previous tree (`db95f0a`):
+> `/root/wellsim-app-pre-deploy-20260905-184818.tar.gz` — restore with
+> `tar -xzf … -C /opt/wellsim && systemctl restart wellsim`. No fresh data
+> pull was needed: the case store has been frozen since 1 Sep and the evening
+> backup `WellSim-FullBackup-2026-09-05g` already holds it.
 >
 > The branch/site table above is the intended contract, and until the PR
 > lands it is NOT a description of what is deployed.

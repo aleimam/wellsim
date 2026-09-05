@@ -3,11 +3,15 @@
 **Live:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
 **Repo:** https://github.com/aleimam/wellsim · **Manual:** https://wellsim.app/help.html
 
-**Live production revision:** 5 September 2026 — `db95f0a` from
-`merge/gas-forecast-into-v2`, deployed 12:38:20 UTC, asset stamp `2026-09-05d`.
+**Live production revision:** 5 September 2026 — `eca327f` from
+`merge/gas-forecast-into-v2`, deployed 18:50:39 UTC, asset stamp `2026-09-05e`.
 Verified after the release: 38/38 module smoke against the live site,
-`NRestarts=0`, no startup errors. It replaced the 2 September containment
-release `6807e73`.
+`NRestarts=0`, no startup errors, the served UI byte-identical to this tree
+apart from CRLF, and one `oil/sensitivity` payload agreeing with the local
+engine to 9.8e-16. It replaced `db95f0a`, deployed at 12:38:20 UTC the same
+day; the rollback archive of that tree is
+`/root/wellsim-app-pre-deploy-20260905-184818.tar.gz` — restore with
+`tar -xzf … -C /opt/wellsim && systemctl restart wellsim`.
 
 **The containment survived that deploy and is still in force:**
 `/api/accounts/status` reports
@@ -27,22 +31,19 @@ database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
 **Where the work sits, 5 September 2026 (evening):** branch
-`merge/gas-forecast-into-v2` at `457fc90` (147 commits), pushed to origin and
-in sync. It is ahead of both `origin/main` (`de2393c`) and
+`merge/gas-forecast-into-v2` at `eca327f` (149 commits), pushed to origin and
+in sync, and **this exact tip is what production runs** — the site was
+redeployed at 18:50:39 UTC. It is ahead of both `origin/main` (`de2393c`) and
 `origin/codex/v2-foundation` (`b087a24`) and **has not been merged into
-either** — no PR exists yet. The four commits after the deployed `db95f0a`
-touch documentation and the build script only, so production is missing no
-behaviour: on 5 Sep the UI wellsim.app serves was compared file by file
-against this tree and is identical apart from CRLF line endings, and one
-`oil/sensitivity` payload replayed against both sites agreed to 2e-15
-relative. The newest portable release is **2.2** (`D:\WellSim_2.2`, also on
-F:), built from `8bba363`.
+either** — no PR exists yet. The newest portable release is **2.2**
+(`D:\WellSim_2.2`, also on F:), built from `8bba363`; it therefore predates
+the Export/Contact removal, which is a website change only.
 
 **Production runs this branch, not `main`** — an interim state the owner
 authorised on 5 September, pending the pull request. Until that PR lands,
-`main` (`de2393c`) and production have DIVERGED by 64 commits — 68 from this
-branch tip — so the two-device branch/site contract below records the intent,
-not the deployment.
+`main` (`de2393c`) and production have DIVERGED by 70 commits — production and
+this branch tip are now the same commit — so the two-device branch/site
+contract below records the intent, not the deployment.
 A green test run is still not authorisation to release; this release was
 authorised explicitly.
 
