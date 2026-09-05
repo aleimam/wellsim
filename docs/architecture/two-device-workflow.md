@@ -92,10 +92,11 @@ the other is compatible or authorized.
 
 ## Current bldrz context — snapshot, not a rollout instruction
 
-The last verified bldrz release is `d5187b4`, with database migrations
-0001–0005 and public authentication/onboarding disabled. The local comparison
-branch contains later administrator-MFA work which is not yet live. Auth0
-configuration, browser acceptance testing and activation gates remain unfinished.
+The last verified bldrz release is `e396487`, deployed 5 September 2026 with
+database migrations 0001–0007 and public authentication/onboarding/portals
+disabled. Administrator-MFA and portal storage are installed and qualified;
+Auth0 configuration, browser acceptance testing and activation gates remain
+unfinished. See the [release receipt](portal-activation-2026-09-05.md).
 Do not activate or deploy that work from the other device as part of WellSim
 development. Refresh the current state before making any future release decision.
 

@@ -73,10 +73,11 @@ provider integration and object storage remain open. A manual encrypted
 database backup and fresh-cluster restore passed, including data equality and
 post-restore tenant isolation. Automated independent storage, retention and
 redundant recovery-key custody remain open; see [bldrz recovery](bldrz-recovery.md).
-Migrations `0001`–`0003` are applied to the isolated `bldrz` database. The
+As of 5 September 2026, migrations `0001`–`0007` are applied to the isolated
+`bldrz` database; see the [release receipt](portal-activation-2026-09-05.md). The
 bounded pool and transaction helper are wired at application startup; no
 authenticated data handler is exposed until the verified identity boundary is
-implemented. `deploy/verify-bldrz-pool.sh` tests native connection reuse and
+operationally activated. `deploy/verify-bldrz-pool.sh` tests native connection reuse and
 error recovery against a disposable schema clone.
 
 ## Phase 4 — Modular shell and first vertical slice

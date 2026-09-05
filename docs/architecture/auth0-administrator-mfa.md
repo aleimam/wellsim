@@ -11,11 +11,15 @@ Action was created, tested and deployed, but **is not attached to the login
 flow yet**: the flow editor did not respond to automated drag-and-drop. The user
 has been asked to attach it and click Apply. Authenticator OTP and recovery-code
 factors are enabled in the development tenant. No paid plan has been purchased,
-and no live MFA migration or authentication activation has occurred. The client
+and no authentication activation has occurred. The client
 secret has not yet been supplied to the private local file or installed on the
 server. Provider configuration is therefore incomplete, not an operational login.
-The last verified live release is `d5187b4`, schema 0001–0005, with authentication,
-onboarding and legacy persistence disabled. `wellsim.app` is outside this work.
+The current live release is `e396487`, schema 0001–0007, deployed 5 September
+2026 after native portal/MFA and encrypted recovery qualification. Authentication,
+onboarding, portals and legacy persistence remain disabled. The Auth0 dashboard
+was signed out on the 5 September follow-up, and the secret file is still absent.
+The Action binding must be rechecked after dashboard sign-in. `wellsim.app` is
+outside this work. See the [release receipt](portal-activation-2026-09-05.md).
 
 ## Enforced policy
 

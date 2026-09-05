@@ -10,12 +10,14 @@ account/case store is DISABLED there: `/api/accounts/status` reports
 Sign in entry is hidden. **Production does not track `main`** — check before
 you deploy, or you will roll that containment back.
 
-**Comparison release:** `85befc18ef87f3cd18398eaf83fca866dc5ac77b` on
-`codex/v2-foundation`, deployed only to bldrz.net on 3 September 2026 UTC, with
+**Comparison release:** `e396487e60b0688d79253ce9d903c03b635e8b06` on
+`codex/v2-foundation`, deployed only to bldrz.net on 5 September 2026 UTC, with
 325 tests passing and 43/43 validation sweep. Earlier `main` work was merged; subsequent `main` commits
 remain the other developer's separate line of work. The active comparison
-database includes migrations `0001`–`0005`; the branch carries `0006` MFA and
-`0007` portal/help work for a separately gated upgrade. Sign-in, onboarding
+database now includes migrations `0001`–`0007`, including MFA and portal/help
+storage. Native portal qualification and encrypted restore passed; see
+[the 5 September release receipt](docs/architecture/portal-activation-2026-09-05.md).
+Sign-in, onboarding
 and portals remain explicitly disabled pending operational gates.
 Check `/opt/bldrz/DEPLOYED_REVISION` for the active commit; follow
 [the bldrz-only release procedure](docs/architecture/bldrz-release.md), not
@@ -158,7 +160,7 @@ private; neither belongs in a repository. They **are** in the F: backup.
 - **PostgreSQL 16.15 is installed for the `bldrz.net` comparison environment.**
   It listens only on `127.0.0.1:5432`; IPv6, wildcard/public listeners and a
   UFW rule for 5432 are absent. The separate `bldrz` database has migrations
-  `0001` through `0005` in this release, non-login owner `bldrz_migration_owner`, login
+  `0001` through `0007` in this release, non-login owner `bldrz_migration_owner`, login
   `bldrz_app`, and non-login least-privilege role `bldrz_runtime`. Native tests
   proved cross-company read, modify, link and export isolation. The credential
   is only in `/etc/bldrz/postgresql.env` (`root:bldrz`, `0640`). The bldrz service
@@ -173,8 +175,9 @@ private; neither belongs in a repository. They **are** in the F: backup.
   **docs/architecture/bldrz-recovery.md**.
 - **OIDC authentication and controlled onboarding are release-qualified, not activated.**
   Migration `0004_verified_sessions`, server-side sessions and read-only
-  company/private-workspace discovery are feature-gated. No provider has been
-  selected/configured, and public signup/invitations
+  company/private-workspace discovery are feature-gated. Auth0 has been selected
+  and partially configured, but its client secret and real browser pilot remain
+  outstanding. Public signup/invitations
   remain off. Migration `0005_controlled_onboarding` adds verified-email
   registration, private workspace bootstrap, explicit company creation,
   invitations and owner-controlled membership changes. `/workspace.html`
@@ -285,21 +288,23 @@ private; neither belongs in a repository. They **are** in the F: backup.
   `Permission denied (publickey)` to a password-only attempt. The original
   file is backed up at `/root/sshd_config.bak-2026-08-29`.
 
-  **SUPERSEDED 2 Sep 2026: `wellsim-deploy` no longer works.** Key-only
-  administrative access was restored through the Hetzner console that day and
-  a new Ed25519 recovery identity was installed (`wellsim-ops-2026-09-02` in
-  the Hetzner project). The server now answers `Permission denied (publickey)`
-  to `wellsim_hetzner` — verified from this workstation on 2 Sep, with no
-  `Server accepts key` line. The recovery key is NOT on this machine, so
-  deploys cannot run from here. Everything below describes the retired key and
-  is kept only because its lessons about ACLs, passphrases and F: paths still
-  apply to whatever key replaces it.
+  **Current SSH status — verified 5 Sep 2026:** both devices can connect.
+  This workstation's `~/.ssh/wellsim_hetzner` is the working
+  `wellsim-ops-2026-09-02` identity. Successful server logins also confirmed
+  the other device's `wellsim-deploy` identity. Three public keys are installed,
+  including `wellsim-other-device-2026-09-03`. None was removed. Key comments
+  and dates alone do not identify a retired key. The other device's earlier
+  decryption failure was a local passphrase problem; both working keys grant
+  unrestricted root SSH access, subject to the two-device work agreement.
+
+  The 2 September recovery/access-failure notes are historical. Do not use
+  them to conclude that the current key is missing or deployment is forbidden.
+  The generic ACL/passphrase/backup lessons below still apply, but filenames
+  on different devices do not prove that their key fingerprints are identical.
 
   See **docs/architecture/infrastructure-audit-2026-09-02.md** for why.
 
-  **The consequence to respect: this host is now reachable only with the
-  private key `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
-  Hetzner console, not SSH. A passphrase-protected copy is kept on the F:
+  **Historical backup location:** a passphrase-protected copy was kept on the F:
   backup drive at **`F:\WellSim-Backup-2026-08-29\ssh-key\`** (the key is
   `wellsim_hetzner` + `.pub`); the passphrase is in the password manager and
   deliberately NOT on that drive.

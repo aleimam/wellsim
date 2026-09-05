@@ -64,13 +64,16 @@ schema compatibility require a separate reviewed plan.
 
 ## What deployment does not enable
 
-The last deployed release is `85befc18ef87f3cd18398eaf83fca866dc5ac77b`
-with schema 0001–0005. Its multi-page static help center is live. The portal,
+The last deployed release is `e396487e60b0688d79253ce9d903c03b635e8b06`
+with schema 0001–0007, deployed 5 September 2026. Its multi-page static help center is live. The portal,
 authentication and onboarding flags remain off, so the deployed administrator
-and membership-request code is dormant. Migrations 0006–0007 are not applied.
-The 0005 → 0006 qualification and activation procedure is in
-[Auth0 administrator MFA](auth0-administrator-mfa.md); do not rerun the
-original 0003 → 0005 procedure on the current database.
+and membership-request code is dormant. The atomic 0005–0007 upgrade, native
+portal checks and encrypted restoration are recorded in the
+[5 September release receipt](portal-activation-2026-09-05.md).
+Do not rerun either historical upgrade procedure on the current database.
+Use the default `restored-schema` mode to restore-test a current backup.
+Auth0 activation is still governed by
+[Auth0 administrator MFA](auth0-administrator-mfa.md).
 
 The release includes company/private-workspace UI and the secure backend, but
 deploying them does not authorize a public identity service or signup. Choose
