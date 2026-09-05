@@ -15,6 +15,14 @@ you deploy, or you will roll that containment back.
 database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
+**Where the work sits, 5 September 2026:** branch
+`merge/gas-forecast-into-v2` at `93f7743`, pushed to origin and in sync. It is
+ahead of both `origin/main` (`de2393c`) and `origin/codex/v2-foundation`
+(`925c7a4`) and **has not been merged into either** — no PR exists yet. The
+newest portable release is **2.0** (`D:\WellSim_2.0`, also on F:), built from
+`0a9abcf`. Nothing here has been deployed: production still serves the 2 Sep
+containment release, and a green test run is not authorisation to release.
+
 ---
 
 ## 1. What this is
@@ -82,6 +90,11 @@ src/core/reserve/    oil-reserve (Havlena-Odeh, static MB, reservoir limit)
                      gas-reserve (p/Z solver, SITHP march, gauge p/Z, reservoir limit, forecast)
                      tarner.js, walsh.js (the two oil forecast methods)
 src/core/solvers/    Brent, bracketing
+src/core/allift/     artificial-lift SELECTION (not design): limits.js is the
+                     global, version-stamped 5-method x 8-parameter screening
+                     matrix, screen.js the life-of-well envelope screen plus the
+                     well-condition gates, economics.js the UDC screen. No
+                     physics of its own — Qgross reuses the composite Vogel
 src/server/api.js    every endpoint; the UI's only contract. TWO sensitivity
                      paths by design: oilSensitivity / gasSensitivity solve every
                      VLP set at the CURRENT Pr (all fluids, all lift types), and
