@@ -3963,17 +3963,23 @@ const ALLIFT_L = [
 ];
 const ALLIFT_ED = [
   ['pwfPsi', 'Pwf', 'psi'], ['prPsi', 'Res. P', 'psi'], ['pbPsi', 'Bubble P', 'psi'], ['j', 'PI (J)', ''],
-  ['depthFt', 'Depth', 'ft'], ['glr', 'GLR', 'scf/stb'], ['whpPsi', 'WHP', 'psi'], ['wcPct', 'Water cut', '%'],
+  // GLR is NOT here: it is calculated from GOR and W.C (see alliftGlr) and
+  // shown as a computed row, exactly like Qgross
+  ['depthFt', 'Depth', 'ft'], ['whpPsi', 'WHP', 'psi'], ['wcPct', 'Water cut', '%'],
   ['gorScfStb', 'GOR', 'scf/stb'], ['devDeg', 'Deviation', 'deg'], ['dogLegDeg', 'Dog-leg', '°/100ft'],
 ];
 const ALLIFT_CAP = { ESP: 500000, GL: 150000, SRP: 300000, JET: 292000, PCP: 400000 };
 const ALLIFT_DEFAULT = [
-  { pwfPsi: 2000, prPsi: 5200, pbPsi: 2000, j: 0.7, depthFt: 3200, glr: 392, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
-  { pwfPsi: 2000, prPsi: 3500, pbPsi: 2000, j: 0.7, depthFt: 3200, glr: 320, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
-  { pwfPsi: 2000, prPsi: 2500, pbPsi: 2000, j: 0.7, depthFt: 3200, glr: 200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 5200, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 3500, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 2500, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
 ];
 const ALLIFT_LABELS = ['Initial', '+6 mo', '+1 yr'];
 const labelAllift = (k) => (ALLIFT_M.find((m) => m.k === k) || {}).label || k;
+
+// GLR from the GOR and the water cut — gas per barrel of TOTAL liquid, where
+// the GOR is gas per barrel of OIL (mirrors the handler's own derivation)
+const alliftGlr = (gor, wcPct) => gor * (1 - wcPct / 100);
 
 function alliftVogel(pwf, j, pr, pb) {
   if (pr >= pb) { if (pwf >= pb) return j * (pr - pwf); return j * (pr - pb) + (j * pb / 1.8) * (1 - 0.2 * (pwf / pb) - 0.8 * (pwf / pb) ** 2); }
@@ -3989,6 +3995,8 @@ function alliftEnsureForm() {
     ALLIFT_LABELS.map((l) => `<th>${l}</th>`).join('') + '</tr></thead><tbody>';
   h += '<tr><td style="text-align:left;color:#0f6e8c">Qgross (Vogel) stb/d</td>' +
     ALLIFT_DEFAULT.map((_, i) => `<td id="al-q-${i}" style="text-align:right;color:#0f6e8c;font-weight:600">&mdash;</td>`).join('') + '</tr>';
+  h += '<tr><td style="text-align:left;color:#0f6e8c">GLR <span class="note" style="margin:0">= GOR &times; (1 &minus; W.C) scf/stb</span></td>' +
+    ALLIFT_DEFAULT.map((_, i) => `<td id="al-glr-${i}" style="text-align:right;color:#0f6e8c;font-weight:600">&mdash;</td>`).join('') + '</tr>';
   for (const [k, label, u] of ALLIFT_ED) {
     h += `<tr><td style="text-align:left">${label}${u ? ` <span class="note" style="margin:0">${u}</span>` : ''}</td>` +
       ALLIFT_DEFAULT.map((s, i) => `<td><input id="al-${k}-${i}" type="number" step="any" value="${s[k]}" style="width:5.5em;text-align:right"></td>`).join('') + '</tr>';
@@ -4006,6 +4014,9 @@ function alliftEnsureForm() {
       const q = alliftVogel(g('pwfPsi'), g('j'), g('prPsi'), g('pbPsi'));
       const c = document.getElementById('al-q-' + i);
       if (c) c.textContent = Number.isFinite(q) ? Math.round(q).toLocaleString() : '—';
+      const glr = alliftGlr(g('gorScfStb'), g('wcPct'));
+      const cg = document.getElementById('al-glr-' + i);
+      if (cg) cg.textContent = Number.isFinite(glr) ? Math.round(glr).toLocaleString() : '—';
     }
   };
   host.querySelectorAll('input[type="number"]').forEach((inp) => inp.addEventListener('input', upd));
@@ -4073,7 +4084,9 @@ function alliftRenderInto(el, r) {
   if (!el) return;
   const num0 = (v) => (v == null ? '—' : fmt(v, 0));
   const PASS = 'background:#e2f0e8;color:#2f8f5b', FAIL = 'background:#f6e2df;color:#b4443a', PART = 'background:#f7edd8;color:#b07d16';
-  const pills = ALLIFT_M.map((m) => { const inSet = r.screen.technicallyApplicable.includes(m.k);
+  const gateOut = r.gateExclusions || {};
+  const applicable = r.applicable || r.screen.technicallyApplicable;
+  const pills = ALLIFT_M.map((m) => { const inSet = applicable.includes(m.k);
     return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 9px;border-radius:999px;margin:0 6px 6px 0;${inSet ? 'background:#e2f0e8;color:#2f8f5b' : 'color:#8a97a2;text-decoration:line-through'}"><span style="width:8px;height:8px;border-radius:2px;background:${m.c}"></span>${m.label}</span>`;
   }).join('');
   let mtx = '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th>' +
@@ -4082,28 +4095,53 @@ function alliftRenderInto(el, r) {
     mtx += `<tr><td style="text-align:left;white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${m.c};margin-right:5px"></span>${m.label} <span class="note" style="margin:0;font-size:10px">${m.engine ? 'engine' : 'clipboard'}</span></td>`;
     for (const p of ALLIFT_P) { const a = agg[p.k], st = a === 'pass' ? PASS : a === 'fail' ? FAIL : PART, g = a === 'pass' ? '✓' : a === 'fail' ? '✕' : '◐';
       mtx += `<td><span style="display:inline-block;min-width:20px;padding:2px 4px;border-radius:4px;${st}">${g}</span></td>`; }
-    const inSet = r.screen.technicallyApplicable.includes(m.k);
-    mtx += `<td style="font-weight:700;color:${inSet ? '#2f8f5b' : '#b4443a'}">${inSet ? 'PASS' : 'out'}</td></tr>`;
+    // three verdicts, not two: PASS, "out" (outside its envelope) and
+    // "excluded" (clears the envelope, ruled out by this well's conditions)
+    const inSet = applicable.includes(m.k);
+    const gated = !!gateOut[m.k] && r.screen.technicallyApplicable.includes(m.k);
+    const verdict = inSet ? 'PASS' : gated ? 'excluded' : 'out';
+    const vcol = inSet ? '#2f8f5b' : gated ? '#b07d16' : '#b4443a';
+    mtx += `<td style="font-weight:700;color:${vcol}">${verdict}</td></tr>`;
   }
   mtx += '</tbody></table>';
+  // the reasons, right under the verdict column that shows them
+  const exRows = Object.entries(gateOut).flatMap(([m, rs]) => rs.map((t) => ({ m, t })));
+  const exBlock = exRows.length
+    ? `<div style="margin-top:8px;border-left:3px solid #b07d16;padding:6px 10px;background:#f7edd8">` +
+      `<div class="senshead" style="margin:0 0 4px">Ruled out by this well's conditions</div>` +
+      exRows.map((x) => `<div class="note" style="margin:2px 0"><b>${labelAllift(x.m)}</b> — ${x.t}</div>`).join('') +
+      `</div>`
+    : '';
   const cum = r.cumBasis.oneYearCumStb;
   let udc = `<div class="note" style="margin:0 0 6px">One-year cum oil (trapezoid of Initial/+6mo/+1yr) = ${num0(cum)} bbl · opex ${fmt(r.economics.opexUsdPerBbl, 0)} $/bbl · UDC limit ${fmt(r.economics.udcLimitUsdPerBbl, 0)} $/bbl</div>`;
-  udc += '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th><th>Applicable</th><th>Capex $</th><th>Cum bbl</th><th>UDC $/bbl</th><th>&le; limit</th><th>Rank</th></tr></thead><tbody>';
+  // only technically-accepted methods are costed, so there is no "applicable"
+  // column any more — everything in this table already cleared the screen
+  udc += '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th><th>Capex $</th><th>Cum bbl</th><th>UDC $/bbl</th><th>&le; limit</th><th>Rank</th></tr></thead><tbody>';
+  let costed = 0;
   for (const m of ALLIFT_M) { const e = r.economics.byMethod[m.k]; if (!e) continue;
+    costed++;
     const isReco = r.recommendation === m.k, rank = r.economics.ranked.indexOf(m.k);
-    udc += `<tr style="${e.technicallyApplicable ? '' : 'opacity:.55'};${isReco ? 'background:#e7f3f6' : ''}"><td style="text-align:left">${labelAllift(m.k)}${isReco ? ' ◄ pick' : ''}</td>` +
-      `<td style="color:${e.technicallyApplicable ? '#2f8f5b' : '#b4443a'}">${e.technicallyApplicable ? '✓' : 'out'}</td>` +
+    udc += `<tr style="${isReco ? 'background:#e7f3f6' : ''}"><td style="text-align:left">${labelAllift(m.k)}${isReco ? ' ◄ pick' : ''}</td>` +
       `<td style="text-align:right">${num0(e.capexUsd)}</td><td style="text-align:right">${num0(e.cumStb)}</td>` +
       `<td style="text-align:right">${e.udcUsdPerBbl == null ? '—' : fmt(e.udcUsdPerBbl, 2)}</td>` +
       `<td>${e.udcUsdPerBbl == null ? 'n/a' : e.economicPass ? '✓' : '✕'}</td>` +
-      `<td>${e.technicallyApplicable && rank >= 0 ? '#' + (rank + 1) : '—'}</td></tr>`;
+      `<td>${rank >= 0 ? '#' + (rank + 1) : '—'}</td></tr>`;
   }
+  if (!costed)
+    udc += '<tr><td colspan="6" style="text-align:center;color:#8a97a2">no method survived the technical screen — nothing to cost</td></tr>';
   udc += '</tbody></table>';
+  // what was dropped before costing, and which of the two reasons it was
+  const dropped = (r.economics.notCosted || []).map((m) => {
+    const why = gateOut[m] && r.screen.technicallyApplicable.includes(m) ? 'ruled out by well conditions' : 'outside envelope';
+    return `${labelAllift(m)} (${why})`;
+  });
+  if (dropped.length)
+    udc += `<div class="note" style="margin:6px 0 0">Not costed &mdash; technically rejected first: ${dropped.join(' · ')}.</div>`;
   const charts = ALLIFT_L.map((lv) => `<div style="min-width:0"><div class="senshead">Level ${lv.level} · ${lv.title}</div>${alliftChartSVG(lv, r)}</div>`).join('');
   const notes = [...(r.gateNotes || []).map((g) => g.text), ...(r.warnings || [])].map((t) => `<div class="note" style="margin:2px 0">• ${t}</div>`).join('');
   el.innerHTML =
     `<div class="senshead">Technically applicable across well life</div><div>${pills}</div>` +
-    `<div style="overflow-x:auto">${mtx}</div>` +
+    `<div style="overflow-x:auto">${mtx}</div>` + exBlock +
     `<div class="senshead" style="margin-top:10px">Economic screen — UDC</div><div style="overflow-x:auto">${udc}</div>` +
     (notes ? `<div style="margin-top:8px">${notes}</div>` : '') +
     `<div class="senshead" style="margin-top:10px">Envelope charts — well design line vs method envelopes</div>` +

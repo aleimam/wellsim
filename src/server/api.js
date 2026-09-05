@@ -24,7 +24,7 @@ import {
   jDarcyOil,
   jFromTest,
 } from '../core/ipr/oil-ipr.js';
-import { screenLifecycle, sideGates } from '../core/allift/screen.js';
+import { screenLifecycle, sideGates, gateExclusions } from '../core/allift/screen.js';
 import { economicScreen, trapezoidCumStb } from '../core/allift/economics.js';
 import { defaultLimits, METHODS as ALLIFT_METHODS } from '../core/allift/limits.js';
 import { getPwfOil } from '../core/nodal/calibrate.js';
@@ -1903,14 +1903,22 @@ function alliftSnapshotPoint(s) {
   const pwfPsi = num(s.pwfPsi);
   const qGrossStbD = qGrossAtPwf(pwfPsi, { j, prPsi, pbPsi });
   const wcPct = num(s.wcPct) ?? 0;
+  const gorScfStb = num(s.gorScfStb);
+  // GLR is gas per barrel of TOTAL liquid; GOR is gas per barrel of OIL. One
+  // follows from the other and the water cut, so it is CALCULATED here rather
+  // than typed — a typed GLR could contradict its own GOR/W.C:
+  //   GLR = GOR x (1 - W.C/100)
+  // (the workbook's own figures are exactly this: 400 x 0.98/0.80/0.50 =
+  // 392 / 320 / 200 across the three snapshots).
+  const glr = gorScfStb != null ? gorScfStb * (1 - wcPct / 100) : undefined;
   return {
     point: {
       qGrossStbD,
       depthFt: num(s.depthFt),
-      glr: num(s.glr),
+      glr,
       whpPsi: num(s.whpPsi),
       wcPct,
-      gorScfStb: num(s.gorScfStb),
+      gorScfStb,
       devDeg: num(s.devDeg),
       dogLegDeg: num(s.dogLegDeg),
     },
@@ -1944,10 +1952,17 @@ export function alliftSelect(f) {
     else cumByMethod[m] = { value: null, source: 'missing' };
   }
 
+  // well-condition gates rule methods out ON TOP of the envelope screen, each
+  // with its reason — a method can clear every band and still be undeployable
+  // here. The final applicable set is what the economics may choose from.
+  const gates = f.gates || {};
+  const gateOut = gateExclusions(gates);
+  const applicable = screen.technicallyApplicable.filter((m) => !gateOut[m]);
+
   const capexUsd = f.capexUsd || {};
   const econ = economicScreen({
     methods: ALLIFT_METHODS.map((m) => m.key),
-    applicable: screen.technicallyApplicable,
+    applicable,
     capexUsdByMethod: capexUsd,
     opexUsdPerBbl: num(f.opexUsdPerBbl) ?? 0,
     udcLimitUsdPerBbl: num(f.udcLimitUsdPerBbl) ?? Infinity,
@@ -1958,6 +1973,10 @@ export function alliftSelect(f) {
     limits: { version: limits.version, provenance: limits.provenance, overrides, bands },
     snapshots: built.map((b, i) => ({ index: i, qGrossStbD: b.qGrossStbD, oilRateStbD: b.oilRateStbD, ...b.point })),
     screen,
+    // the envelope result is screen.technicallyApplicable; these two say what
+    // the well's own conditions did to it
+    gateExclusions: gateOut,
+    applicable,
     economics: econ,
     cumBasis: {
       source: oneYearCumStb != null ? 'prod-data' : 'none',
@@ -1965,11 +1984,19 @@ export function alliftSelect(f) {
       oneYearCumStb: oneYearCumStb ?? null,
       note: 'trapezoid of oil rate at Initial / +6 mo / +1 yr',
     },
-    gateNotes: sideGates(f.gates || {}),
+    gateNotes: sideGates(gates),
     recommendation: econ.cheapestApplicable,
     warnings: [
       ...(oneYearCumStb == null ? ['One-year cumulative needs oil rate at 2+ snapshots.'] : []),
-      ...(screen.technicallyApplicable.length === 0 ? ['No method passes the technical screen across the well life.'] : []),
+      // name each exclusion, so a method never disappears without its reason
+      ...Object.entries(gateOut)
+        .filter(([m]) => screen.technicallyApplicable.includes(m))
+        .flatMap(([m, rs]) => rs.map((r) => `${m} clears its envelope but is ruled out by this well: ${r}`)),
+      ...(screen.technicallyApplicable.length === 0
+        ? ['No method passes the envelope screen across the well life.']
+        : applicable.length === 0
+          ? ['Every method that clears its envelope is ruled out by this well\'s conditions — see the exclusions above.']
+          : []),
     ],
     disclaimer:
       'First-pass screening advisory. Bands are heuristic, not physical limits; the final ' +

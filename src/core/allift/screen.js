@@ -86,11 +86,39 @@ export function screenLifecycle(points, bands = BANDS) {
 // shows these next to the recommendation so the analyst weighs them.
 export function sideGates({ nearGasCompression, naturalFlow, sourGasHigh }) {
   const notes = [];
-  if (nearGasCompression === false)
-    notes.push({ method: 'GL', severity: 'warn', text: 'No gas compression nearby — Gas Lift needs a compression source (can be built).' });
   if (naturalFlow === true)
-    notes.push({ method: null, severity: 'info', text: 'Well flows naturally at this stage — artificial lift may be deferred.' });
+    notes.push({ method: null, severity: 'info', text: 'Well flows naturally at this stage — artificial lift may be deferred altogether.' });
   if (sourGasHigh === true)
-    notes.push({ method: null, severity: 'warn', text: 'High H2S/CO2 — check metallurgy/elastomers for all methods (esp. PCP elastomers).' });
+    notes.push({ method: null, severity: 'warn', text: 'High H2S/CO2 — check metallurgy and elastomers for every surviving method (PCP elastomers especially).' });
   return notes;
+}
+
+/**
+ * Well-condition gates that RULE A METHOD OUT, each with its reason.
+ *
+ * These are NOT envelope bands: a method can clear every band and still be
+ * undeployable on this well, because what stops it is a facility or a
+ * metallurgy question rather than its operating envelope. They are therefore
+ * kept out of screenLifecycle and applied on top of it, so the two kinds of
+ * exclusion stay distinguishable — "outside its envelope" and "ruled out by
+ * this well's conditions" are different findings, and the second is often the
+ * actionable one (compression can be installed; sour service cannot be typed
+ * away). Nothing is ever removed silently: the reason travels with it.
+ *
+ *   no gas compression -> Gas Lift  (no source of injection gas)
+ *   flows naturally    -> Sucker Rod
+ *   high H2S / CO2     -> Sucker Rod (rod-string sour service)
+ *
+ * Returns { METHOD: [reason, ...] } for the excluded methods only.
+ */
+export function gateExclusions({ nearGasCompression, naturalFlow, sourGasHigh } = {}) {
+  const out = {};
+  const add = (m, reason) => { (out[m] ??= []).push(reason); };
+  if (nearGasCompression === false)
+    add('GL', 'No gas compression nearby — gas lift has no source of injection gas. Removable: tie in or install compression.');
+  if (naturalFlow === true)
+    add('SRP', 'The well still flows naturally — a rod pump belongs on a well that can no longer flow unaided.');
+  if (sourGasHigh === true)
+    add('SRP', 'High H2S/CO2 — sour service attacks the rod string (sulphide stress cracking) and the stuffing box.');
+  return out;
 }

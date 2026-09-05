@@ -42,14 +42,20 @@ export function udcForMethod({ capexUsd, opexUsdPerBbl, cum }) {
 
 /**
  * Economic screen — the workbook's D16:D21 block.
- * UDC is computed for EVERY method that has a capex (the sheet lists a UDC per
- * method), using the SAME well cumulative for all of them (the one-year prod
- * cum is the well's oil production, not method-specific). The economical method
- * is then the cheapest that is BOTH technically applicable and under the UDC
- * limit.
+ * TECHNICAL ACCEPTANCE COMES FIRST. Only a method that survives the envelope
+ * screen AND this well's conditions is costed at all: a method that cannot be
+ * run on the well has no economics worth reading, and pricing it would invite a
+ * cheap-but-undeployable option to sit beside the real candidates. The ones
+ * dropped before costing are returned in `notCosted` rather than left silently
+ * absent.
+ *
+ * The survivors share the SAME well cumulative (the one-year prod cum is the
+ * well's oil production, not method-specific), so UDC differences are capex
+ * differences. The economical method is the cheapest survivor under the limit.
  *  inputs:
- *    methods           - all method keys to cost, e.g. ['ESP','GL','SRP','JET','PCP']
- *    applicable        - keys that passed the technical screen
+ *    methods           - the full method universe, e.g. ['ESP','GL','SRP','JET','PCP']
+ *                        (used only to report what was dropped)
+ *    applicable        - keys that passed the technical screen AND the gates
  *    capexUsdByMethod  - { ESP: 500000, ... }         (analyst input)
  *    opexUsdPerBbl     - global opex (workbook opex), e.g. 3
  *    udcLimitUsdPerBbl - pass/fail threshold (workbook UDC limit), e.g. 11
@@ -57,22 +63,24 @@ export function udcForMethod({ capexUsd, opexUsdPerBbl, cum }) {
  */
 export function economicScreen({ methods, applicable, capexUsdByMethod, opexUsdPerBbl, udcLimitUsdPerBbl, cumByMethod }) {
   const rows = {};
-  for (const m of methods) {
+  for (const m of applicable) {
     if (capexUsdByMethod[m] == null) continue;
     const udc = udcForMethod({ capexUsd: capexUsdByMethod[m], opexUsdPerBbl, cum: cumByMethod[m] });
     rows[m] = {
       ...udc,
-      technicallyApplicable: applicable.includes(m),
+      technicallyApplicable: true,
       economicPass: udc.udcUsdPerBbl != null && udc.udcUsdPerBbl <= udcLimitUsdPerBbl,
     };
   }
   const passers = Object.keys(rows)
-    .filter((m) => rows[m].technicallyApplicable && rows[m].economicPass)
+    .filter((m) => rows[m].economicPass)
     .sort((a, b) => rows[a].udcUsdPerBbl - rows[b].udcUsdPerBbl);
   return {
     udcLimitUsdPerBbl,
     opexUsdPerBbl,
     byMethod: rows,
+    // dropped before costing, so the reader sees what was left out and why
+    notCosted: (methods ?? []).filter((m) => !applicable.includes(m)),
     cheapestApplicable: passers[0] ?? null, // the economical method
     ranked: passers,
   };
