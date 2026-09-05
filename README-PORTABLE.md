@@ -1,9 +1,41 @@
 # WellSim — standalone portable program
 
-**Build 1.7 — 4 September 2026**, from commit `6c6a1f3` of the main project.
+**Build 1.8 — 5 September 2026**, from commit `56fab16` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 309
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Changes since build 1.6 (4 Sep):
+there. Changes since build 1.7 (4 Sep):
+
+- **The ESP gas separator can now be matched to a well test, instead of
+  assumed.** Separator efficiency was an input pinned at 95 % — and because the
+  pump's delivered ΔP depends on how much free gas the separator lets through,
+  a separator underperforming its rating was being booked silently as *pump
+  wear*. There is now a third matching factor beside Match stages and Match
+  wear: **Match separator efficiency (actual Pint/Pdis)**. It reads the same
+  measured intake/discharge couple, holds the wear input where you set it
+  (0 = new pump), and solves the separation that reproduces the measured
+  ΔP = Pdis − Pint.
+  The rule it enforces is that **one measured ΔP fixes one unknown** — you
+  match wear with separation held, or separation with wear held, never both
+  from the same test. The honest way to separate them is time: match the
+  separator at start-up while the pump is new, then hold that figure and match
+  wear over the run life. Each button now says which factor it holds.
+  The result is drawn, not just reported: a **sweep of pump ΔP against
+  separation from 0 to 100 %**, with the measured ΔP as a dashed line, the
+  match starred where they cross, and the **gas-locked band shaded** — the
+  separation below which intake gas pushes the pump past the end of its curve
+  and it delivers no head at all. On the demo well that cliff sits at 27.6 %,
+  which is worth seeing: it is the margin between a pump that lifts and a pump
+  that stalls. The matched efficiency is **written back into the separator
+  input**, so every later run — solve, forecast, sensitivities — uses it.
+  Free gas at the intake is reported before and after separation, an optional
+  test Pwf measured at the perforations anchors the PI and turns the back-march
+  into a consistency check, and the cases that gas cannot explain are named
+  rather than fitted: a ΔP above the 100 % curve is *"check stages, frequency
+  or PI, not the separator"*; below the 0 % curve it is wear, or worse. On the
+  demo's own gauges at wear 0 the match recovers the workbook's 95 % as
+  **95.16 %**.
+
+Changes in build 1.7 (4 Sep), kept for reference:
 
 - **A new Artificial Lift Selection module joins the Oil tab.** Alongside Well
   model, Reserve and Forecast, a fourth choice — *Lift selection* — screens five
