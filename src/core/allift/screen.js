@@ -88,8 +88,10 @@ export function sideGates({ nearGasCompression, naturalFlow, sourGasHigh }) {
   const notes = [];
   if (naturalFlow === true)
     notes.push({ method: null, severity: 'info', text: 'Well flows naturally at this stage — artificial lift may be deferred altogether.' });
-  if (sourGasHigh === true)
-    notes.push({ method: null, severity: 'warn', text: 'High H2S/CO2 — check metallurgy and elastomers for every surviving method (PCP elastomers especially).' });
+  if (sourGasHigh === true) {
+    notes.push({ method: null, severity: 'warn', text: 'High H2S/CO2 — check metallurgy for every surviving method: tubing, wellhead and any pump housing need sour-service grades.' });
+    notes.push({ method: 'JET', severity: 'warn', text: 'Jet pump in sour service: the pump itself tolerates it (no moving parts, carbide nozzle and throat, inhibitor can ride down in the power fluid), but an OPEN power-fluid loop returns sour fluid through the surface plant — confirm a closed loop or sour-rated surface handling before selecting it.' });
+  }
   return notes;
 }
 
@@ -108,6 +110,16 @@ export function sideGates({ nearGasCompression, naturalFlow, sourGasHigh }) {
  *   no gas compression -> Gas Lift  (no source of injection gas)
  *   flows naturally    -> Sucker Rod
  *   high H2S / CO2     -> Sucker Rod (rod-string sour service)
+ *                      -> PCP        (stator elastomer)
+ *
+ * The jet pump is deliberately NOT excluded on sour gas. In the published
+ * screening tables it rates well on corrosion — no moving parts downhole, a
+ * carbide nozzle and throat, and inhibitor can ride down continuously in the
+ * power fluid; sour service is one of the classic arguments FOR a jet pump.
+ * Its real weakness is free gas at the throat, and that is already screened by
+ * the GLR band. What sour gas does raise for a jet pump is a facilities
+ * question — sour returns through an open power-fluid loop — so that travels
+ * as a named warning in `sideGates`, not as an exclusion.
  *
  * Returns { METHOD: [reason, ...] } for the excluded methods only.
  */
@@ -118,7 +130,9 @@ export function gateExclusions({ nearGasCompression, naturalFlow, sourGasHigh } 
     add('GL', 'No gas compression nearby — gas lift has no source of injection gas. Removable: tie in or install compression.');
   if (naturalFlow === true)
     add('SRP', 'The well still flows naturally — a rod pump belongs on a well that can no longer flow unaided.');
-  if (sourGasHigh === true)
+  if (sourGasHigh === true) {
     add('SRP', 'High H2S/CO2 — sour service attacks the rod string (sulphide stress cracking) and the stuffing box.');
+    add('PCP', 'High H2S/CO2 — H2S and CO2 swell and harden the stator elastomer until it chunks; in sour service the stator is the PCP\'s shortest-lived part. Removable: an elastomer qualified for THIS gas composition.');
+  }
   return out;
 }

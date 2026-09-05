@@ -4042,7 +4042,7 @@ function alliftReadForm() {
 async function alliftRun() {
   const r = await api('allift/select', alliftReadForm());
   document.getElementById('oil-allift-result').textContent = r.recommendation
-    ? `Economical method: ${labelAllift(r.recommendation)} — UDC ${fmt(r.economics.byMethod[r.recommendation].udcUsdPerBbl, 2)} $/bbl (one-year cum ${fmt(r.cumBasis.oneYearCumStb, 0)} bbl).`
+    ? `Economical method: ${labelAllift(r.recommendation)} — UDC ${fmt(r.economics.byMethod[r.recommendation].udcUsdPerBbl, 2)} $/bbl oil (one-year cum oil ${fmt(r.cumBasis.oneYearCumStb, 0)} stb).`
     : 'No method passes both the technical and economic screens.';
   alliftRenderInto(document.getElementById('oil-allift-output'), r);
   applyOilRows();
@@ -4113,10 +4113,10 @@ function alliftRenderInto(el, r) {
       `</div>`
     : '';
   const cum = r.cumBasis.oneYearCumStb;
-  let udc = `<div class="note" style="margin:0 0 6px">One-year cum oil (trapezoid of Initial/+6mo/+1yr) = ${num0(cum)} bbl · opex ${fmt(r.economics.opexUsdPerBbl, 0)} $/bbl · UDC limit ${fmt(r.economics.udcLimitUsdPerBbl, 0)} $/bbl</div>`;
+  let udc = `<div class="note" style="margin:0 0 6px">One-year cum OIL = ${num0(cum)} stb — trapezoid of the oil rate (gross &times; (1 &minus; W.C)) at Initial/+6mo/+1yr, one well cum shared by every method · opex ${fmt(r.economics.opexUsdPerBbl, 0)} $/bbl · UDC limit ${fmt(r.economics.udcLimitUsdPerBbl, 0)} $/bbl</div>`;
   // only technically-accepted methods are costed, so there is no "applicable"
   // column any more — everything in this table already cleared the screen
-  udc += '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th><th>Capex $</th><th>Cum bbl</th><th>UDC $/bbl</th><th>&le; limit</th><th>Rank</th></tr></thead><tbody>';
+  udc += '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th><th>Capex $</th><th>Cum oil, stb</th><th>UDC $/bbl oil</th><th>&le; limit</th><th>Rank</th></tr></thead><tbody>';
   let costed = 0;
   for (const m of ALLIFT_M) { const e = r.economics.byMethod[m.k]; if (!e) continue;
     costed++;
@@ -4138,11 +4138,16 @@ function alliftRenderInto(el, r) {
   if (dropped.length)
     udc += `<div class="note" style="margin:6px 0 0">Not costed &mdash; technically rejected first: ${dropped.join(' · ')}.</div>`;
   const charts = ALLIFT_L.map((lv) => `<div style="min-width:0"><div class="senshead">Level ${lv.level} · ${lv.title}</div>${alliftChartSVG(lv, r)}</div>`).join('');
-  const notes = [...(r.gateNotes || []).map((g) => g.text), ...(r.warnings || [])].map((t) => `<div class="note" style="margin:2px 0">• ${t}</div>`).join('');
+  // a note aimed at one method says so — the jet-pump sour-service caveat is
+  // useless floating free of the method it qualifies
+  const notes = [
+    ...(r.gateNotes || []).map((g) => (g.method ? `<b>${labelAllift(g.method)}</b> — ${g.text}` : g.text)),
+    ...(r.warnings || []),
+  ].map((t) => `<div class="note" style="margin:2px 0">• ${t}</div>`).join('');
   el.innerHTML =
     `<div class="senshead">Technically applicable across well life</div><div>${pills}</div>` +
     `<div style="overflow-x:auto">${mtx}</div>` + exBlock +
-    `<div class="senshead" style="margin-top:10px">Economic screen — UDC</div><div style="overflow-x:auto">${udc}</div>` +
+    `<div class="senshead" style="margin-top:10px">Economic screen — UDC on the one-year cumulative OIL</div><div style="overflow-x:auto">${udc}</div>` +
     (notes ? `<div style="margin-top:8px">${notes}</div>` : '') +
     `<div class="senshead" style="margin-top:10px">Envelope charts — well design line vs method envelopes</div>` +
     `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px">${charts}</div>`;

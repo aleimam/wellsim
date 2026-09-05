@@ -59,6 +59,25 @@ test('allift: the demo well screens to ESP + Gas Lift + Jet, SRP and PCP out', (
   assert.ok(r.screen.byMethod.PCP.failedParams.includes('depthFt'));
 });
 
+test('allift: the UDC denominator is cumulative OIL, not gross liquid', () => {
+  const r = run();
+  assert.equal(r.cumBasis.stream, 'oil');
+  // each snapshot's oil rate is the gross rate less the water cut ...
+  for (const s of r.snapshots) near(s.oilRateStbD, s.qGrossStbD * (1 - s.wcPct / 100), 1e-9, 'oil rate');
+  // ... so the cum is the trapezoid of THOSE, and sits below the gross cum by
+  // the water cut: 369,581 against 427,963 stb, 13.6% on this well. The
+  // trapezoid weights the early, driest snapshots most, which is why the gap is
+  // smaller than the 50% water cut of the final one - but it is enough to move
+  // the ESP's UDC by 0.18 $/bbl, so the two are not interchangeable.
+  const oil = trapezoidCumStb(r.snapshots.map((s) => s.oilRateStbD));
+  const gross = trapezoidCumStb(r.snapshots.map((s) => s.qGrossStbD));
+  near(r.cumBasis.oneYearCumStb, oil, 1e-9, 'cum is the oil trapezoid');
+  assert.ok(oil < gross * 0.9, `oil cum ${oil} should sit below gross ${gross}`);
+  near(500000 / oil - 500000 / gross, 0.1845, 0.001, 'what costing on gross would hide');
+  // and the UDC that quotes it is $/bbl of oil
+  near(r.economics.byMethod.GL.udcUsdPerBbl, 150000 / oil + 3, 1e-9, 'UDC = capex/cum-oil + opex');
+});
+
 test('allift: one-year cum and UDC tie to the workbook; Gas Lift is the pick', () => {
   const r = run();
   near(r.cumBasis.oneYearCumStb, 369580.75, 1, 'one-year cum'); // trapezoid of 2195.2 / 840 / 175
@@ -107,6 +126,41 @@ test('gate: high H2S/CO2 rules Sucker Rod out, with its reason', () => {
 test('gate: both sucker-rod conditions give both reasons, not one', () => {
   const r = run({ gates: { naturalFlow: true, nearGasCompression: true, sourGasHigh: true } });
   assert.equal(r.gateExclusions.SRP.length, 2, 'each condition states itself');
+});
+
+// A shallower, gentler, lower-rate well than the demo, so PCP actually clears
+// its envelope — on the demo well it fails on depth and dog-leg, which would
+// hide whether the sour-gas gate fired at all.
+const PCP_OK = [2, 20, 50].map((wcPct, i) => ({
+  j: 0.5, prPsi: [5200, 3500, 2500][i], pbPsi: 2000, pwfPsi: 2000,
+  depthFt: 2200, whpPsi: 250, wcPct, gorScfStb: 400, devDeg: 3, dogLegDeg: 2,
+}));
+
+test('gate: high H2S/CO2 also rules PCP out, on the stator elastomer', () => {
+  const clean = run({ snapshots: PCP_OK, gates: { naturalFlow: false, nearGasCompression: true, sourGasHigh: false } });
+  assert.ok(clean.applicable.includes('PCP'), 'PCP clears its envelope on this well');
+
+  const r = run({ snapshots: PCP_OK, gates: { naturalFlow: false, nearGasCompression: true, sourGasHigh: true } });
+  assert.ok(r.screen.technicallyApplicable.includes('PCP'), 'still inside its bands — the exclusion is metallurgy');
+  assert.ok(!r.applicable.includes('PCP'), 'but ruled out by the well');
+  assert.match(r.gateExclusions.PCP[0], /stator|elastomer/i);
+  assert.ok(!r.economics.byMethod.PCP, 'and therefore never costed');
+  assert.ok(r.economics.notCosted.includes('PCP'), 'reported, not silently dropped');
+  assert.ok(r.warnings.some((w) => /^PCP clears its envelope but is ruled out/.test(w)), 'the reason reaches the user');
+});
+
+test('gate: high H2S/CO2 leaves the jet pump IN, with a power-fluid warning', () => {
+  // The published screening tables rate the jet pump well on corrosion: no
+  // moving parts downhole, carbide nozzle and throat, inhibitor carried in the
+  // power fluid. What sour gas raises is a surface-facilities question, so it
+  // is a named note rather than an exclusion.
+  const r = run({ snapshots: PCP_OK, gates: { naturalFlow: false, nearGasCompression: true, sourGasHigh: true } });
+  assert.ok(!r.gateExclusions.JET, 'jet pump is not excluded by sour gas');
+  assert.ok(r.applicable.includes('JET'), 'and stays in the costed set');
+  assert.ok(r.economics.byMethod.JET, 'jet pump is costed');
+  const jetNote = (r.gateNotes || []).find((g) => g.method === 'JET');
+  assert.ok(jetNote, 'the sour-service caveat is stated against the jet pump');
+  assert.match(jetNote.text, /power[- ]fluid/i);
 });
 
 test('gate: with no condition set, nothing is excluded and the demo is unchanged', () => {

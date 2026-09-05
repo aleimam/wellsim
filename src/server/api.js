@@ -1981,8 +1981,10 @@ export function alliftSelect(f) {
     cumBasis: {
       source: oneYearCumStb != null ? 'prod-data' : 'none',
       horizon: 'oneYear',
+      stream: 'oil', // NOT gross liquid: the rate is gross x (1 - W.C/100)
+      label: 'One-year cumulative oil, stb',
       oneYearCumStb: oneYearCumStb ?? null,
-      note: 'trapezoid of oil rate at Initial / +6 mo / +1 yr',
+      note: 'trapezoid of the OIL rate (gross x (1 - W.C/100)) at Initial / +6 mo / +1 yr, stb',
     },
     gateNotes: sideGates(gates),
     recommendation: econ.cheapestApplicable,

@@ -1,6 +1,12 @@
 // Artificial-lift economic screen — UDC (Undiscounted Development Cost).
 //
-//   UDC ($/bbl) = capex / cumulative-oil + opex
+//   UDC ($/bbl of OIL) = capex / one-year cumulative OIL + opex
+//
+// The denominator is OIL, never gross liquid. The handler builds each
+// snapshot's rate as gross x (1 - W.C/100) before the trapezoid, so on the
+// workbook's +1 yr snapshot at 50% water cut the cum is half the gross. Costing
+// on gross would flatter every method by the water cut, and by more as the well
+// waters out — which is exactly when the lift decision is being made.
 //
 // Ported from the workbook's D16:D21 block, with its no-op term removed: the
 // sheet wrote `=Cost*1e6/CUM + Opex*CUM/CUM`; the `*CUM/CUM` is identically 1,
@@ -20,7 +26,9 @@
 // never renders with the same authority as a forecast-backed one.
 
 /** Workbook trapezoid over the year: half-year segments between the three
- *  oil-rate snapshots. `days` defaults to 365. */
+ *  OIL-rate snapshots, returning stb. Pass oil rates, not gross liquid — the
+ *  name says stb because the answer is stock-tank barrels of oil.
+ *  `days` defaults to 365. */
 export function trapezoidCumStb(oilRatesStbD, days = 365) {
   const r = oilRatesStbD.filter((x) => Number.isFinite(x));
   if (r.length < 2) return null;
