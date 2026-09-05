@@ -3863,7 +3863,6 @@ document.getElementById('acct-signout').onclick = guard(async () => {
   acctSet(null);
 });
 document.getElementById('acct-save').onclick = guard(acctSaveCase);
-document.getElementById('acct-refresh').onclick = guard(acctRefresh);
 acctUi();
 acctLoadCapabilities();
 
