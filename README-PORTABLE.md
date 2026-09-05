@@ -1,9 +1,43 @@
 # WellSim — standalone portable program
 
-**Build 1.9 — 5 September 2026**, from commit `eabcea1` of the main project.
+**Build 2.0 — 5 September 2026**, from commit `0a9abcf` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 324
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Changes since build 1.8 (5 Sep):
+there. Changes since build 1.9 (5 Sep):
+
+- **Sour gas now rules the PCP out as well as the sucker rod.** Ticking
+  **High H2S/CO2** excludes the progressing-cavity pump with its own reason:
+  H₂S and CO₂ swell and harden the stator elastomer until it chunks, and in
+  sour service that stator is the PCP's shortest-lived part. Like the other
+  gates the reason names its own way out — an elastomer qualified for *that*
+  gas composition. The module already half-knew this: it printed "check
+  elastomers (PCP especially)" as a note nobody had to act on. It is now an
+  exclusion that states itself, and the verdict column reads **excluded**
+  (clears its envelope, ruled out by this well) rather than **PASS**.
+- **The jet pump is deliberately NOT excluded by sour gas**, and the program
+  now says why. The published screening tables rate it well on corrosion — no
+  moving parts downhole, a carbide nozzle and throat, and inhibitor can ride
+  down continuously in the power fluid; sour service is one of the classic
+  arguments *for* a jet pump. Its real weakness is free gas at the throat, and
+  the GLR band already screens that. What sour gas does raise is a **surface
+  facilities** question — sour returns through an open power-fluid loop — so it
+  travels as a warning **named against the jet pump** instead of a feasibility
+  bar. Notes aimed at one method now carry that method's name; before, they
+  floated free of whatever they qualified.
+- **The economics now names its denominator: cumulative OIL.** Nothing computed
+  changed — the cum was always the trapezoid of the oil rate, gross × (1 −
+  W.C/100) — but the labels said only "cum". The column is now **Cum oil, stb**,
+  the UDC is **$/bbl oil**, the section title names the basis, and the summary
+  line spells out the trapezoid and that one well cumulative is shared by every
+  method. On the demo well that distinction is **369,581 stb of oil against
+  427,963 stb gross**: costing on gross would understate the ESP's UDC by
+  0.18 $/bbl, and by more as the well waters out — which is exactly when the
+  lift decision gets made.
+- **Three more tests** (324): the PCP gated on a well where it genuinely clears
+  its envelope, the jet pump surviving sour gas with its note, and the
+  cumulative pinned as oil rather than gross.
+
+Changes in build 1.9 (5 Sep), kept for reference:
 
 - **The lift-selection GLR is now calculated, not typed.** The GLR is gas per
   barrel of TOTAL liquid while the GOR is gas per barrel of OIL, so one follows
@@ -42,7 +76,7 @@ there. Changes since build 1.8 (5 Sep):
   identity (and that a typed GLR is ignored), the Vogel rates, the screen, the
   economics and every gate.
 
-Changes in build 1.8 (5 Sep), kept for reference:
+Changes in build 1.8 (5 Sep), also kept for reference:
 
 - **The ESP gas separator can now be matched to a well test, instead of
   assumed.** Separator efficiency was an input pinned at 95 % — and because the
