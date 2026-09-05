@@ -74,19 +74,20 @@ docs/                 user-guide.md, equations.md, deploy.md
 ## The website
 
 The header bar carries the three well tabs (**Oil | Water | Gas**) plus
-**Save as · Open · Print / PDF · Help**. A server-case link appears only
+**Save as · Open · Help**. A server-case link appears only
 when a supported case store reports itself available:
 
 - **Save as / Open** — the whole case (every input, selection and production
   table across all tabs) to/from a JSON file.
-- **Print / PDF** — results-only clean page (charts, tables, summaries);
-  "Save as PDF" in the browser dialog makes the shareable report.
+- **Printing** — no header button; the browser's own print command gives a
+  results-only clean page (charts, tables, summaries), and "Save as PDF" in
+  that dialog makes the shareable report.
 - **Server cases** — the old JSON company store is disabled by default because
   a typed company slug is not proof of membership. It can be enabled only as
   an invite-gated migration aid; it is not the future tenant model. The
   portable program still exposes its local case folder through this link.
 - **Visitor use stays complete** — every calculation, browser autosave, Save as,
-  Open and Print/PDF workflow works without an account.
+  Open and printing workflow works without an account.
 - **Help** — the full in-app manual at `/help.html` (user guide + every
   equation, constant and workbook deviation).
 

@@ -3885,11 +3885,6 @@ function csvImport(parse, fill) {
 document.getElementById('gas-prod-csv').onclick = () => csvImport(parseProdClipboard, fillProdRows);
 document.getElementById('oil-prod-csv').onclick = () => csvImport(parseOilProdClipboard, fillOilProdRows);
 
-// printable report: hide the input column and chrome, keep summary + charts
-document.getElementById('print-report').onclick = (e) => {
-  e.preventDefault();
-  window.print();
-};
 document.getElementById('water-btn-solve').onclick = guard(waterSolve);
 document.getElementById('water-btn-calibrate').onclick = guard(waterCalibrate);
 document.getElementById('water-btn-sens').onclick = guard(waterSens);

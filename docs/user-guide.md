@@ -27,12 +27,13 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   (day > 31, month > 12) are rejected with the row number — nothing silently rolls over.
   Time-of-day is honoured (sporadic test timestamps work). `dt` is days from the first row.
 - **Header bar** (final layout): the **Oil Well | Water Well | Gas Well** tabs,
-  then **Save as · Open · Print / PDF · Help**. A server-case link is shown
+  then **Save as · Open · Help**. A server-case link is shown
   only when the deployment reports a supported case store. Help opens the full
   in-app manual (`/help.html` — user guide + every equation and deviation).
-- **Print / PDF** (header): prints the results only — charts, tables, summary
-  cards and banners on a clean white page (inputs, navigation and buttons hide).
-  Use the browser dialog's "Save as PDF" for a shareable report.
+- **Printing** (the browser's own print command — there is no header button):
+  the print stylesheet keeps the results only — charts, tables, summary cards
+  and banners on a clean white page (inputs, navigation and buttons hide).
+  Use the dialog's "Save as PDF" for a shareable report.
 - **Save as / Open** (header buttons): the whole case — every input,
   selection and production table across all three tabs — saves to a JSON
   file and restores in one click; program-filled grey cells stay
@@ -43,7 +44,7 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   controlled migration, registration is invite-only. The portable program uses
   the same panel for its local `cases/` folder and needs no account.
 - **Visitor use stays complete:** every calculation, browser autosave, Save as,
-  Open and Print/PDF workflow works without an account.
+  Open and printing workflow works without an account.
 - **Mobile**: below 640 px the layout stacks, inputs grow to finger size, and the main
   action button stays pinned while you scroll.
 - **Your inputs survive a refresh.** Everything you type is saved in the
