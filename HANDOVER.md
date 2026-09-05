@@ -26,17 +26,23 @@ deploying it would restore public registration. Production does not track
 database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
-**Where the work sits, 5 September 2026:** branch
-`merge/gas-forecast-into-v2` at `db95f0a`, pushed to origin and in sync. It is
-ahead of both `origin/main` (`de2393c`) and `origin/codex/v2-foundation`
-(`925c7a4`) and **has not been merged into either** — no PR exists yet. The
-newest portable release is **2.0** (`D:\WellSim_2.0`, also on F:), built from
-`0a9abcf`.
+**Where the work sits, 5 September 2026 (evening):** branch
+`merge/gas-forecast-into-v2` at `457fc90` (147 commits), pushed to origin and
+in sync. It is ahead of both `origin/main` (`de2393c`) and
+`origin/codex/v2-foundation` (`b087a24`) and **has not been merged into
+either** — no PR exists yet. The four commits after the deployed `db95f0a`
+touch documentation and the build script only, so production is missing no
+behaviour: on 5 Sep the UI wellsim.app serves was compared file by file
+against this tree and is identical apart from CRLF line endings, and one
+`oil/sensitivity` payload replayed against both sites agreed to 2e-15
+relative. The newest portable release is **2.2** (`D:\WellSim_2.2`, also on
+F:), built from `8bba363`.
 
 **Production runs this branch, not `main`** — an interim state the owner
 authorised on 5 September, pending the pull request. Until that PR lands,
-`main` (`de2393c`) and production have DIVERGED by 64 commits, so the
-two-device branch/site contract below records the intent, not the deployment.
+`main` (`de2393c`) and production have DIVERGED by 64 commits — 68 from this
+branch tip — so the two-device branch/site contract below records the intent,
+not the deployment.
 A green test run is still not authorisation to release; this release was
 authorised explicitly.
 
@@ -235,9 +241,12 @@ private; neither belongs in a repository. They **are** in the F: backup.
   from committed source; the outputs (`WellSim.exe`, `build/`) are gitignored
   because they are ~200 MB per build. It serves the identical UI and physics,
   stores cases in a `cases/` folder **beside the exe**, has no accounts, and
-  takes the first free port from 3355. Current: **build 1.2, 30 Aug 2026**,
-  from commit `ce63b3f`; it lives on the Transcend at `F:\petrosim\` and on
-  the Desktop under `WellSim\`.
+  takes the first free port from 3355. Current: **build 2.2, 5 Sep 2026**,
+  from commit `8bba363`, signed `CN=M. El-Ashry`; it lives at
+  `D:\WellSim_2.2\` and `F:\WellSim_2.2\`, and inside the 5 Sep full backup as
+  `portable/WellSim-2.2.zip`. Builds 1.3–2.0 carry the ThePWF signature; that
+  certificate and its private key were destroyed on 5 Sep and can never sign
+  again — README-PORTABLE.md records what that does and does not change.
 
   Two things about it are easy to get wrong, and both were wrong until
   30 Aug 2026:
@@ -291,20 +300,30 @@ private; neither belongs in a repository. They **are** in the F: backup.
   `Permission denied (publickey)` to a password-only attempt. The original
   file is backed up at `/root/sshd_config.bak-2026-08-29`.
 
-  **SUPERSEDED 2 Sep 2026: `wellsim-deploy` no longer works.** Key-only
-  administrative access was restored through the Hetzner console that day and
-  a new Ed25519 recovery identity was installed (`wellsim-ops-2026-09-02` in
-  the Hetzner project). The server now answers `Permission denied (publickey)`
-  to `wellsim_hetzner` — verified from this workstation on 2 Sep, with no
-  `Server accepts key` line. The recovery key is NOT on this machine, so
-  deploys cannot run from here. Everything below describes the retired key and
-  is kept only because its lessons about ACLs, passphrases and F: paths still
-  apply to whatever key replaces it.
+  **2 Sep 2026, SINCE REVERSED: `wellsim_hetzner` was unauthorised for three
+  days.** Key-only administrative access was restored through the Hetzner
+  console that day and a new Ed25519 recovery identity was installed
+  (`wellsim-ops-2026-09-02` in the Hetzner project). With `wellsim_hetzner`
+  out of `authorized_keys` the server answered `Permission denied (publickey)`
+  to it — verified from this workstation on 2 Sep, with no `Server accepts
+  key` line — and deploys could not run from here.
+
+  **It was re-added through the Hetzner console on 5 Sep 2026 and works
+  again.** Same key, same fingerprint `SHA256:/3IAf9gT…`; it was never
+  "retired", only unauthorised. Verified from this workstation on 5 Sep:
+  `Server accepts key` followed by `Authenticated to 91.98.23.255 using
+  "publickey"`. Three keys now open root — `wellsim-deploy`,
+  `wellsim-ops-2026-09-02`, `wellsim-other-device-2026-09-03` — and none are
+  to be removed. docs/deploy.md carries the same account plus the Windows
+  gotcha that costs the most time: Git Bash's `ssh` cannot see the Windows
+  ssh-agent, so use `C:\Windows\System32\OpenSSH\ssh.exe`. Everything below
+  therefore describes the key still in use.
 
   See **docs/architecture/infrastructure-audit-2026-09-02.md** for why.
 
-  **The consequence to respect: this host is now reachable only with the
-  private key `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
+  **The consequence to respect: this host accepts no passwords — from this
+  workstation it is reachable only with the private key
+  `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
   Hetzner console, not SSH. A passphrase-protected copy is kept on the F:
   backup drive at **`F:\WellSim-Backup-2026-08-29\ssh-key\`** (the key is
   `wellsim_hetzner` + `.pub`); the passphrase is in the password manager and
