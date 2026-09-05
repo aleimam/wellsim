@@ -3,15 +3,15 @@
 **Live:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
 **Repo:** https://github.com/aleimam/wellsim · **Manual:** https://wellsim.app/help.html
 
-**Live production revision:** 5 September 2026 — `b8ba394` from
-`merge/gas-forecast-into-v2`, deployed 19:05:39 UTC, asset stamp `2026-09-05f`.
+**Live production revision:** 5 September 2026 — `211a96c` from
+`merge/gas-forecast-into-v2`, deployed 19:14:30 UTC, asset stamp `2026-09-05g`.
 Verified after the release: 38/38 module smoke against the live site,
 `NRestarts=0`, no startup errors, the served UI byte-identical to this tree
 apart from CRLF, and one `oil/sensitivity` payload agreeing with the local
-engine to 9.8e-16. It replaced `eca327f` (18:50:39 UTC), which had
-replaced `db95f0a` (12:38:20 UTC) earlier the same day; the rollback archive
-of the `eca327f` tree is
-`/root/wellsim-app-pre-deploy-20260905-190441.tar.gz` — restore with
+engine to 9.8e-16. It is the fourth release of 5 September, after
+`db95f0a` (12:38:20), `eca327f` (18:50:39) and `b8ba394` (19:05:39); the
+rollback archive of the `b8ba394` tree is
+`/root/wellsim-app-pre-deploy-20260905-191356.tar.gz` — restore with
 `tar -xzf … -C /opt/wellsim && systemctl restart wellsim`.
 
 **The containment survived that deploy and is still in force:**
@@ -32,17 +32,18 @@ database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
 **Where the work sits, 5 September 2026 (evening):** branch
-`merge/gas-forecast-into-v2` at `b8ba394` (151 commits), pushed to origin and
+`merge/gas-forecast-into-v2` at `211a96c` (153 commits), pushed to origin and
 in sync, and **this exact tip is what production runs** — the site was
-redeployed at 19:05:39 UTC. It is ahead of both `origin/main` (`de2393c`) and
+redeployed at 19:14:30 UTC. It is ahead of both `origin/main` (`de2393c`) and
 `origin/codex/v2-foundation` (`b087a24`) and **has not been merged into
 either** — no PR exists yet. The newest portable release is **2.2**
 (`D:\WellSim_2.2`, also on F:), built from `8bba363`; it therefore predates
-the Export/Contact and Print/PDF removals, which are website changes only.
+the Export/Contact, Print/PDF and account-Refresh removals, which are website
+changes only.
 
 **Production runs this branch, not `main`** — an interim state the owner
 authorised on 5 September, pending the pull request. Until that PR lands,
-`main` (`de2393c`) and production have DIVERGED by 72 commits — production and
+`main` (`de2393c`) and production have DIVERGED by 74 commits — production and
 this branch tip are now the same commit — so the two-device branch/site
 contract below records the intent, not the deployment.
 A green test run is still not authorisation to release; this release was

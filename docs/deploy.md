@@ -190,8 +190,8 @@ www.thepwf.net {
 > *shipped* the containment, not the commit that implements it.
 >
 > **Superseded 5 Sep 2026 — what is deployed now.** wellsim.app runs
-> `b8ba394` from `merge/gas-forecast-into-v2`, deployed 19:05:39 UTC, asset
-> stamp `2026-09-05f`. The owner authorised it explicitly as an interim while
+> `211a96c` from `merge/gas-forecast-into-v2`, deployed 19:14:30 UTC, asset
+> stamp `2026-09-05g`. The owner authorised it explicitly as an interim while
 > the pull request is prepared on the second machine. The warning above still
 > stands **for `main`**: `27ea04e` is on the deployed branch but is still not
 > on `main`, so `main` remains unsafe to deploy here.
@@ -205,8 +205,8 @@ www.thepwf.net {
 > Release evidence: 38/38 module smoke against the live site, `NRestarts=0`,
 > no startup errors, every served UI file byte-identical to the committed tree
 > apart from CRLF, and an `oil/sensitivity` replay agreeing with the local
-> engine to 9.8e-16. Rollback archive of the previous tree (`eca327f`):
-> `/root/wellsim-app-pre-deploy-20260905-190441.tar.gz` — restore with
+> engine to 9.8e-16. Rollback archive of the previous tree (`b8ba394`):
+> `/root/wellsim-app-pre-deploy-20260905-191356.tar.gz` — restore with
 > `tar -xzf … -C /opt/wellsim && systemctl restart wellsim`. No fresh data
 > pull was needed: the case store has been frozen since 1 Sep and the evening
 > backup `WellSim-FullBackup-2026-09-05g` already holds it.
