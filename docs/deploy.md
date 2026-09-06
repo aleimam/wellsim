@@ -221,7 +221,7 @@ www.thepwf.net {
 > second machine's agreement permits porting "with reviewed pull requests or
 > cherry-picks" but not automatic merging of the two lines.
 
-From a clean working tree on `main`, after `node --test` passes:
+From a clean working tree on `main`, after `npm test` passes:
 
 ```bash
 git archive --format=tar.gz -o /tmp/wellsim-src.tar.gz HEAD

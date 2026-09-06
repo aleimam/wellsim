@@ -24,7 +24,7 @@ const DOCS = [
   'src/ui/help.html',
 ];
 
-/** Every test( call across the suite — what `node --test` will report. */
+/** Every test( call across the suite — what `npm test` will report. */
 function actualTestCount() {
   return fs
     .readdirSync(path.join(root, 'tests'))

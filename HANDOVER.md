@@ -80,7 +80,7 @@ The web server uses Node built-ins plus `pg` for opt-in PostgreSQL. The UI is
 plain HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-node --test                       # 324 unit, regression and security tests
+npm test                          # 324 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 
@@ -393,7 +393,7 @@ Worth remembering before chasing it as a bug.
 1. Find the workbook cell it comes from. The workbooks are in `oil excel/`
    and `gas excel/` in the backup.
 2. Pin it with a test at 15 digits, the way the existing tests do.
-3. Run `node --test` **and** `node scripts/validation-sweep.mjs`.
+3. Run `npm test` **and** `node scripts/validation-sweep.mjs`.
 4. Verify in the browser — the app is the deliverable, not the API.
 5. Only then deploy, and bump the asset stamp.
 

@@ -33,7 +33,7 @@ Database use is off by default; see `db/README.md` for the bldrz boundary.
 ## Tests
 
 ```bash
-node --test
+npm test
 ```
 
 324 tests: PVT pins against workbook cells (15-digit), wellbore-march station parity
