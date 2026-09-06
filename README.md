@@ -80,8 +80,9 @@ when a supported case store reports itself available:
 - **Save as / Open** — the whole case (every input, selection and production
   table across all tabs) to/from a JSON file on your own machine; the server
   is never involved. Save as opens the browser Save dialog so the folder and
-  name are yours to choose, with a download fallback where that dialog does
-  not exist.
+  name are yours to choose; on a phone, where no browser has that dialog, it
+  opens the share sheet instead ("Save to Files" and friends), with a download
+  fallback where neither exists.
 - **Printing** — no header button; the browser's own print command gives a
   results-only clean page (charts, tables, summaries), and "Save as PDF" in
   that dialog makes the shareable report.

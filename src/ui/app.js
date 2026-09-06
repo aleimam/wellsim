@@ -3460,6 +3460,30 @@ async function saveCaseAs() {
       return;
     }
   }
+  // Phones have no Save dialog: neither Android Chrome nor iOS Safari
+  // implements the File System Access API. The share sheet is the mobile
+  // equivalent — "Save to Files" on iOS, Files/Drive on Android — so the
+  // analyst still chooses where the case lands instead of it dropping into
+  // the downloads folder unseen. share() must be reached from the click
+  // without an await in front of it, which is why this sits before the
+  // prompt-and-download fallback and builds the File synchronously.
+  if (navigator.canShare && navigator.share) {
+    // plain application/json, not the contract's vendor +json subtype: share
+    // targets match on the MIME type, and a type they do not recognise can
+    // leave the sheet with nothing useful to offer. The .json extension and
+    // the content are unchanged either way.
+    const file = new File([artifact.content], artifact.filename, { type: 'application/json' });
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: artifact.filename });
+        showOk(`Shared ${artifact.filename} — pick "Save to Files" to keep it`);
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return; // the analyst closed the sheet
+        // anything else (no target app, sheet unavailable): fall through
+      }
+    }
+  }
   let name;
   try { name = prompt('Save case as', artifact.filename); } catch { name = artifact.filename; }
   if (name === null) return; // cancelled

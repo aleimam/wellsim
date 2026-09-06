@@ -40,9 +40,12 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
   program-filled (they refill on the next run). Both are **local file**
   operations and never involve the server. Save as opens the browser Save
   dialog, so you pick the folder and the name; Open starts in the folder the
-  last case went to (the two dialogs share a picker id). Browsers without the
-  File System Access API — Firefox, Safari — fall back to naming the file and
-  saving it wherever that browser puts downloads.
+  last case went to (the two dialogs share a picker id). **On a phone** no
+  browser has that dialog, so Save as opens the system share sheet — "Save to
+  Files" on iOS, Files or Drive on Android — and the folder is still yours to
+  choose; Open uses the system document picker. Where neither exists (Firefox,
+  older Safari) it falls back to naming the file and saving it wherever that
+  browser puts downloads.
 - **Server cases:** the legacy JSON company store is disabled by default while
   the secure organization/membership store is built. A company name or slug is
   not proof that somebody belongs to that company. When explicitly enabled for
