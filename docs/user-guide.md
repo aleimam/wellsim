@@ -37,7 +37,12 @@ chart, a pink output cell, or a grey *input-or-calculated* cell.
 - **Save as / Open** (header buttons): the whole case — every input,
   selection and production table across all three tabs — saves to a JSON
   file and restores in one click; program-filled grey cells stay
-  program-filled (they refill on the next run).
+  program-filled (they refill on the next run). Both are **local file**
+  operations and never involve the server. Save as opens the browser Save
+  dialog, so you pick the folder and the name; Open starts in the folder the
+  last case went to (the two dialogs share a picker id). Browsers without the
+  File System Access API — Firefox, Safari — fall back to naming the file and
+  saving it wherever that browser puts downloads.
 - **Server cases:** the legacy JSON company store is disabled by default while
   the secure organization/membership store is built. A company name or slug is
   not proof that somebody belongs to that company. When explicitly enabled for

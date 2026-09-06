@@ -78,7 +78,10 @@ The header bar carries the three well tabs (**Oil | Water | Gas**) plus
 when a supported case store reports itself available:
 
 - **Save as / Open** — the whole case (every input, selection and production
-  table across all tabs) to/from a JSON file.
+  table across all tabs) to/from a JSON file on your own machine; the server
+  is never involved. Save as opens the browser Save dialog so the folder and
+  name are yours to choose, with a download fallback where that dialog does
+  not exist.
 - **Printing** — no header button; the browser's own print command gives a
   results-only clean page (charts, tables, summaries), and "Save as PDF" in
   that dialog makes the shareable report.

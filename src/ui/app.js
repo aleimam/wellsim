@@ -3420,18 +3420,73 @@ function downloadArtifact(artifact) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-function saveCaseAs() {
-  let name;
-  try { name = prompt('Save case as', 'wellsim-case.json'); } catch { name = 'wellsim-case.json'; }
-  if (name === null) return; // cancelled
-  if (!name) name = 'wellsim-case.json';
+// Save as / Open are LOCAL file operations and never involve the server.
+// Where the browser offers the File System Access API (Chromium, and the
+// portable build's localhost is a secure context too) the analyst gets a real
+// Save-As dialog and picks the folder and the name; both dialogs share an id,
+// so Open starts in the folder the last case was saved to. Firefox and Safari
+// have no such dialog: there the case still saves locally, through the
+// download path, to wherever that browser files downloads.
+const CASE_PICKER = {
+  id: 'wellsim-cases',
+  types: [{ description: 'WellSim case', accept: { 'application/json': ['.json'] } }],
+};
+
+async function saveCaseAs() {
+  let artifact;
   try {
-    const artifact = caseExportArtifact('case-json', name);
-    downloadArtifact(artifact);
-    showOk(`Downloaded ${artifact.filename}`);
+    artifact = caseExportArtifact('case-json', 'wellsim-case');
+  } catch (e) {
+    showError(`could not export case: ${e.message}`);
+    return;
+  }
+  if (globalThis.showSaveFilePicker) {
+    let handle = null;
+    try {
+      handle = await globalThis.showSaveFilePicker({ ...CASE_PICKER, suggestedName: artifact.filename });
+    } catch (e) {
+      if (e.name === 'AbortError') return; // the analyst closed the dialog
+      handle = null; // picker refused (permissions policy, opaque origin): fall back
+    }
+    if (handle) {
+      try {
+        const stream = await handle.createWritable();
+        await stream.write(artifact.content);
+        await stream.close();
+        showOk(`Saved ${handle.name}`);
+      } catch (e) {
+        showError(`could not save case: ${e.message}`);
+      }
+      return;
+    }
+  }
+  let name;
+  try { name = prompt('Save case as', artifact.filename); } catch { name = artifact.filename; }
+  if (name === null) return; // cancelled
+  try {
+    const named = caseExportArtifact('case-json', name || 'wellsim-case');
+    downloadArtifact(named);
+    showOk(`Downloaded ${named.filename}`);
   } catch (e) {
     showError(`could not export case: ${e.message}`);
   }
+}
+
+async function openCase() {
+  if (globalThis.showOpenFilePicker) {
+    let handle = null;
+    try {
+      [handle] = await globalThis.showOpenFilePicker({ ...CASE_PICKER, multiple: false });
+    } catch (e) {
+      if (e.name === 'AbortError') return; // the analyst closed the dialog
+      handle = null;
+    }
+    if (handle) {
+      openCaseFile(await handle.getFile());
+      return;
+    }
+  }
+  document.getElementById('open-case-file').click(); // <input type="file">
 }
 
 function openCaseFile(file) {
@@ -3843,8 +3898,8 @@ document.getElementById('tab-water').onclick = () => switchTab('water');
 document.getElementById('tab-gas').onclick = () => switchTab('gas');
 document.getElementById('mb-inputs').onclick = () => setMobileView('inputs');
 document.getElementById('mb-results').onclick = () => setMobileView('results');
-document.getElementById('save-case').onclick = (e) => { e.preventDefault(); saveCaseAs(); };
-document.getElementById('open-case').onclick = (e) => { e.preventDefault(); document.getElementById('open-case-file').click(); };
+document.getElementById('save-case').onclick = (e) => { e.preventDefault(); saveCaseAs().catch((err) => showError(String(err.message ?? err))); };
+document.getElementById('open-case').onclick = (e) => { e.preventDefault(); openCase().catch((err) => showError(String(err.message ?? err))); };
 document.getElementById('open-case-file').onchange = (e) => {
   if (e.target.files?.[0]) openCaseFile(e.target.files[0]);
   e.target.value = '';
