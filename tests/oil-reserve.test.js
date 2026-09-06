@@ -238,3 +238,116 @@ test('ESP: a forecast survives the low-rate probes used to bracket its root', ()
   assert.ok(Math.abs(fc.nMMstb - rsv.fit.nAvgMMstb) < 1e-6, 'N must come from the reserve chain');
   for (const r of fc.rows) assert.ok(Number.isFinite(r.pwfPsi), 'every step needs a finite Pwf');
 });
+
+// ---- prod_data Model column (WellSim extension; owner decisions 6 Sep 2026) ----
+// Each row names the well model that solves its Pwf and the J that backs out
+// its Pr. No workbook does this within one history, so the tests are
+// consistency tests against the single-model runs, not workbook pins.
+
+test('Model column: each row solves with its own model, and its own J', () => {
+  const rows = ESP_PROD.map((r, i) => ({ ...r, model: i < 2 ? 'natural' : 'esp' }));
+  const f = { ...ESP_FORM, ...WITH_PUMP, liftType: 'natural', userJ: '2.7', presSource: 'prod' };
+  const mixed = api.oilReserve({ ...f, prodRows: rows });
+  assert.equal(mixed.error, undefined);
+  const allNat = api.oilReserve({ ...f, prodRows: ESP_PROD.map((r) => ({ ...r, model: 'natural' })) });
+  const allEsp = api.oilReserve({ ...f, prodRows: ESP_PROD.map((r) => ({ ...r, model: 'esp' })) });
+  // the two models genuinely differ on the same row
+  assert.notEqual(allNat.rows[2].pwfPsi, allEsp.rows[2].pwfPsi);
+  // natural rows: the plain march and the Darcy future J
+  for (let i = 0; i < 2; i++) {
+    assert.equal(mixed.rows[i].model, 'natural');
+    assert.equal(mixed.rows[i].pwfPsi, allNat.rows[i].pwfPsi);
+    assert.equal(mixed.rows[i].jSource, 'darcy');
+  }
+  // ESP rows: the coupled pump solve and the ESP module's J -- the typed PI
+  for (let i = 2; i < 4; i++) {
+    assert.equal(mixed.rows[i].model, 'esp');
+    assert.equal(mixed.rows[i].pwfPsi, allEsp.rows[i].pwfPsi);
+    assert.equal(mixed.rows[i].jSource, 'pi');
+    assert.equal(mixed.rows[i].jUsed, 2.7);
+  }
+});
+
+test('Model column: a User row takes its typed Pwf and Pr, and needs both', () => {
+  const rows = ESP_PROD.map((r, i) =>
+    i === 3 ? { ...r, model: 'user', pwfPsi: '1500', presPsi: '2900' } : { ...r, model: 'natural' }
+  );
+  const r = api.oilReserve({ ...ESP_FORM, prodRows: rows, presSource: 'prod' });
+  assert.equal(r.error, undefined);
+  assert.equal(r.rows[3].pwfPsi, 1500);
+  assert.equal(r.rows[3].presPsi, 2900);
+  assert.equal(r.rows[3].pwfSource, 'input');
+  assert.equal(r.rows[3].presSource, 'input');
+  assert.equal(r.rows[3].jSource, null);
+  const missing = api.oilReserve({
+    ...ESP_FORM, presSource: 'prod',
+    prodRows: rows.map((x, i) => (i === 3 ? { ...x, presPsi: '' } : x)),
+  });
+  assert.match(missing.error, /row 4 .*User row needs BOTH Pwf and Pr/);
+  // a Pr left in the cell of a NON-User row is not an input: Pr is backed out
+  const stray = api.oilReserve({
+    ...ESP_FORM, presSource: 'prod',
+    prodRows: ESP_PROD.map((x) => ({ ...x, model: 'natural', presPsi: '9999' })),
+  });
+  assert.equal(stray.error, undefined);
+  assert.equal(stray.rows[0].presSource, 'calculated');
+  assert.notEqual(stray.rows[0].presPsi, 9999);
+});
+
+test('Model column: a row naming a model the panel cannot supply fails by row, never silently', () => {
+  const esp = api.oilReserve({
+    ...ESP_FORM, userJ: '2.7', presSource: 'prod',
+    prodRows: ESP_PROD.map((r) => ({ ...r, model: 'esp' })),
+  });
+  assert.match(esp.error, /row 1 .*ESP row needs the pump setting depth/);
+  const gl = api.oilReserve({
+    ...ESP_FORM, userJ: '2.7', presSource: 'prod',
+    prodRows: ESP_PROD.map((r) => ({ ...r, model: 'gaslift' })),
+  });
+  assert.match(gl.error, /row 1 .*Gas-lift row needs the injection depth/);
+  // ESP and gas-lift rows use the module's J -- the typed PI -- and say so
+  const noPi = api.oilReserve({
+    ...ESP_FORM, ...WITH_PUMP, presSource: 'prod',
+    prodRows: ESP_PROD.map((r) => ({ ...r, model: 'esp' })),
+  });
+  assert.match(noPi.error, /row 1 .*typed PI/);
+  const bad = api.oilReserve({ ...ESP_FORM, presSource: 'prod', prodRows: [{ ...ESP_PROD[0], model: 'jet' }, ESP_PROD[1]] });
+  assert.match(bad.error, /row 1 .*unknown model "jet"/);
+});
+
+test('Model column: a Gas-lift row carries its own injection rate, blank = the panel', () => {
+  const base = { ...ESP_FORM, userJ: '2.7', injDepthTvdM: '2490.92', injRateMMscfd: '0.5', presSource: 'prod' };
+  const panel = api.oilReserve({ ...base, prodRows: ESP_PROD.map((r) => ({ ...r, model: 'gaslift' })) });
+  const own = api.oilReserve({ ...base, prodRows: ESP_PROD.map((r) => ({ ...r, model: 'gaslift', injMMscfd: '1.5' })) });
+  const blank = api.oilReserve({ ...base, prodRows: ESP_PROD.map((r) => ({ ...r, model: 'gaslift', injMMscfd: '' })) });
+  assert.equal(panel.error, undefined);
+  assert.equal(own.error, undefined);
+  assert.notEqual(panel.rows[0].pwfPsi, own.rows[0].pwfPsi, 'a different injection rate must move Pwf');
+  assert.equal(blank.rows[0].pwfPsi, panel.rows[0].pwfPsi, 'blank inj = the panel rate');
+  for (const row of panel.rows) assert.equal(row.jUsed, 2.7);
+});
+
+test('Model column: rows without a model keep the whole-history behaviour exactly', () => {
+  // the byte-identical guard: the same case with and without the column
+  const before = api.oilReserve({ ...ESP_FORM, presSource: 'prod' });
+  const after = api.oilReserve({ ...ESP_FORM, presSource: 'prod', prodRows: ESP_PROD.map((r) => ({ ...r, model: '' })) });
+  assert.equal(before.fit.nAvgMMstb, after.fit.nAvgMMstb);
+  assert.deepEqual(before.rows.map((r) => r.presPsi), after.rows.map((r) => r.presPsi));
+  assert.equal(after.rows[0].model, null);
+});
+
+test('the forecast continues the well as LAST MODELLED: the last row that names a model wins over the panel', () => {
+  const rows = ESP_PROD.map((r, i) => ({ ...r, model: i < 3 ? 'natural' : 'esp' }));
+  const f = { ...ESP_FORM, ...WITH_PUMP, liftType: 'natural', userJ: '2.7', prodRows: rows };
+  const fc = api.oilForecastApi(f);
+  assert.equal(fc.error, undefined);
+  const fcNat = api.oilForecastApi({ ...f, prodRows: rows.map((r) => ({ ...r, model: 'natural' })) });
+  assert.equal(fcNat.error, undefined);
+  assert.notEqual(fc.eurMMstb, fcNat.eurMMstb, 'an ESP-modelled last row must change the forecast');
+  // a trailing User row names no model: the search walks back to the ESP row
+  const withUser = api.oilForecastApi({
+    ...f,
+    prodRows: [...rows, { date: '360', thpPsi: '700', qOilStbD: '1600', wcPct: '58', gorScfStb: '5700', model: 'user', pwfPsi: '1400', presPsi: '2800' }],
+  });
+  assert.equal(withUser.error, undefined);
+});

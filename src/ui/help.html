@@ -183,7 +183,7 @@ pre.eq code { background: none; padding: 0; }
   <h1>WellSim Manual</h1>
   <p class="tag">Nodal analysis, minimum connected reserves, and production forecasting for oil &amp; gas wells &mdash; a web port of the field-proven M.&nbsp;El-Ashry Excel toolset, with the macros replaced by deterministic solvers and every formula pinned against the original workbook cells.</p>
   <div class="statusrow">
-    <span class="chip"><b>324</b> regression and security tests passing</span>
+    <span class="chip"><b>330</b> regression and security tests passing</span>
     <span class="chip"><b>43/43</b> sheet-parity sensitivities</span>
     <span class="chip">gas march <b>bit-exact</b> vs workbook</span>
     <span class="chip">port 3355 &middot; optional PostgreSQL</span>
@@ -211,7 +211,7 @@ pre.eq code { background: none; padding: 0; }
 
 <h2 id="run">Run &amp; test</h2>
 <pre class="eq">node src/server/server.js               # serves http://localhost:3355
-npm test                                # 324 tests
+npm test                                # 330 tests
 node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity cases</pre>
 <p>The server uses only Node built-ins; the UI is plain HTML/JS (Plotly for charts). Documentation lives in the repo: <code>README.md</code>, <code>docs/user-guide.md</code>, <code>docs/equations.md</code>, <code>docs/deploy.md</code>. A standalone portable build (<code>WellSim.exe</code>, no install, cases saved beside the exe) is produced from this same source tree by <code>build.ps1</code>.</p>
 
@@ -295,7 +295,8 @@ node scripts/validation-sweep.mjs       # 43 module-vs-workbook sensitivity case
 <h2 id="oil-reserve"><span class="sect">Oil</span> &mdash; Reserve estimate</h2>
 <div class="selgrid">
   <div class="selcard"><span class="n">1</span><h5>Prod data &amp; macro</h5>
-    <p>Per-row Pwf (input-or-march) &rarr; Pr by composite-Vogel inversion iterated with J_2 &rarr; Havlena&ndash;Odeh MB. Headline N = AVERAGE(F/Eo); slope of F&nbsp;vs&nbsp;Eo as cross-check; F&ndash;Eo crossplot + N&nbsp;vs&nbsp;Np charts.</p></div>
+    <p>Per-row Pwf (input-or-march) &rarr; Pr by composite-Vogel inversion iterated with J_2 &rarr; Havlena&ndash;Odeh MB. Headline N = AVERAGE(F/Eo); slope of F&nbsp;vs&nbsp;Eo as cross-check; F&ndash;Eo crossplot + N&nbsp;vs&nbsp;Np charts.</p>
+    <p><b>Model column</b> (per row): which well model solves that date&rsquo;s Pwf and which J backs out its Pr. <b>Natural</b> &mdash; plain march, Darcy future J. <b>Gas lift</b> &mdash; lifted march at the row&rsquo;s own <i>GL inj</i> (blank = panel), Pr with the typed PI. <b>ESP</b> &mdash; coupled pump solve at the row&rsquo;s own <i>Hz</i> (blank = panel), Pr with the typed PI. <b>User</b> &mdash; type both Pwf and Pr. New rows take the active lift type; a change fills down. A row naming a model the panel cannot supply stops with that row named. The Forecast continues the well as the last modelled row.</p></div>
   <div class="selcard"><span class="n">2</span><h5>Static Pres history</h5>
     <p>Measured memory-gauge pressures typed directly (Date | Pres) &mdash; no IPR/VLP anywhere. Np/Gp from the prod-data cumulative. The strongest data when surveys exist.</p></div>
   <div class="selcard"><span class="n">3</span><h5>Reservoir limit</h5>
@@ -526,6 +527,7 @@ LIMIT: neither MB carries a water term &mdash; the Forecast W.C affects LIFT onl
   <li><b>Rounding artifacts preserved</b> where parity needs them: &pi; = 22/7 trajectory cosine; the <code>rouhgsc</code> artifact available as a test override.</li>
   <li><b>Oil-forecast PVT evaluation point</b>: Rs/Bo/Bg/&mu; are evaluated at the TRIAL pressure inside each step&rsquo;s solve, for both methods. The saved Tarner sheet froze PVT at initial values; the training material directs otherwise, and the Walsh Gp residual moves with pressure almost entirely through the PVT (Bg, Rs, Rv) &mdash; freezing it leaves no root.</li>
   <li><b>Walsh PVT table pressure</b>: the sheet reads its PVT table at the parallel TARNER sheet&rsquo;s pressures (a shared-table convenience of the workbook); WellSim reads it at Walsh&rsquo;s own solved pressure.</li>
+  <li><b>Per-row well model in prod_data</b> (WellSim extension, 6 Sep 2026): no workbook switches the well model within one production history &mdash; each sheet solves every row with its own lift and its own J. The Model column lets a history that crossed a lift change (natural &rarr; gas lift &rarr; ESP) be solved row by row with the model and the J that applied on that date, and the Forecast starts from the last modelled row. Rows without a model solve exactly as the sheets do.</li>
   <li><b>Lift-selection UDC term</b>: the workbook&rsquo;s <code>Cost&times;10&#8310;/CUM + Opex&times;CUM/CUM</code> carries a &times;CUM/CUM that is identically 1; WellSim drops it &mdash; UDC = capex/cum + opex.</li>
 </ol>
 

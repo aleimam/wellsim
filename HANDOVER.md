@@ -27,7 +27,7 @@ deploying it would restore public registration. Production does not track
 `main` — check before you deploy, or you will roll that containment back.
 
 **Current working tree:** `main` merged into `codex/v2-foundation`,
-324 tests passing and 43/43 validation sweep. The separate `bldrz`
+330 tests passing and 43/43 validation sweep. The separate `bldrz`
 database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
@@ -80,7 +80,7 @@ The web server uses Node built-ins plus `pg` for opt-in PostgreSQL. The UI is
 plain HTML/JS. Plotly is the single external asset, from a CDN.
 
 ```bash
-npm test                          # 324 unit, regression and security tests
+npm test                          # 330 unit, regression and security tests
 node scripts/validation-sweep.mjs # 43 physics checks against analytic answers
 ```
 

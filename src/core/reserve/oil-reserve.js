@@ -65,6 +65,13 @@ export function prFromRowOil(ipr, pvt, { qGrossStbD, pwfPsi, prStart }) {
 // `march` is injectable so an ESP well can be solved: with a catalogue pump
 // the dP is not an input, it is solved from the pump curve at each row's own
 // rate. Defaults to the plain march, so natural and gas-lift are unchanged.
+//
+// Per-row well model (WellSim extension, owner decision 6 Sep 2026 — no
+// workbook switches the model within one history): a row may carry its own
+// `march`, `marchCfg` and `ipr` record, chosen by the prod_data Model column,
+// and a User row carries a typed `presPsi` beside its typed Pwf. Rows without
+// them take the globals, so a case saved before the column existed solves
+// exactly as it did.
 export function oilPresSolver(marchCfg, ipr, pvt, rows, march = oilMarch) {
   const boi = oilFvf(ipr.priPsi, pvt);
   const t0 = rows.length ? toDays(rows[0].date) : 0;
@@ -74,20 +81,29 @@ export function oilPresSolver(marchCfg, ipr, pvt, rows, march = oilMarch) {
   let prPrev = ipr.prPsi;
   return rows.map((r) => {
     const tDays = toDays(r.date);
-    const wc = r.wcPct ?? marchCfg.wcPct;
-    const gor = r.gorScfStb ?? marchCfg.gorScfStb;
+    const rowMarch = r.march ?? march;
+    const rowCfg = r.marchCfg ?? marchCfg;
+    const rowIpr = r.ipr ?? ipr;
+    const wc = r.wcPct ?? rowCfg.wcPct;
+    const gor = r.gorScfStb ?? rowCfg.gorScfStb;
     const pwfSource = r.pwfPsi != null ? 'input' : 'calculated';
     const pwfPsi =
       r.pwfPsi ??
-      march({
-        ...marchCfg,
-        thpPsi: r.thpPsi ?? marchCfg.thpPsi,
+      rowMarch({
+        ...rowCfg,
+        thpPsi: r.thpPsi ?? rowCfg.thpPsi,
         qOilStbD: r.qOilStbD,
         gorScfStb: gor,
         wcPct: wc,
       }).pwfPsi;
     const qGross = r.qOilStbD / (1 - wc / 100);
-    const { presPsi } = prFromRowOil(ipr, pvt, { qGrossStbD: qGross, pwfPsi, prStart: prPrev });
+    // a User row's Pr is measured, not backed out: no J is involved at all
+    const presSource = r.presPsi != null ? 'input' : 'calculated';
+    const solvedPr =
+      r.presPsi != null
+        ? { presPsi: r.presPsi, j: null }
+        : prFromRowOil(rowIpr, pvt, { qGrossStbD: qGross, pwfPsi, prStart: prPrev });
+    const presPsi = solvedPr.presPsi;
     prPrev = presPsi;
     const z = zAtResOil(marchCfg, presPsi);
     const gorEff = presPsi >= pvt.pbPsi ? pvt.rsiScfStb : gor;
@@ -115,6 +131,11 @@ export function oilPresSolver(marchCfg, ipr, pvt, rows, march = oilMarch) {
       pwfPsi,
       pwfSource,
       presPsi,
+      presSource,
+      // which well model solved the row and which J backed out its Pr
+      model: r.model ?? null,
+      jUsed: solvedPr.j,
+      jSource: presSource === 'input' ? null : (r.jSource ?? (rowIpr.darcy ? 'darcy' : 'j')),
       dpPsi: presPsi - pwfPsi,
       z,
       npMMstb: np,

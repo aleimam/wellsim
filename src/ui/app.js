@@ -451,6 +451,15 @@ function setComputed(id, value, decimals = 1) {
     el.classList.add('computed');
   }
 }
+/** Like setComputed, but overwrites a typed value too — for a cell whose
+ *  typed value the server has just declared not an input. */
+function setComputedAlways(id, value, decimals = 1) {
+  const el = document.getElementById(id);
+  if (!el || value == null) return;
+  el.value = Number(value).toFixed(decimals);
+  el.dataset.computed = '1';
+  el.classList.add('computed');
+}
 document.addEventListener('input', (e) => {
   if (e.target?.dataset?.computed === '1') {
     delete e.target.dataset.computed;
@@ -555,7 +564,11 @@ function renderGridTable(id, prefix, cols, rows) {
             .map((c) =>
               c.out
                 ? `<td class="col-${c.key}"><input id="${prefix}-${i}-${c.key}" class="outcell" readonly tabindex="-1" value="${r[c.key] ?? ''}"/></td>`
-                : `<td class="col-${c.key}"><input id="${prefix}-${i}-${c.key}" value="${r[c.key] ?? ''}"/></td>`
+                : c.select
+                  ? `<td class="col-${c.key}"><select id="${prefix}-${i}-${c.key}">${c.select
+                      .map(([v, l]) => `<option value="${v}"${(r[c.key] || c.defaultValue?.()) === v ? ' selected' : ''}>${l}</option>`)
+                      .join('')}</select></td>`
+                  : `<td class="col-${c.key}"><input id="${prefix}-${i}-${c.key}" value="${r[c.key] ?? ''}"/></td>`
             )
             .join('')}</tr>`
       )
@@ -767,15 +780,25 @@ function fillProdRows(rows, startIdx = 0) {
 }
 
 /* ---- oil prod_data + static-survey tables (same pattern as gas) ---- */
+// prod_data Model column (WellSim extension): which well model solves this
+// row's Pwf and which J backs out its Pr — Natural (Darcy future J), Gas
+// lift / ESP (the typed PI, at the row's own inj rate / Hz, blank = panel),
+// or User (Pwf AND Pr typed). New rows default to the active lift type and
+// a change fills down. Pr is input-or-calculated like Pwf: typed on a User
+// row, computed (grey) on every other.
+const OIL_PROD_MODELS = [['natural', 'Natural'], ['gaslift', 'Gas lift'], ['esp', 'ESP'], ['user', 'User']];
 const OIL_PROD_COLS = [
   { key: 'date', label: 'Date dd/mm/yyyy hh:mm:ss' },
+  { key: 'model', label: 'Model', select: OIL_PROD_MODELS, defaultValue: () => oilLiftType() },
   { key: 'thpPsi', label: 'FTHP psi' },
   { key: 'qOilStbD', label: 'Oil stb/d' },
   { key: 'gorScfStb', label: 'GOR scf/stb' },
   { key: 'wcPct', label: 'WC %' },
+  { key: 'injMMscfd', label: 'GL inj MMscf/d' },
+  { key: 'espHz', label: 'ESP Hz' },
   { key: 'dtDays', label: 'dt d', out: true },
   { key: 'pwfPsi', label: 'Pwf psi' },
-  { key: 'presPsi', label: 'pr', out: true },
+  { key: 'presPsi', label: 'Pr psi' },
   { key: 'z', label: 'z', out: true },
 ];
 const OIL_STATIC_COLS = [
@@ -1965,7 +1988,9 @@ async function oilReserveRun() {
       if (i == null) return;
       if (row.pwfSource === 'calculated') setComputed(`oil-prod-${i}-pwfPsi`, row.pwfPsi, 1);
       setOut(`oil-prod-${i}-dtDays`, row.dtDays, 2);
-      setOut(`oil-prod-${i}-presPsi`, row.presPsi, 1);
+      // a backed-out Pr REPLACES whatever the cell held: only a User row's
+      // typed Pr is an input, and the server has already ignored any other
+      if (row.presSource === 'calculated') setComputedAlways(`oil-prod-${i}-presPsi`, row.presPsi, 1);
       setOut(`oil-prod-${i}-z`, row.z, 4);
     });
   }
@@ -3343,13 +3368,17 @@ function collectCase() {
 }
 
 function applyCase(c) {
-  // dynamic tables first (their row count defines which cell ids exist)
-  if (c.grids?.gasProd) renderProdTable(c.grids.gasProd);
-  if (c.grids?.oilProd) renderOilProdTable(c.grids.oilProd);
+  // radios first: the prod_data Model column defaults a row with no model to
+  // the ACTIVE lift type, so the case's own lift must be in place before its
+  // grid renders — otherwise an ESP case opened in a natural-flow session
+  // would default its old rows to natural
   for (const [name, v] of Object.entries(c.radios ?? {})) {
     const el = document.querySelector(`input[name="${name}"][value="${v}"]`);
     if (el) el.checked = true;
   }
+  // then the dynamic tables (their row count defines which cell ids exist)
+  if (c.grids?.gasProd) renderProdTable(c.grids.gasProd);
+  if (c.grids?.oilProd) renderOilProdTable(c.grids.oilProd);
   for (const [id, v] of Object.entries(c.selects ?? {})) {
     const el = document.getElementById(id);
     if (el) el.value = v;
@@ -3859,6 +3888,15 @@ document.getElementById('oil-prod-paste').onclick = async () => {
   }
 };
 document.getElementById('oil-prod-add').onclick = () => ensureOilProdRows(oilProdCount + 10);
+// Model fills DOWN: "converted to ESP on this date" is one change, not one per row
+document.getElementById('oil-prod-table').addEventListener('change', (e) => {
+  const m = e.target?.id?.match(/^oil-prod-(\d+)-model$/);
+  if (!m) return;
+  for (let i = Number(m[1]) + 1; i < oilProdCount; i++) {
+    const el = document.getElementById(`oil-prod-${i}-model`);
+    if (el) el.value = e.target.value;
+  }
+});
 document.getElementById('oil-prod-clear').onclick = () => renderOilProdTable([{}, {}, {}, {}, {}, {}, {}, {}]);
 document.querySelectorAll('input[name="oil-pressource"]').forEach((r) => (r.onchange = switchOilPresSource));
 switchOilPresSource();

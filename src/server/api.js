@@ -1328,6 +1328,60 @@ export function gasForecastApi(f) {
  *  MB on solver-derived Pres), 'static' (MB on measured memory-gauge Pres
  *  history), 'rlt' (reservoir limit). Well data and the matched IPR come
  *  from the oil Well model module. */
+/** prod_data Model column (WellSim extension — no workbook switches the well
+ *  model within one production history; owner decisions of 6 Sep 2026):
+ *    natural  Pwf by the plain march; Pr backed out with the Darcy future J
+ *    gaslift  lifted march at the row's own injection rate (blank = panel);
+ *             Pr backed out with the TYPED PI, constant — the GL module's J
+ *    esp      coupled pump solve at the row's own frequency (blank = panel);
+ *             Pr backed out with the typed PI — the ESP module's J
+ *    user     Pwf AND Pr typed; no march, no J
+ *  A row naming a model the panel cannot supply fails by row, never falls
+ *  back silently. A row with no model keeps the whole-history behaviour. */
+const ROW_MODELS = ['natural', 'gaslift', 'esp', 'user'];
+function rowModelPlan(f, cfg, ipr, row, i) {
+  const model = row.model;
+  if (model == null) return {};
+  const where = `prod row ${i + 1} (${row.date})`;
+  if (!ROW_MODELS.includes(model)) return { error: `${where}: unknown model "${model}"` };
+  if (model === 'user') {
+    if (row.pwfPsi == null || row.presPsi == null)
+      return { error: `${where}: a User row needs BOTH Pwf and Pr typed` };
+    return { jSource: null };
+  }
+  // the panel config without its lift: the row decides which zones the march has
+  const base = { ...cfg };
+  delete base.gasLift;
+  delete base.esp;
+  if (model === 'natural') {
+    if (!ipr.darcy)
+      return { error: `${where}: a Natural row backs out Pr with the Darcy future J — fill the Darcy geometry (K, H, Re, Rw) so the PI can be matched to it` };
+    return { marchCfg: base, march: oilMarch, ipr, jSource: 'darcy' };
+  }
+  const pi = num(f.userJ);
+  if (!(pi > 0))
+    return { error: `${where}: ${model === 'esp' ? 'an ESP' : 'a Gas-lift'} row backs out Pr with the typed PI — enter J (bbl/d/psi) on the User-PI basis` };
+  const rowIpr = { ...ipr, j: pi, jSource: 'jones', darcy: undefined };
+  if (model === 'gaslift') {
+    const depth = num(f.injDepthTvdM);
+    if (depth == null) return { error: `${where}: a Gas-lift row needs the injection depth on the Gas lift panel` };
+    const marchCfg = { ...base, gasLift: { injDepthTvdM: depth, injRateMMscfd: row.injMMscfd ?? num(f.injRateMMscfd) ?? 0 } };
+    return { marchCfg, march: oilMarch, ipr: rowIpr, jSource: 'pi' };
+  }
+  const esp = { pumpDpPsi: num(f.pumpDpPsi) };
+  if (num(f.pumpAhM) != null) esp.pumpAhM = num(f.pumpAhM);
+  else if (num(f.pumpTvdM) != null) esp.pumpTvdM = num(f.pumpTvdM);
+  else return { error: `${where}: an ESP row needs the pump setting depth on the ESP panel` };
+  if (num(f.tubingGasScfD) != null) esp.tubingGasScfD = num(f.tubingGasScfD);
+  const fRow = { ...f, liftType: 'esp', espFreqHz: row.espHz ?? f.espFreqHz };
+  const pump = buildEspPump(fRow);
+  if (pump.error) return { error: `${where}: ${pump.error}` };
+  if (!pump.pump && !(num(f.pumpDpPsi) > 0))
+    return { error: `${where}: an ESP row needs a catalogue or custom pump, or a typed pump dP, on the ESP panel` };
+  const marchCfg = { ...base, esp };
+  return { marchCfg, march: marchFor(fRow, marchCfg), ipr: rowIpr, jSource: 'pi' };
+}
+
 export function oilReserve(f) {
   if (f.fluid === 'water')
     return { error: 'Reserve estimate (solution-gas material balance) applies to oil wells — switch Well fluid to Oil' };
@@ -1344,10 +1398,22 @@ export function oilReserve(f) {
       pwfPsi: num(r.pwfPsi),
       gorScfStb: num(r.gorScfStb),
       wcPct: num(r.wcPct),
+      // prod_data Model column — see rowModelPlan. A typed Pr is honoured on
+      // a User row ONLY: on every other model Pr is backed out, and a value
+      // left in the cell from an earlier run must not silently override it.
+      model: r.model && String(r.model).trim() !== '' ? String(r.model).trim() : undefined,
+      presPsi: r.model === 'user' ? num(r.presPsi) : undefined,
+      injMMscfd: num(r.injMMscfd),
+      espHz: num(r.espHz),
     }));
   for (let i = 0; i < rows.length; i++) {
     if (Number.isNaN(toDays(rows[i].date)))
       return { error: `row ${i + 1}: unparseable date "${rows[i].date}" — use d-MMM-yy, dd/mm/yyyy hh:mm:ss or a day number` };
+  }
+  for (let i = 0; i < rows.length; i++) {
+    const plan = rowModelPlan(f, cfg, ipr, rows[i], i);
+    if (plan.error) return { error: plan.error };
+    Object.assign(rows[i], plan);
   }
   const src = f.presSource ?? 'prod';
 
@@ -1464,6 +1530,17 @@ export function oilEspSens(f) {
  *  the sheet's active behavior). */
 export function oilForecastApi(f) {
   if (f.fluid === 'water') return { error: 'the Tarner forecast applies to oil wells' };
+  // The forecast continues the well AS LAST MODELLED (owner decision, 6 Sep
+  // 2026): the lift model, with its per-row injection rate or frequency,
+  // comes from the last prod row that names one. A trailing User row names
+  // none, so the search walks back past it; with no row naming a model the
+  // panel's lift type stands, as before.
+  const lastModelled = [...(f.prodRows ?? [])].reverse().find((r) => ['natural', 'gaslift', 'esp'].includes(r.model));
+  if (lastModelled) {
+    f = { ...f, liftType: lastModelled.model };
+    if (num(lastModelled.injMMscfd) != null) f.injRateMMscfd = lastModelled.injMMscfd;
+    if (num(lastModelled.espHz) != null) f.espFreqHz = lastModelled.espHz;
+  }
   const cfg = buildOilCfg(f);
   const pb = oilPb(f, cfg);
   const ipr = buildOilIpr(f, cfg, pb);

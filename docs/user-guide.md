@@ -450,7 +450,26 @@ from the Well model module. Three selections (one active):
 ### 3.1 Prod data & macro (Pres solver)
 
 The workbook `prod_data` sheet + Solver macro. Table columns:
-`Date | FTHP | Oil rate | GOR | WC% | dt (out) | Pwf (input-or-calc) | pr (out) | z (out)`.
+`Date | Model | FTHP | Oil rate | GOR | WC% | GL inj | ESP Hz | dt (out) | Pwf (input-or-calc) | Pr (input-or-calc) | z (out)`.
+
+**Model** (per row, a WellSim extension — no workbook switches the well model
+within one history) names which well model solves that date's Pwf and which J
+backs out its Pr:
+
+| Model | Pwf | Pr backed out with |
+|---|---|---|
+| Natural | plain march at the row's FTHP / rate / GOR / WC | the Darcy future J (needs the Darcy geometry) |
+| Gas lift | lifted march at the row's **GL inj** (blank = panel rate) | the typed PI — the GL module's J |
+| ESP | coupled pump solve at the row's **ESP Hz** (blank = panel) | the typed PI — the ESP module's J |
+| User | typed | typed — both are required |
+
+New rows default to the active lift type, and changing one row fills down
+(“converted to ESP on this date” is one edit). A row naming a model the panel
+cannot supply — an ESP row with no pump depth, a Gas-lift row with no injection
+depth, an ESP/GL row with no PI — stops with that row named; nothing falls back
+silently. Rows with no model solve exactly as the workbook does. The **Forecast**
+continues the well as the last row that names a model (a trailing User row is
+skipped over), with that row's injection rate or frequency.
 
 Per row: Pwf is marched from that row's FTHP/rate/GOR/WC (or taken as input), then
 **reservoir pressure is back-calculated** through the composite-Vogel closed form
