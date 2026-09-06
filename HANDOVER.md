@@ -3,15 +3,15 @@
 **Live:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
 **Repo:** https://github.com/aleimam/wellsim · **Manual:** https://wellsim.app/help.html
 
-**Live production revision:** 5 September 2026 — `1a94ce0` from
-`merge/gas-forecast-into-v2`, deployed 6 September 08:58:55 UTC, asset stamp
-`2026-09-06a`.
+**Live production revision:** 5 September 2026 — `518b2c7` from
+`merge/gas-forecast-into-v2`, deployed 6 September 10:34:08 UTC, asset stamp
+`2026-09-06b`.
 Verified after the release: 38/38 module smoke against the live site,
 `NRestarts=0`, no startup errors, the served UI byte-identical to this tree
 apart from CRLF, and one `oil/sensitivity` payload agreeing with the local
-engine to 9.8e-16. It replaced `211a96c`, the last of four releases on
-5 September; the rollback archive of that tree is
-`/root/wellsim-app-pre-deploy-20260906-085816.tar.gz` — restore with
+engine to 9.8e-16. It replaced `1a94ce0` (08:58:55 the same morning); the
+rollback archive of that tree is
+`/root/wellsim-app-pre-deploy-20260906-103348.tar.gz` — restore with
 `tar -xzf … -C /opt/wellsim && systemctl restart wellsim`.
 
 **The containment survived that deploy and is still in force:**
@@ -32,9 +32,9 @@ database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
 **Where the work sits, 5 September 2026 (evening):** branch
-`merge/gas-forecast-into-v2` at `1a94ce0` (156 commits), pushed to origin and
+`merge/gas-forecast-into-v2` at `518b2c7` (158 commits), pushed to origin and
 in sync, and **this exact tip is what production runs** — the site was
-redeployed on 6 September at 08:58:55 UTC. It is ahead of both `origin/main` (`de2393c`) and
+redeployed on 6 September at 10:34:08 UTC. It is ahead of both `origin/main` (`de2393c`) and
 `origin/codex/v2-foundation` (`b087a24`) and **has not been merged into
 either** — no PR exists yet. The newest portable release is **2.2**
 (`D:\WellSim_2.2`, also on F:), built from `8bba363`; it therefore predates
@@ -43,7 +43,7 @@ changes only.
 
 **Production runs this branch, not `main`** — an interim state the owner
 authorised on 5 September, pending the pull request. Until that PR lands,
-`main` (`de2393c`) and production have DIVERGED by 77 commits — production and
+`main` (`de2393c`) and production have DIVERGED by 79 commits — production and
 this branch tip are now the same commit — so the two-device branch/site
 contract below records the intent, not the deployment.
 A green test run is still not authorisation to release; this release was
