@@ -825,6 +825,20 @@ function renderOilProdTable(values) {
   const rows = values.slice(0, oilProdCount);
   while (rows.length < oilProdCount) rows.push({});
   renderGridTable('oil-prod-table', 'oil-prod', OIL_PROD_COLS, rows);
+  syncOilProdLiftCols();
+}
+
+/** GL inj and ESP Hz are per-row overrides for two lift types — most
+ *  histories use neither, and twelve columns is what crushed the table. Each
+ *  column shows only while some row selects its lift. Hidden cells keep their
+ *  ids and values, so a column that comes back brings its numbers with it. */
+function syncOilProdLiftCols() {
+  const t = document.getElementById('oil-prod-table');
+  if (!t) return;
+  const models = [];
+  for (let i = 0; i < oilProdCount; i++) models.push(document.getElementById(`oil-prod-${i}-model`)?.value);
+  t.classList.toggle('no-gl', !models.includes('gaslift'));
+  t.classList.toggle('no-esp', !models.includes('esp'));
 }
 
 function ensureOilProdRows(n) {
@@ -3395,6 +3409,9 @@ function applyCase(c) {
     const el = document.getElementById(id);
     if (el) { el.value = ''; delete el.dataset.computed; el.classList.remove('computed'); }
   }
+  // the Model selects were re-applied above, after the grid rendered: the
+  // lift columns follow whatever the restored case actually asks for
+  syncOilProdLiftCols();
   // re-apply every view switch to the restored state
   switchTab(c.activeTab ?? 'oil');
   switchOilModule();
@@ -3896,6 +3913,7 @@ document.getElementById('oil-prod-table').addEventListener('change', (e) => {
     const el = document.getElementById(`oil-prod-${i}-model`);
     if (el) el.value = e.target.value;
   }
+  syncOilProdLiftCols();
 });
 document.getElementById('oil-prod-clear').onclick = () => renderOilProdTable([{}, {}, {}, {}, {}, {}, {}, {}]);
 document.querySelectorAll('input[name="oil-pressource"]').forEach((r) => (r.onchange = switchOilPresSource));

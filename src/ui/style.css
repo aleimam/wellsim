@@ -189,6 +189,22 @@ tr.thrust-up input { background: #FBE9E7 !important; }
   background: #EDF5EC; font: 400 12px var(--sans); color: var(--ink); min-width: 74px;
 }
 .sens select:focus { outline: 2px solid var(--accent); }
+/* Grid tables scroll sideways inside their own box rather than squeezing:
+   with twelve columns the reserve prod_data cells collapsed to ~25 px, too
+   narrow to read a pressure in. The floors below are what a value actually
+   needs; the table takes the width it needs and the box scrolls. */
+.gridscroll { overflow-x: auto; overflow-y: hidden; }
+.gridscroll .sens { width: auto; min-width: 100%; }
+.gridscroll .sens th { white-space: nowrap; }
+.gridscroll .sens td input { min-width: 62px; }
+.gridscroll .sens td select { min-width: 78px; }
+#oil-prod-table .col-date input { min-width: 104px; }
+#oil-prod-table .col-gorScfStb input, #oil-prod-table .col-injMMscfd input { min-width: 72px; }
+#oil-prod-table .col-wcPct input, #oil-prod-table .col-espHz input,
+#oil-prod-table .col-dtDays input, #oil-prod-table .col-z input { min-width: 54px; }
+/* the lift columns appear only when a row asks for them */
+#oil-prod-table.no-gl .col-injMMscfd, #oil-prod-table.no-esp .col-espHz { display: none; }
+
 .senshead { font: 500 10.5px/1.5 var(--sans); text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-2); margin: 8px 0 2px; }
 .presrow { display: flex; gap: 8px; }
 .presrow input { width: 90px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 2px; background: #EDF5EC; font: 400 13px var(--mono); }
@@ -286,6 +302,7 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--accent); }
   .sens th { font-size: 9px; letter-spacing: 0.2px; padding: 2px 3px; white-space: nowrap; }
   .sens td { padding: 1px 2px; }
   .sens input { font-size: 13px; padding: 5px 4px; min-width: 56px; min-height: 32px; }
+  .sens select { font-size: 13px; padding: 5px 3px; min-height: 32px; }
   .sens td:first-child input { min-width: 92px; }
   #gas-prod-table td:first-child input, #oil-prod-table td:first-child input,
   #gas-sithp-table td:first-child input, #oil-static-table td:first-child input { min-width: 96px; text-align: left; }
