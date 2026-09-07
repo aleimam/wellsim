@@ -143,3 +143,148 @@ test('gas C&n calibration with all-input points reproduces the workbook fit', ()
   close(r.ipr.c, 1.74848658948593e-6); // B17
   close(r.qMaxMMscfd, 25.2481463521766); // B15
 });
+
+// ---- VLP head-factor match (owner spec, 7 Sep 2026) ----
+// One measured pressure fixes the head factor; friction is held; both are
+// bounded to 0.8-1.2. Round-trip tests: a target the march can reach inside
+// the bounds is met exactly, a target it cannot reach is pinned and flagged,
+// and every missing input is named. Nothing is silent.
+
+import { matchHeadFactor, MATCH_HEAD_LO, MATCH_HEAD_HI } from '../src/core/nodal/calibrate.js';
+import * as api from '../src/server/api.js';
+
+test('matchHeadFactor: a root inside the bounds is exact; outside it is pinned and flagged', () => {
+  const linear = (h) => 1000 + 500 * h; // 1400 at 0.8, 1600 at 1.2
+  const inside = matchHeadFactor(linear, 1550);
+  assert.equal(inside.status, 'ok');
+  close(inside.matchHead, 1.1, 1e-6);
+  const high = matchHeadFactor(linear, 2000);
+  assert.equal(high.status, 'pinned-high');
+  assert.equal(high.matchHead, MATCH_HEAD_HI);
+  close(high.residualPsi, 1600 - 2000, 1e-9);
+  const low = matchHeadFactor(linear, 1300);
+  assert.equal(low.status, 'pinned-low');
+  assert.equal(low.matchHead, MATCH_HEAD_LO);
+  close(low.residualPsi, 1400 - 1300, 1e-9);
+});
+
+const MH_FORM = {
+  thpPsi: '700', qOilStbD: '2100', wcPct: '50', gorScfStb: '5000', tubingIdIn: '2.992',
+  roughness: '0.00006', topPerfAhM: '2810', devStartM: '1910', devAngleDeg: '7',
+  api: '46', gasSg: '0.842', rsiScfStb: '700', tresF: '201', oilViscCp: '6',
+  waterSg: '1.05', pbPsi: '', soilTempF: '90', htcBtu: '3', tubingOdIn: '3.5', cpBtu: '0.51',
+  priPsi: '3550', prPsi: '', permMd: '50', thicknessFt: '42.653', reFt: '1640.5',
+  rwFt: '0.5104166667', skin: '0', matchHead: '1', matchFriction: '1',
+  testQOilStbD: '2100', testThpPsi: '700', testPwfPsi: '',
+};
+
+test('oil head match: meets a reachable measured Pwf exactly, with friction held where the analyst set it', () => {
+  const r = api.oilMatchHead({ ...MH_FORM, testPwfPsi: '2650', matchFriction: '1.05' });
+  assert.equal(r.error, undefined, r.error);
+  assert.equal(r.mode, 'natural');
+  assert.equal(r.status, 'ok');
+  assert.equal(r.frictionHeld, 1.05);
+  assert.ok(r.matchHead > MATCH_HEAD_LO && r.matchHead < MATCH_HEAD_HI, `head ${r.matchHead} inside the bounds`);
+  close(r.marchedPsi, 2650, 1e-6);
+  assert.ok(Math.abs(r.residualPsi) < 1e-3);
+  assert.equal(r.flag, null);
+  // the answer is a fixed point: fed back as the input it reproduces itself
+  const again = api.oilMatchHead({ ...MH_FORM, testPwfPsi: '2650', matchFriction: '1.05', matchHead: String(r.matchHead) });
+  close(again.matchHead, r.matchHead, 1e-6);
+  // and the head factor the analyst had typed does not bias the answer
+  const from08 = api.oilMatchHead({ ...MH_FORM, testPwfPsi: '2650', matchFriction: '1.05', matchHead: '0.8' });
+  close(from08.matchHead, r.matchHead, 1e-6);
+});
+
+test('oil head match: a target beyond the bounds is pinned and says what to check', () => {
+  const hi = api.oilMatchHead({ ...MH_FORM, testPwfPsi: '9000' });
+  assert.equal(hi.error, undefined, hi.error);
+  assert.equal(hi.status, 'pinned-high');
+  assert.equal(hi.matchHead, MATCH_HEAD_HI);
+  assert.match(hi.flag, /pinned at 1\.20; still .* psi short — check friction, PVT or the test rate/);
+  const lo = api.oilMatchHead({ ...MH_FORM, testPwfPsi: '900' });
+  assert.equal(lo.status, 'pinned-low');
+  assert.equal(lo.matchHead, MATCH_HEAD_LO);
+  assert.match(lo.flag, /pinned at 0\.80; still .* psi over — check friction, PVT or the test rate/);
+});
+
+test('oil head match: missing inputs are named, and a friction outside the bounds is refused', () => {
+  const none = api.oilMatchHead({ ...MH_FORM, testQOilStbD: '', testThpPsi: '', testPwfPsi: '' });
+  assert.match(none.error, /head match needs the test rate, the test FTHP, a measured Test Pwf/);
+  // the UI sends a grey get-Pwf cell as blank: not a measurement
+  const grey = api.oilMatchHead({ ...MH_FORM, testPwfPsi: '' });
+  assert.match(grey.error, /a measured Test Pwf \(typed/);
+  const fr = api.oilMatchHead({ ...MH_FORM, testPwfPsi: '2650', matchFriction: '1.5' });
+  assert.match(fr.error, /Matching friction 1\.5 is outside 0\.8-1\.2/);
+});
+
+test('ESP head match: matches the marched DISCHARGE to Pdis and reports Pint as a check', () => {
+  const esp = {
+    ...MH_FORM, liftType: 'esp', espPumpMode: 'db', espPumpName: 'WD 150',
+    espStages: '145', espFreqHz: '50', pumpAhM: '2985', espSepEffPct: '95',
+  };
+  const missing = api.oilMatchHead(esp);
+  assert.match(missing.error, /ESP head match needs the measured Pint, the measured Pdis/);
+  const bad = api.oilMatchHead({ ...esp, espMeasPintPsi: '2000', espMeasPdisPsi: '1500' });
+  assert.match(bad.error, /Pdis must exceed Pint/);
+  const probe = api.oilMatchHead({ ...esp, espMeasPintPsi: '1000', espMeasPdisPsi: '2000' });
+  assert.equal(probe.error, undefined, probe.error);
+  assert.equal(probe.mode, 'esp');
+  assert.equal(probe.targetPsi, 2000);
+  assert.equal(probe.frictionHeld, 1);
+  assert.ok(['ok', 'pinned-high', 'pinned-low'].includes(probe.status));
+  if (probe.status === 'ok') close(probe.marchedPsi, 2000, 1e-6);
+  else assert.match(probe.flag, /check friction, PVT or the test rate/);
+  // the Pint check is present, named for a catalogue pump, and is a delta
+  assert.equal(probe.intakeSource, 'pump curve');
+  assert.ok(Number.isFinite(probe.intakePsi));
+  assert.equal(probe.measPintPsi, 1000);
+  close(probe.intakeDeltaPsi, probe.intakePsi - 1000, 1e-9);
+  // round trip: the discharge the match landed on, fed back as Pdis, returns
+  // the same head factor
+  if (probe.status === 'ok') {
+    const back = api.oilMatchHead({ ...esp, espMeasPintPsi: '1000', espMeasPdisPsi: String(probe.marchedPsi), matchHead: '1.15' });
+    close(back.matchHead, probe.matchHead, 1e-6);
+  }
+});
+
+test('gas head match: the FIRST test row, and only a typed Pwf counts', () => {
+  const GAS = {
+    thpPsi: '1625', qGasMMscfd: '14.137', cgrStbMMscf: '57.4358974',
+    wgrStbMMscf: '3.8461538', tubingIdIn: '2.992', roughnessBase: '0.0021',
+    topPerfAhM: '3013', devStartM: '690', devAngleDeg: '23.65',
+    condApi: '48.7', gasSg: '0.763', n2Pct: '1.2', co2Pct: '3', h2sPpm: '2',
+    tresF: '232', oilViscCp: '2', sigmaDyneCm: '30',
+    soilTempF: '90', htcBtu: '3', tubingOdIn: '3.5', cpBtu: '0.51',
+    priPsi: '3800', prPsi: '', permMd: '5', thicknessFt: '80',
+    reFt: '1640.5', rwFt: '0.5104166667', skin: '0',
+    matchHead: '1', matchFriction: '1', iprMode: 'j',
+    testPoints: [
+      { thpPsi: '2440', qMMscfd: '5.192', pwfPsi: '' },
+      { thpPsi: '2000', qMMscfd: '10.002', pwfPsi: '3000' },
+    ],
+  };
+  // the second row's Pwf does not rescue a blank first row
+  const blank = api.gasMatchHead(GAS);
+  assert.match(blank.error, /first test row needs a typed Pwf/);
+  const r = api.gasMatchHead({ ...GAS, testPoints: [{ thpPsi: '2440', qMMscfd: '5.192', pwfPsi: '3100' }, GAS.testPoints[1]] });
+  assert.equal(r.error, undefined, r.error);
+  assert.equal(r.mode, 'gas');
+  assert.equal(r.testThpPsi, 2440);
+  assert.equal(r.testQMMscfd, 5.192);
+  assert.ok(['ok', 'pinned-high', 'pinned-low'].includes(r.status));
+  if (r.status === 'ok') close(r.marchedPsi, 3100, 1e-6);
+  else assert.match(r.flag, /check friction, PVT or the test rate/);
+});
+
+test('water injector head match: marched BHIP to the typed test BHIP', () => {
+  const INJ = { ...MH_FORM, fluid: 'water', liftType: 'natural', qOilStbD: '2000', testQOilStbD: '2000', testThpPsi: '200', testPwfPsi: '' };
+  const missing = api.waterInjMatchHead(INJ);
+  assert.match(missing.error, /injector head match needs a measured test BHIP/);
+  const r = api.waterInjMatchHead({ ...INJ, testPwfPsi: '4300' });
+  assert.equal(r.error, undefined, r.error);
+  assert.equal(r.mode, 'injector');
+  assert.ok(['ok', 'pinned-high', 'pinned-low'].includes(r.status));
+  if (r.status === 'ok') close(r.marchedPsi, 4300, 1e-6);
+  else assert.match(r.flag, /check friction, PVT or the test rate/);
+});

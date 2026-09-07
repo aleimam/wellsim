@@ -10,6 +10,7 @@ import { oilMarch, oilFraction } from '../vlp/oil-march.js';
 import { gasMarch } from '../vlp/gas-march.js';
 import { bubblePointPsi } from '../pvt/oil.js';
 import { createOilIpr, jFromTest, jDarcyOil, permFromJOil } from '../ipr/oil-ipr.js';
+import { brent } from '../solvers/brent.js';
 import { createGasIpr, jFromTestGas, jDarcyGas, permFromJGas, fitCn } from '../ipr/gas-ipr.js';
 
 /** get_Pwf macro equivalent: Pwf from the march at a test rate (the march
@@ -101,4 +102,42 @@ export function calibrateGasCn({ marchCfg, priPsi, points }) {
   });
   const { c, n, qMaxMMscfd } = fitCn(resolved, priPsi);
   return { ipr: createGasIpr({ c, n, priPsi }), points: resolved, qMaxMMscfd };
+}
+
+// ---- VLP head-factor match (owner spec, 7 Sep 2026) ----
+//
+// The IPR calibration above matches K to a test; this matches the MARCH to
+// it. One measured pressure fixes one unknown: the head factor is solved so
+// the marched pressure meets the measured one, with the friction factor HELD
+// at whatever the analyst set (1 = untouched). Bounds are fixed at 0.8-1.2
+// for both factors. A root inside the bounds is exact (Brent). A root outside
+// is PINNED at the nearer bound and flagged: the pinned value is still the
+// best legal answer, and the flag says it is not a real match -- the analyst
+// is told to look at friction, PVT or the test rate instead.
+export const MATCH_HEAD_LO = 0.8;
+export const MATCH_HEAD_HI = 1.2;
+
+/** `marched(h)` -> the pressure the march gives at head factor h. */
+export function matchHeadFactor(marched, targetPsi, { lo = MATCH_HEAD_LO, hi = MATCH_HEAD_HI } = {}) {
+  const g = (h) => marched(h) - targetPsi;
+  const gLo = g(lo);
+  const gHi = g(hi);
+  if (!Number.isFinite(gLo) || !Number.isFinite(gHi))
+    throw new Error('head match: the march did not return a pressure at the bounds');
+  if (gLo === 0) return { matchHead: lo, status: 'ok', residualPsi: 0, iterations: 0 };
+  if (gHi === 0) return { matchHead: hi, status: 'ok', residualPsi: 0, iterations: 0 };
+  if (gLo * gHi < 0) {
+    const r = brent(g, lo, hi, { tol: 1e-7 });
+    return { matchHead: r.root, status: 'ok', residualPsi: r.froot, iterations: r.iterations };
+  }
+  // same sign at both bounds: the target lies beyond the range. The head
+  // factor raises the marched pressure monotonically, so the nearer bound is
+  // the one on the target's side; residual = marched - target there.
+  const pinHi = Math.abs(gHi) < Math.abs(gLo);
+  return {
+    matchHead: pinHi ? hi : lo,
+    status: pinHi ? 'pinned-high' : 'pinned-low',
+    residualPsi: pinHi ? gHi : gLo,
+    iterations: 0,
+  };
 }

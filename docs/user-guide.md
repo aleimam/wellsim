@@ -186,6 +186,18 @@ inputs are required; there is no input THT.
    **active lift type** (a blank cell always means "base value", and values
    you typed survive a lift switch):
 
+   **Match head factor from test** (under *Match factors*, all three tabs) is
+   the march-side counterpart: Calibrate matches K, this matches the **Matching
+   head** so the marched pressure meets a *typed* measurement, with the friction
+   factor held where you set it (1 = untouched). Both factors are bounded to
+   0.8–1.2. Natural, gas-lift and water wells match the marched Pwf to the Test
+   Pwf; ESP wells match the marched **discharge** pressure to the measured Pdis
+   and report Pint as a consistency check (a large Δ points at the pump or its
+   wear, not the head factor); gas wells use the first test row. A target the
+   bounds cannot reach is pinned at the bound and flagged — check friction, PVT
+   or the test rate. Missing inputs are named. The result is written into the
+   input; re-solve to use it.
+
    | Well | VLP sensitivity parameters |
    |---|---|
    | Oil — natural | FTHP · GOR · W.C · tubing ID |

@@ -32,7 +32,7 @@ const OIL_SCHEMA = [
   { title: 'Match factors', fields: [
     ['matchHead', 'Matching head', '-', 1],
     ['matchFriction', 'Matching friction', '-', 1],
-  ]},
+  ], buttons: [['btn-matchhead', 'Match head factor from test (Pwf · ESP: Pdis)']] },
 ];
 
 // IPR basis (its own fieldset, like the gas tab): Darcy from reservoir
@@ -156,7 +156,7 @@ const WATER_SCHEMA = [
   { title: 'Match factors', fields: [
     ['matchHead', 'Matching head', '-', 1],
     ['matchFriction', 'Matching friction', '-', 1],
-  ]},
+  ], buttons: [['btn-matchhead', 'Match head factor from test (Pwf · ESP: Pdis)']] },
 ];
 const WATER_TEST_FIELDS = [
   ['testQOilStbD', 'Test water rate', 'bbl/d', 2000],
@@ -295,7 +295,7 @@ const GAS_SCHEMA = [
   { title: 'Match factors', fields: [
     ['matchHead', 'Matching head', '-', 1],
     ['matchFriction', 'Matching friction', '-', 1],
-  ]},
+  ], buttons: [['btn-matchhead', 'Match head factor from test (Pwf · ESP: Pdis)']] },
 ];
 
 const GAS_DARCY_FIELDS = [
@@ -428,7 +428,12 @@ const frow = (prefix, [k, label, unit, def]) =>
 function renderForm(containerId, prefix, schema) {
   const el = document.getElementById(containerId);
   el.innerHTML = schema
-    .map((g) => `<div class="group"><h3>${g.title}</h3><div class="rows">${g.fields.map((f) => frow(prefix, f)).join('')}</div></div>`)
+    .map((g) =>
+      `<div class="group"><h3>${g.title}</h3><div class="rows">${g.fields.map((f) => frow(prefix, f)).join('')}</div>` +
+      (g.buttons
+        ? `<div class="btnrow">${g.buttons.map(([id, label]) => `<button id="${prefix}-${id}" class="action secondary" type="button">${label}</button>`).join('')}</div>`
+        : '') +
+      '</div>')
     .join('');
 }
 
@@ -2648,6 +2653,46 @@ async function liquidCalibrate(c) {
 }
 
 const oilCalibrate = () => liquidCalibrate(OIL_CTX);
+
+// ---- Match head factor from test (owner spec, 7 Sep 2026) ----
+// The Calibrate button matches K; this matches the MARCH. The matched head
+// factor is written into the Matching head input as a real value (not a grey
+// computed cell -- the form drops those, and every run must read it).
+function matchHeadNote(r) {
+  const what = r.mode === 'esp' ? 'Pdis' : r.mode === 'injector' ? 'BHIP' : 'Pwf';
+  const bound = r.status === 'pinned-high' ? 'upper' : 'lower';
+  let txt =
+    `Head match, friction held at ${fmt(r.frictionHeld, 3)}: marched ${what} ${fmt(r.marchedPsi, 1)} psi vs measured ${fmt(r.targetPsi, 1)} ` +
+    `\u2192 matching head = ${fmt(r.matchHead, 4)}` +
+    (r.status === 'ok'
+      ? ' (applied to the Matching head input \u2014 re-solve to use it).'
+      : ` (PINNED at the ${bound} bound of ${r.boundsLo}\u2013${r.boundsHi}, applied).`);
+  if (r.flag) txt += '\n' + r.flag;
+  if (r.mode === 'esp') {
+    txt += r.intakePsi != null
+      ? '\n' + `Pint check (${r.intakeSource}): ${fmt(r.intakePsi, 0)} psi vs measured ${fmt(r.measPintPsi, 0)} (\u0394 ${fmt(r.intakeDeltaPsi, 0)} psi) \u2014 a large \u0394 points at the pump or its wear, not at the head factor.`
+      : '\nPint not checked \u2014 select a pump or type a pump dP.';
+  }
+  return txt;
+}
+async function liquidMatchHead(c) {
+  const path = c.prefix === 'water' && waterWellType() === 'injector' ? 'water/injmatchhead' : 'oil/matchhead';
+  const r = await api(path, c.form());
+  document.getElementById(`${c.prefix}-cal-result`).textContent = matchHeadNote(r);
+  const el = document.getElementById(`${c.prefix}-matchHead`);
+  el.value = r.matchHead.toFixed(4);
+  delete el.dataset.computed;
+  el.classList.remove('computed');
+}
+async function gasMatchHead() {
+  const r = await api('gas/matchhead', gasForm());
+  document.getElementById('gas-cal-result').textContent =
+    matchHeadNote(r) + '\n' + `(first test row: THP ${fmt(r.testThpPsi, 0)} psi, q ${fmt(r.testQMMscfd, 3)} MMscf/d)`;
+  const el = document.getElementById('gas-matchHead');
+  el.value = r.matchHead.toFixed(4);
+  delete el.dataset.computed;
+  el.classList.remove('computed');
+}
 const waterCalibrate = () =>
   waterWellType() === 'injector' ? waterInjCalibrateRun() : liquidCalibrate(WATER_CTX);
 
@@ -4021,6 +4066,7 @@ document.getElementById('oil-prod-csv').onclick = () => csvImport(parseOilProdCl
 
 document.getElementById('water-btn-solve').onclick = guard(waterSolve);
 document.getElementById('water-btn-calibrate').onclick = guard(waterCalibrate);
+document.getElementById('water-btn-matchhead').onclick = guard(() => liquidMatchHead(WATER_CTX));
 document.getElementById('water-btn-sens').onclick = guard(waterSens);
 /* ===== Artificial-lift selection (Oil tab · "Lift selection" module) =====
  * Screens the 5 lift methods against the global envelope bands across 3 life
@@ -4240,6 +4286,7 @@ function alliftRenderInto(el, r) {
 document.getElementById('water-btn-gl').onclick = guard(waterGl);
 document.getElementById('oil-btn-solve').onclick = guard(oilSolve);
 document.getElementById('oil-btn-calibrate').onclick = guard(oilCalibrate);
+document.getElementById('oil-btn-matchhead').onclick = guard(() => liquidMatchHead(OIL_CTX));
 document.getElementById('oil-btn-sens').onclick = guard(oilSens);
 document.getElementById('oil-btn-gl').onclick = guard(oilGl);
 document.getElementById('oil-btn-reserve').onclick = guard(oilReserveRun);
@@ -4252,6 +4299,7 @@ document.getElementById('oil-btn-espwear').onclick = guard(espWearRun);
 document.getElementById('oil-btn-espsep').onclick = guard(espSepEffRun);
 document.getElementById('gas-btn-solve').onclick = guard(gasSolve);
 document.getElementById('gas-btn-calibrate').onclick = guard(gasCalibrate);
+document.getElementById('gas-btn-matchhead').onclick = guard(gasMatchHead);
 document.getElementById('gas-btn-sens').onclick = guard(gasSens);
 document.getElementById('gas-btn-reserve').onclick = guard(gasReserveRun);
 document.getElementById('gas-btn-forecast').onclick = guard(gasForecastRun);

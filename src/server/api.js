@@ -65,7 +65,7 @@ import {
   oilOperatingPoint,
   gasOperatingPoint,
 } from '../core/nodal/nodal.js';
-import { calibrateOilIpr, calibrateGasCn } from '../core/nodal/calibrate.js';
+import { calibrateOilIpr, calibrateGasCn, matchHeadFactor, MATCH_HEAD_LO, MATCH_HEAD_HI } from '../core/nodal/calibrate.js';
 import { gasLiftPerformance } from '../core/nodal/gaslift.js';
 import {
   gasPresSolver,
@@ -518,6 +518,139 @@ export function oilCalibrate(f) {
     pbPsi: pb,
     mlFit,
   };
+}
+
+// ---- VLP head-factor match (owner spec, 7 Sep 2026) ----
+//
+// The Calibrate button matches the IPR (K) to the test; this matches the
+// MARCH. Friction is held at the analyst's value, the head factor is solved,
+// both bounded to 0.8-1.2. Natural, gas-lift and water-producer wells match
+// the marched Pwf to the TYPED test Pwf (a grey get-Pwf value is not a
+// measurement, and formVal already drops it). ESP wells match the marched
+// DISCHARGE pressure to the measured Pdis -- the tubing above the pump is the
+// stretch the head factor governs -- and report Pint as a consistency check:
+// Pint is Pdis minus the pump dP, so a large delta there points at the pump
+// or its wear, not at the head factor. Gas wells match the FIRST test row.
+// A root outside the bounds is pinned and flagged; nothing is silent.
+const HEAD_BOUNDS = { lo: MATCH_HEAD_LO, hi: MATCH_HEAD_HI };
+function frictionHeld(f) {
+  const fr = num(f.matchFriction) ?? 1;
+  if (!(fr >= MATCH_HEAD_LO && fr <= MATCH_HEAD_HI))
+    return { error: `Matching friction ${fr} is outside ${MATCH_HEAD_LO}-${MATCH_HEAD_HI} — set it within the bounds first (1 = untouched)` };
+  return { value: fr };
+}
+const headFlag = (m) =>
+  m.status === 'ok'
+    ? null
+    : `head factor pinned at ${m.matchHead.toFixed(2)}; still ${Math.abs(m.residualPsi).toFixed(1)} psi ${m.residualPsi < 0 ? 'short' : 'over'} — check friction, PVT or the test rate`;
+const needs = (missing, what) => ({ error: `${what} needs ${missing.join(', ')}` });
+function headResult(mode, m, extra) {
+  return {
+    mode,
+    matchHead: m.matchHead,
+    status: m.status,
+    residualPsi: m.residualPsi,
+    iterations: m.iterations,
+    flag: headFlag(m),
+    boundsLo: MATCH_HEAD_LO,
+    boundsHi: MATCH_HEAD_HI,
+    ...extra,
+  };
+}
+const NOT_A_MEASUREMENT = 'a measured Test Pwf (typed — a grey get-Pwf value is not a measurement)';
+
+export function oilMatchHead(f) {
+  const cfg = buildOilCfg(f);
+  const fr = frictionHeld(f);
+  if (fr.error) return fr;
+  const q = num(f.testQOilStbD);
+  const thp = num(f.testThpPsi);
+  const missing = [];
+  if (q == null) missing.push('the test rate');
+  if (thp == null) missing.push('the test FTHP');
+  if (cfg.esp) {
+    const pint = num(f.espMeasPintPsi);
+    const pdis = num(f.espMeasPdisPsi);
+    if (pint == null) missing.push('the measured Pint');
+    if (pdis == null) missing.push('the measured Pdis');
+    if (missing.length) return needs(missing, 'ESP head match');
+    if (!(pdis > pint)) return { error: 'measured Pdis must exceed Pint' };
+    // the discharge pressure is the tubing above the pump marched from THP:
+    // it does not depend on the pump, so any dP placeholder gives the same Pdis
+    const base = { ...cfg, thpPsi: thp, qOilStbD: q, matchFriction: fr.value, esp: { ...cfg.esp, pumpDpPsi: cfg.esp.pumpDpPsi ?? 0 } };
+    const marched = (h) => oilMarch({ ...base, matchHead: h }).dischargePsi;
+    let m;
+    try { m = matchHeadFactor(marched, pdis, HEAD_BOUNDS); } catch (e) { return { error: e.message }; }
+    // Pint check at the matched head: the coupled solve with a pump, else
+    // discharge minus the typed dP; neither -> reported as not checked
+    let intakePsi = null;
+    let intakeSource = null;
+    const bp = buildEspPump(f);
+    if (!bp.error && bp.pump) {
+      try {
+        intakePsi = espSolveDp({ ...base, matchHead: m.matchHead }, bp.pump, espOpts(f)).march.intakePsi;
+        intakeSource = 'pump curve';
+      } catch { intakePsi = null; }
+    } else if (num(f.pumpDpPsi) > 0) {
+      intakePsi = marched(m.matchHead) - num(f.pumpDpPsi);
+      intakeSource = 'typed dP';
+    }
+    const ok = Number.isFinite(intakePsi);
+    return headResult('esp', m, {
+      frictionHeld: fr.value, targetPsi: pdis, marchedPsi: marched(m.matchHead),
+      intakePsi: ok ? intakePsi : null, intakeSource: ok ? intakeSource : null,
+      measPintPsi: pint, intakeDeltaPsi: ok ? intakePsi - pint : null,
+    });
+  }
+  const pwf = num(f.testPwfPsi);
+  if (pwf == null) missing.push(NOT_A_MEASUREMENT);
+  if (missing.length) return needs(missing, 'head match');
+  const base = { ...cfg, thpPsi: thp, qOilStbD: q, matchFriction: fr.value };
+  const marched = (h) => oilMarch({ ...base, matchHead: h }).pwfPsi;
+  let m;
+  try { m = matchHeadFactor(marched, pwf, HEAD_BOUNDS); } catch (e) { return { error: e.message }; }
+  return headResult(cfg.gasLift ? 'gaslift' : 'natural', m, {
+    frictionHeld: fr.value, targetPsi: pwf, marchedPsi: marched(m.matchHead),
+  });
+}
+
+export function waterInjMatchHead(f) {
+  const cfg = buildOilCfg(f);
+  const fr = frictionHeld(f);
+  if (fr.error) return fr;
+  const q = num(f.testQOilStbD);
+  const thp = num(f.testThpPsi);
+  const bhip = num(f.testPwfPsi);
+  const missing = [];
+  if (q == null) missing.push('the test injection rate');
+  if (thp == null) missing.push('the test injection THP');
+  if (bhip == null) missing.push('a measured test BHIP (typed — a grey marched value is not a measurement)');
+  if (missing.length) return needs(missing, 'injector head match');
+  const base = { ...cfg, thpPsi: thp, qOilStbD: q, matchFriction: fr.value };
+  const marched = (h) => waterInjectorMarch({ ...base, matchHead: h }).pwfPsi;
+  let m;
+  try { m = matchHeadFactor(marched, bhip, HEAD_BOUNDS); } catch (e) { return { error: e.message }; }
+  return headResult('injector', m, { frictionHeld: fr.value, targetPsi: bhip, marchedPsi: marched(m.matchHead) });
+}
+
+export function gasMatchHead(f) {
+  const cfg = buildGasCfg(f);
+  const fr = frictionHeld(f);
+  if (fr.error) return fr;
+  const first = (f.testPoints ?? [])[0];
+  const q = num(first?.qMMscfd);
+  const thp = num(first?.thpPsi);
+  const pwf = num(first?.pwfPsi);
+  const missing = [];
+  if (q == null) missing.push('a gas rate');
+  if (thp == null) missing.push('a THP');
+  if (pwf == null) missing.push('a typed Pwf (a grey calculated value is not a measurement)');
+  if (missing.length) return needs(missing, 'gas head match: the first test row');
+  const base = { ...cfg, thpPsi: thp, qGasMMscfd: q, matchFriction: fr.value };
+  const marched = (h) => gasMarch({ ...base, matchHead: h }).pwfPsi;
+  let m;
+  try { m = matchHeadFactor(marched, pwf, HEAD_BOUNDS); } catch (e) { return { error: e.message }; }
+  return headResult('gas', m, { frictionHeld: fr.value, targetPsi: pwf, marchedPsi: marched(m.matchHead), testQMMscfd: q, testThpPsi: thp });
 }
 
 export function oilSensitivity(f) {
@@ -2086,12 +2219,14 @@ export function alliftSelect(f) {
 export const handlers = {
   'oil/nodal': oilNodal,
   'oil/calibrate': oilCalibrate,
+  'oil/matchhead': oilMatchHead,
   'oil/sensitivity': oilSensitivity,
   'oil/gaslift': oilGasLift,
   'oil/reserve': oilReserve,
   'oil/forecast': oilForecastApi,
   'water/injector': waterInjector,
   'water/injcalibrate': waterInjCalibrate,
+  'water/injmatchhead': waterInjMatchHead,
   'water/injsensitivity': waterInjSensitivity,
   'esp/pumps': espPumps,
   'oil/esp': oilEsp,
@@ -2101,6 +2236,7 @@ export const handlers = {
   'oil/espsepeff': oilEspSepEff,
   'gas/nodal': gasNodal,
   'gas/calibrate': gasCalibrate,
+  'gas/matchhead': gasMatchHead,
   'gas/sensitivity': gasSensitivity,
   'gas/reserve': gasReserve,
   'gas/forecast': gasForecastApi,
