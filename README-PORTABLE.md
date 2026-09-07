@@ -1,9 +1,43 @@
 # WellSim — standalone portable program
 
-**Build 2.3 — 5 September 2026**, from commit `67d2e4b` of the main project.
+**Build 2.4 — 7 September 2026**, from commit `0f5b6c4` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 337
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Change since build 2.2 (5 Sep):
+there. Changes since build 2.3 (5 Sep) — seven website releases, all now in
+the portable:
+
+- **Save as asks where.** It was always local, but it only prompted for a
+  name and the browser filed the case in its downloads folder. On Chromium
+  and Edge the portable now opens the real Save dialog — `localhost` counts as
+  a secure context, so the File System Access API works here exactly as on
+  the website — and you choose the folder and the name; **Open** starts in the
+  folder the last case went to. Firefox keeps the prompt-and-download path.
+  Cancelling either dialog is silent.
+- **Reserve prod_data gains a Model column.** Each production row names the
+  well model that solves its Pwf and the J that backs out its Pr — Natural
+  (Darcy future J), Gas lift or ESP (the typed PI, at the row's own injection
+  rate or frequency, blank = panel), or User (type both Pwf and Pr). New rows
+  take the active lift type and a change fills down; a row naming a model the
+  panel cannot supply stops with the row named; the Forecast continues the
+  well as the last modelled row. Rows with no model solve exactly as before.
+  The table scrolls inside its own box rather than squeezing, and the two
+  lift columns appear only when a row asks for them.
+- **Match head factor from test** — a button under *Match factors* on all
+  three tabs. *Calibrate from test* matches the IPR; this matches the march:
+  it solves the Matching head so the marched pressure meets a **typed**
+  measurement, with Matching friction held where you set it, both bounded to
+  0.8–1.2. Natural, gas-lift and water wells match the Test Pwf; **ESP wells
+  match the marched discharge pressure to the measured Pdis** and report Pint
+  as a consistency check; gas wells use the first test row. Out of range is
+  pinned at the bound and flagged — check friction, PVT or the test rate.
+- **What did NOT change:** every number an existing case produces. The
+  reserve solver only branches when a row names a model, the head-match
+  solver only runs when its button is pressed, and nothing since `0a9abcf`
+  touches the marches or the PVT. The account panel's Refresh button (already
+  gone from the website in 2.3's day) is gone here too.
+
+Changes in build 2.3 (5 Sep), kept for reference:
+
 
 - **The header loses four controls, matching the website.** Gone are
   **Export**, **Contact me**, **Print / PDF** and the account panel's
