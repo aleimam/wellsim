@@ -73,20 +73,33 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // everything else: cache first, then fill the cache behind the response
+  // everything else: cache first, then fill the cache behind the response.
+  //
+  // The second lookup ignores the query string, and it is what makes the
+  // offline promise real. PRECACHE stores bare paths ('/style.css'), but
+  // index.html asks for the STAMPED url ('/style.css?v=2026-09-06g'), and a
+  // plain caches.match keys on the whole url — so every precached asset was a
+  // miss and fell through to the network. With the server unreachable that
+  // left the cached index.html rendering alone: no stylesheet, no app.js, an
+  // unstyled skeleton that looks broken rather than offline. Same-origin
+  // paths in this cache are unique, so dropping the query cannot match the
+  // wrong entry, and /api/ has already returned above.
   e.respondWith(
-    caches.match(req).then(
-      (hit) =>
-        hit ||
-        fetch(req).then((res) => {
-          // opaque cross-origin responses (the Plotly CDN) are cacheable and
-          // worth keeping — without them the charts do not draw offline
-          if (res && (res.ok || res.type === 'opaque')) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        })
-    )
+    caches
+      .match(req)
+      .then((hit) => hit || caches.match(req, { ignoreSearch: true }))
+      .then(
+        (hit) =>
+          hit ||
+          fetch(req).then((res) => {
+            // opaque cross-origin responses (the Plotly CDN) are cacheable and
+            // worth keeping — without them the charts do not draw offline
+            if (res && (res.ok || res.type === 'opaque')) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+            }
+            return res;
+          })
+      )
   );
 });
