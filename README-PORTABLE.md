@@ -1,9 +1,22 @@
 # WellSim — standalone portable program
 
+> **NO BUILT COPY OF THIS PROGRAM EXISTS.** On 9 September 2026 the owner had
+> every portable deleted from both backup drives — 1.0 through 2.5, the build
+> working folders, and the copies inside all 26 dated backup and handover
+> folders. wellsim.app was retired the day before, so **WellSim now exists
+> only as source.** Everything below describes build 2.5 as it was, and is
+> also the specification a rebuild reproduces.
+>
+> To build one: `npm install` then `.\build.ps1`. The signing identity
+> `CN=M. El-Ashry` survives with its private key, and `portable/main.js` is
+> committed source. **The result will not match the hashes in
+> `WellSim-2.5.sha256.txt`** — a new signature and timestamp make a different
+> file. Those hashes record what shipped; they are not a target to hit.
+
 **Build 2.5 — 8 September 2026**, from commit `9025968` of the main project.
-Identical physics to https://wellsim.app; the current source is guarded by 344
-tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Changes since build 2.4 (7 Sep) — two website releases, both in the
+Identical physics to what wellsim.app served before it was retired; the source
+is guarded by 344 tests, the 43/43 validation sweep and a 38/38 module smoke
+check, all passing. Changes since build 2.4 (7 Sep) — two website releases, both in the
 **Lift selection** module on the Oil tab:
 
 - **The depth band is METRES, and the row reads "To perf. Depth, m".** The

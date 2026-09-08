@@ -302,10 +302,24 @@ private; neither belongs in a repository. They **are** in the F: backup.
   from committed source; the outputs (`WellSim.exe`, `build/`) are gitignored
   because they are ~200 MB per build. It serves the identical UI and physics,
   stores cases in a `cases/` folder **beside the exe**, has no accounts, and
-  takes the first free port from 3355. Current: **build 2.5, 8 Sep 2026**,
-  from commit `9025968`, signed `CN=M. El-Ashry`; it lives at
-  `D:\WellSim_2.5\` and `F:\WellSim_2.5\`, with 2.0–2.4 kept beside it.
-  **With wellsim.app retired this is the shipping product**, not a sidecar. Builds 1.3–2.0 carry the ThePWF signature.
+  takes the first free port from 3355. The last build was **2.5, 8 Sep 2026**,
+  from commit `9025968`, signed `CN=M. El-Ashry`.
+
+  **NO BUILT COPY EXISTS ANY MORE.** On 9 Sep 2026 the owner had every
+  portable deleted from both drives — 1.0 through 2.5, the build working
+  folders, and the copies inside all 26 dated backup and handover folders,
+  about 4.5 GB. With the site retired as well, **WellSim now exists only as
+  source**: this repo, plus the workbooks and archives on D: and F:.
+
+  Getting a binary back is a command, not a reconstruction —
+  `npm install` then `.\build.ps1`. Everything it needs survived on purpose:
+  the signing identity `CN=M. El-Ashry` in `CurrentUser\My` with its private
+  key, its backup at `F:\key\M-ElAshry-CodeSigning.pfx`, and
+  `portable/main.js`, which is committed source and is what makes the exe
+  serve the vendored Plotly instead of the CDN — do not confuse that folder
+  with a build output. **A rebuild will not match the published hashes in
+  `WellSim-2.5.sha256.txt`**; a fresh signature and timestamp make a
+  different file. Those hashes are the record of what shipped, not a target. Builds 1.3–2.0 carry the ThePWF signature.
 
   **The ThePWF private key was NOT destroyed on 5 Sep, whatever this file and
   README-PORTABLE said for three days.** It had been exported to
