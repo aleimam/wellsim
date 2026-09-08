@@ -42,12 +42,22 @@ database and runtime user.
 
 Still outstanding:
 
-- **DNS still points at the old box.** `wellsim.app` and `www.wellsim.app`
-  both resolve to `91.98.23.255`, which no longer claims either name — the
-  names simply fail to answer (no Caddy block, so no certificate). Harmless
-  while that box serves only fixed site blocks, but the records should be
-  removed at Cloudflare so nothing added there later answers to this name by
-  accident. **Registrar and Cloudflare are the owner's to do.**
+- **DNS stays as it is — a decision, not an oversight (owner, 8 Sep 2026).**
+  `wellsim.app` and `www.wellsim.app` still resolve to `91.98.23.255` through
+  Cloudflare, and that is deliberate. **Do not "fix" it.** The end state is
+  already the intended one, verified 8 Sep: HTTPS fails outright — no Caddy
+  block claims the name, so no certificate is ever requested — while
+  thepwf.net and bldrz.net on the same IP answer 200 from the same machine.
+  The 308 on port 80 is Caddy's blanket HTTP→HTTPS redirect, returned
+  identically for `Host: nosuchname.invalid`; it is the listener, not a
+  WellSim site. **The name resolves and serves nothing.**
+
+  What leaving the records in place does cost: they must be revisited before
+  anything with a catch-all or on-demand TLS is ever added to that Caddy,
+  since such a block would answer to a name WellSim no longer means to serve.
+  Deleting the two A records turns the dead connection into a clean NXDOMAIN
+  and removes that condition. **The registrar and Cloudflare remain the
+  owner's alone** — no token for either is on this workstation.
 - the `wellsim` service user (uid 996, `/usr/sbin/nologin`, home
   `/opt/wellsim` which no longer exists) is all that is left of the app on
   that box. It owns nothing and can log in nowhere; `userdel wellsim` closes
@@ -319,9 +329,15 @@ private; neither belongs in a repository. They **are** in the F: backup.
   worker are correct for the website and are untouched. Verify a build by
   running the exe and checking the page loads `/vendor/plotly.min.js`, not
   the CDN.
-- **Secrets** are in `d:\github_token.txt`, `d:\hetzner_token.txt`,
-  `d:\wellsim_token.txt` (Cloudflare). They are never committed and never
-  printed. The server accepts SSH keys only; the private key is
+- **Secrets are NOT at the paths this file used to give.** It named
+  `d:\github_token.txt`, `d:\hetzner_token.txt` and `d:\wellsim_token.txt`
+  (Cloudflare); **none of the three exists**, checked 8 Sep 2026 when a
+  Cloudflare call needed one. `docs/deploy.md` says only that they live in an
+  "excluded, access-restricted workstation secrets area", which is where to
+  look. **The actual location is deliberately not recorded here** — that is
+  the point of it — so the owner is the one who knows. Do not paste a token
+  into a chat or a terminal recording to work around this; anything that has
+  been pasted must be rotated. They are never committed and never printed. The server accepts SSH keys only; the private key is
   `~/.ssh/wellsim_hetzner`. The root password file `d:\ssh pass` written
   during setup was **deleted on 29 Aug 2026**, and no rotation was needed:
   on the server `root` carries no password hash at all (`!*` in
