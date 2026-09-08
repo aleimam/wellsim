@@ -1,53 +1,86 @@
 # WellSim — handover
 
-**Live:** https://wellsim.app · **Codex comparison:** https://bldrz.net ·
-**Repo:** https://github.com/aleimam/wellsim · **Manual:** https://wellsim.app/help.html
+**Live:** none — wellsim.app retired 8 Sep 2026; run locally or use the portable ·
+**Codex comparison:** https://bldrz.net ·
+**Repo:** https://github.com/aleimam/wellsim · **Manual:** `src/ui/help.html` (served at /help.html by a local run)
 
-**Live production revision:** 5 September 2026 — `4c9378e` from
-`merge/gas-forecast-into-v2`, deployed 8 September 17:48:24 UTC, asset stamp
-`2026-09-08f`.
-Verified after the release: 38/38 module smoke against the live site,
-`NRestarts=0`, no startup errors, the served UI byte-identical to this tree
-apart from CRLF, and one `oil/sensitivity` payload agreeing with the local
-engine to 9.8e-16. It replaced `d36d6a9` (17:04:06 the same day); the
-rollback archive of that tree is
-`/root/wellsim-app-pre-deploy-20260908-174819.tar.gz` — restore with
-`tar -xzf … -C /opt/wellsim && systemctl restart wellsim`.
+**WELLSIM.APP IS RETIRED.** On 8 September 2026 the owner retired the domain
+outright and took WellSim off the Hetzner box. **There is no production site.**
+The app runs **locally** (`npm start`, http://localhost:3355) and as the
+portable exe until a new domain is chosen and stood up.
 
-**The containment survived that deploy and is still in force:**
-`/api/accounts/status` reports
+What was done to `91.98.23.255`, in order, each step verified:
+
+1. Final `data/` pull taken and **read back**: 4 accounts, 8 cases, every one
+   parsing as a WellSim case. Captured with the 30-day backup history, the
+   configs and a server inventory to `WellSim-ServerRetirement-2026-09-08`
+   on **D: and F:**, 11/11 checksums OK on both.
+2. The two `wellsim.app` blocks removed from `/etc/caddy/Caddyfile`
+   (backed up as `Caddyfile.bak-20260908`), `caddy validate` run **before**
+   the reload, then reloaded.
+3. `systemctl disable --now wellsim.service wellsim-backup.timer` —
+   both inactive and disabled, port 3355 free on the box.
+4. `/opt/wellsim` → `/opt/wellsim.retired-2026-09-08` and
+   `/var/backups/wellsim` → `/var/backups/wellsim.retired-2026-09-08`.
+   **Moved, not deleted** — still recoverable on the box.
+
+**The box lives on and still serves the other two sites**, which were never
+touched: thepwf.net and bldrz.net both verified HTTP 200 after the Caddy
+reload, their `www` names 301 as before. bldrz keeps its own PostgreSQL
+database and runtime user.
+
+Still outstanding, and the owner's to do:
+
+- the permanent delete on the box —
+  `rm -rf /opt/wellsim.retired-2026-09-08 /var/backups/wellsim.retired-2026-09-08`
+- the registrar and Cloudflare records for `wellsim.app`
+- when the new domain exists: `deploy/README-server-rebuild.md` has the whole
+  rebuild order, and `deploy/Caddyfile.wellsim` is the site block to install.
+  **Every published reference to wellsim.app then needs updating in one pass** —
+  the manual, README, README-PORTABLE, this file, the brochure and the meeting
+  invite in ALdocs.
+
+The containment travels with the retirement: the account store was shut when
+the site went down, and any new box must pass the same check before DNS points
+at it — `/api/accounts/status` must report
+`{"enabled":false,"registrationEnabled":false}`. `main` still lacks `27ea04e`
+and must not be deployed anywhere.
+
+**The containment held to the end, and it still binds the next box.** While
+the site ran, `/api/accounts/status` reported
 `{"enabled":false,"registrationEnabled":false,"mode":"legacy-web"}` and the
-Sign in entry is hidden. It holds two ways over — the gate commit `27ea04e` is
-on the deployed branch, AND `WELLSIM_ENABLE_LEGACY_CASE_STORE` is absent from
+Sign in entry was hidden. It held two ways over — the gate commit `27ea04e` on
+the deployed branch, AND `WELLSIM_ENABLE_LEGACY_CASE_STORE` absent from
 `wellsim.service` (`Environment=PORT=3355 NODE_ENV=production`). Either alone
-would keep registration closed.
+would keep registration closed. Both requirements carry forward verbatim to
+whatever machine serves the new domain.
 
-**`main` STILL MUST NOT BE DEPLOYED HERE.** `27ea04e` is not on `main`, so
-deploying it would restore public registration. Production does not track
-`main` — check before you deploy, or you will roll that containment back.
+**`main` MUST NOT BE DEPLOYED ANYWHERE.** `27ea04e` is not on `main`, so a
+fresh box built from `main` would reopen public registration on a machine
+nobody is watching yet. The check in `deploy/README-server-rebuild.md` has to
+pass before any DNS points at anything.
 
 **Current working tree:** `main` merged into `codex/v2-foundation`,
 344 tests passing and 43/43 validation sweep. The separate `bldrz`
 database has migrations `0001`–`0003`, with least-privilege roles and an
 opt-in, bounded PostgreSQL connection pool.
 
-**Where the work sits, 5 September 2026 (evening):** branch
-`merge/gas-forecast-into-v2` at `4c9378e` (172 commits), pushed to origin and
-in sync, and **this exact tip is what production runs** — the site was
-redeployed on 8 September at 17:48:24 UTC. It is ahead of both `origin/main` (`de2393c`) and
+**Where the work sits, 8 September 2026 (evening):** branch
+`merge/gas-forecast-into-v2` at `b0581d4` (176 commits), pushed to origin and
+in sync. It is ahead of both `origin/main` (`de2393c`, by 97 commits) and
 `origin/codex/v2-foundation` (`b087a24`) and **has not been merged into
-either** — no PR exists yet. The newest portable release is **2.2**
-(`D:\WellSim_2.2`, also on F:), built from `8bba363`; it therefore predates
-the Export/Contact, Print/PDF and account-Refresh removals, which are website
-changes only.
+either** — no PR exists yet. **This branch is the only place the current work
+lives**, and with no site to hold a copy, that matters more than it did: the
+backups on D: and F: and the pushed remote are the redundancy.
 
-**Production runs this branch, not `main`** — an interim state the owner
-authorised on 5 September, pending the pull request. Until that PR lands,
-`main` (`de2393c`) and production have DIVERGED by 93 commits — production and
-this branch tip are now the same commit — so the two-device branch/site
-contract below records the intent, not the deployment.
-A green test run is still not authorisation to release; this release was
-authorised explicitly.
+**The newest portable release is 2.5** (`D:\WellSim_2.5`, also on F:), built
+from `9025968` and signed `CN=M. El-Ashry`. It carries everything the retired
+site carried, so **the portable is now the delivery vehicle** — demos and
+daily work need no domain at all.
+
+The two-device branch/site contract below records the branch discipline. Its
+site half is dormant: there is no site to deploy to, and a green test run was
+never authorisation to release in any case.
 
 ---
 
@@ -95,10 +128,16 @@ physics bug.
 
 ## 3. Deploying
 
-See **[docs/deploy.md](docs/deploy.md)** — it documents the live Hetzner +
-Caddy setup, the exact deploy command, and two caveats that will bite
-otherwise (the tar deploy never deletes files; `data/` survives only because
-of that).
+**There is nowhere to deploy to.** wellsim.app is retired and WellSim no
+longer runs on the Hetzner box; see the retirement record at the top. The
+deliverables are a local run and the portable exe.
+
+When a new domain is stood up, **[deploy/README-server-rebuild.md](deploy/README-server-rebuild.md)**
+is the rebuild order — captured from the live box before it left, including
+the containment check that must pass before DNS points anywhere.
+**[docs/deploy.md](docs/deploy.md)** still describes the deploy METHOD
+accurately (the tar deploy never deletes files; `data/` survives only because
+of that); only its host is gone.
 
 The one rule that is easy to forget: **bump the asset stamp in
 `src/ui/index.html` whenever `app.js`, `style.css` or `index.html` changes**,
@@ -152,39 +191,30 @@ private; neither belongs in a repository. They **are** in the F: backup.
   organization/membership model. Visitor calculations and Save as / Open are
   unaffected, and the portable build continues to use its local case folder.
 - **`data/` is the only stateful thing in the entire application.** It holds
-  `users.json` and the company case store, lives at `/opt/wellsim/app/data`,
-  and is not in git. The deploy does not touch it and nothing else will
-  recreate it.
+  `users.json` and the company case store, and is not in git. The deploy does
+  not touch it and nothing else will recreate it.
 
-  **A nightly backup runs, and the case store is NOT empty.** Both were the
-  other way round until 1 Sep 2026, and this entry said so — it justified
-  having no off-box copy on the grounds that there was nothing to lose.
-  There is now: **4 accounts across 2 companies (bapetco, bap) and 8 saved
-  client cases**, growing daily.
+  **THE NIGHTLY SERVER BACKUP NO LONGER RUNS.** It ran on the Hetzner box until
+  8 September 2026 — `wellsim-backup.timer` (systemd, 02:30 UTC, 30 days kept)
+  running `/usr/local/bin/wellsim-backup`, which tarred `/opt/wellsim/app/data`
+  into `/var/backups/wellsim/`, deliberately outside the app directory so
+  re-extracting or wiping it could not take the backups with it. That timer was
+  disabled with the retirement. **Nothing is backing up automatically now.**
 
-  What is installed on the box: `wellsim-backup.timer` (systemd, 02:30 UTC,
-  30 days kept) running `/usr/local/bin/wellsim-backup`, which tars `data/`
-  into **`/var/backups/wellsim/`** — deliberately outside `/opt/wellsim/app`
-  so re-extracting or wiping the app directory cannot take the backups with
-  it. The app also still writes its own rolling copy into `data-backups/`
-  when a case is saved.
+  What that store held is captured and safe: the final pull and the whole
+  30-day history are in `WellSim-ServerRetirement-2026-09-08` on **D: and F:**,
+  11/11 checksums OK on both — **4 accounts across 2 companies (bapetco, bap)
+  and 8 saved client cases**, every one read back and confirmed to parse. The
+  workstation's own `data/` is AHEAD of that capture (gas-lift-oil and gas-test
+  were re-saved locally on 2 Sep with newer fields), so restoring the archive
+  over it would roll those back.
 
-  **The 2 Sep infrastructure audit could not independently verify that
-  timer** — the recovery SSH key and its documented `F:` backup were
-  unavailable on the audit workstation and TCP/22 was closed or filtered
-  from that network. It was verified on 1 Sep from the deploy workstation,
-  so treat it as installed-and-once-verified rather than continuously
-  monitored, and re-check it from the box when access allows.
-
-  **Neither copy is off-box.** Both sit on the same disk as the thing they
-  protect: they survive a bad write, a bad deploy or an accidental delete —
-  NOT a lost server. The 2 Sep audit did pull one fresh encrypted archive
-  off the VPS and recovery-tested it, but that was manual and is not
-  scheduled. The off-box pull in **docs/deploy.md → “Backing up `data/`
-  off-box”** is still the one that actually protects the client cases. A
-  full manual snapshot was taken on 1 Sep 2026 into
-  `D:WellSim-FullBackup-2026-09-01server-data`. See also
-  **docs/architecture/infrastructure-audit-2026-09-02.md**.
+  **The protection now is manual and yours.** Local `data/` and `data-backups/`
+  sit on the same disk as the thing they protect — they survive a bad write,
+  not a lost machine. The full-project backups to D: and F: are the off-machine
+  copy, and they only exist when someone takes one. The script and units are
+  preserved in `deploy/` so the timer can be reinstated verbatim on a new box.
+  See also **docs/architecture/infrastructure-audit-2026-09-02.md**.
 - **Sessions are in-memory.** Any restart signs users out. Cases on disk are
   unaffected. This is fine and expected; do not treat it as a bug report.
 - **PostgreSQL 16.15 is installed for the `bldrz.net` comparison environment.**
@@ -244,10 +274,10 @@ private; neither belongs in a repository. They **are** in the F: backup.
   from committed source; the outputs (`WellSim.exe`, `build/`) are gitignored
   because they are ~200 MB per build. It serves the identical UI and physics,
   stores cases in a `cases/` folder **beside the exe**, has no accounts, and
-  takes the first free port from 3355. Current: **build 2.2, 5 Sep 2026**,
-  from commit `8bba363`, signed `CN=M. El-Ashry`; it lives at
-  `D:\WellSim_2.2\` and `F:\WellSim_2.2\`, and inside the 5 Sep full backup as
-  `portable/WellSim-2.2.zip`. Builds 1.3–2.0 carry the ThePWF signature; that
+  takes the first free port from 3355. Current: **build 2.5, 8 Sep 2026**,
+  from commit `9025968`, signed `CN=M. El-Ashry`; it lives at
+  `D:\WellSim_2.5\` and `F:\WellSim_2.5\`, with 2.0–2.4 kept beside it.
+  **With wellsim.app retired this is the shipping product**, not a sidecar. Builds 1.3–2.0 carry the ThePWF signature; that
   certificate and its private key were destroyed on 5 Sep and can never sign
   again — README-PORTABLE.md records what that does and does not change.
 

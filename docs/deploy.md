@@ -1,14 +1,41 @@
 # Deploying WellSim
 
-This documents the **live production setup**, not a hypothetical one. WellSim
+> **RETIRED, 8 September 2026.** wellsim.app no longer exists and WellSim no
+> longer runs on the Hetzner box (91.98.23.255) — the site was taken down at
+> the owner's decision, the domain retired outright, and the app directory and
+> backup history moved aside pending permanent deletion. **There is nothing to
+> deploy to.** The app runs locally and as the portable exe until a new domain
+> is stood up.
+>
+> That box is still alive and still serves **thepwf.net** and **bldrz.net**,
+> which were never part of WellSim's move and were verified working after the
+> Caddy change. Do not treat anything below as live infrastructure for this
+> app.
+>
+> To stand the site up again on a new domain, follow
+> **deploy/README-server-rebuild.md** — it has the rebuild order, the captured
+> unit and Caddy files, and the containment check that must pass before DNS
+> points anywhere. The procedure below remains accurate as the DEPLOY METHOD
+> (git archive → scp → tar → npm install → restart); only the host is gone.
+
+This documented the **live production setup** until 8 September 2026, and is
+kept as the record of it and as the method for the next one. WellSim
 is a Node app (calculation API plus an explicitly gated legacy case store), so a static host such as GitHub
 Pages or Cloudflare Pages **cannot run it** — those serve files only.
 
 ```
 GitHub aleimam/wellsim  →  Hetzner VPS (Node + Caddy)  →  Cloudflare DNS  →  wellsim.app
+                                                                    [RETIRED 8 Sep 2026]
 ```
 
-## Production facts
+## Production facts — AS THEY WERE, to 8 September 2026
+
+Everything in this table describes the box **before** WellSim left it. The app
+path and the two services no longer exist there (moved aside as
+`/opt/wellsim.retired-2026-09-08` and `/var/backups/wellsim.retired-2026-09-08`,
+pending permanent deletion); `thepwf.net` and `bldrz.net` rows are still live
+and still that box's business, not this app's. The verbatim unit, Caddy and
+backup files are committed under `deploy/`.
 
 | | |
 |---|---|
@@ -164,6 +191,11 @@ www.thepwf.net {
 
 ## Deploy a new version
 
+> **THERE IS NO PRODUCTION TO DEPLOY TO.** The sequence below is correct as a
+> METHOD and is what a new box will use; today it has no target. Do not run it
+> against `91.98.23.255` — WellSim is gone from that machine and the other two
+> sites on it are not ours.
+>
 > **Check what production is running first, and know which site is yours.**
 >
 > Since 3 Sep 2026 the owner has agreed a two-device split, recorded in
@@ -292,6 +324,12 @@ carrying a query string, which had been shipping unnoticed.
 
 ## Backing up `data/` off-box
 
+**No server backup runs any more** — `wellsim-backup.timer` was disabled with
+the retirement, and the final pull plus the whole 30-day history are captured
+in `WellSim-ServerRetirement-2026-09-08` on D: and F:. Local `data/` is now
+protected only by the manual full backups to those drives. The options below
+are the design to reinstate on a new box.
+
 The legacy JSON account/case store is disabled unless the service explicitly
 sets `WELLSIM_ENABLE_LEGACY_CASE_STORE=1`. Do not set that flag on a public
 deployment merely to restore the old Sign in link: company slugs do not prove
@@ -380,6 +418,8 @@ stops being optional.
 ---
 
 ## Routine operations
+
+*(Nothing to operate — these ran on the retired box. Kept for the next one.)*
 
 ```bash
 systemctl status wellsim          # is it up
