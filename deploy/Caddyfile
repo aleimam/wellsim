@@ -1,0 +1,40 @@
+wellsim.app {
+    reverse_proxy 127.0.0.1:3355
+    # access log added 1 Sep 2026 — the site had NO traffic record since launch
+    log {
+        output file /var/log/caddy/wellsim.access.log {
+            roll_size 10MB
+            roll_keep 10
+        }
+    }
+}
+www.wellsim.app {
+    redir https://wellsim.app{uri} permanent
+}
+thepwf.net {
+    root * /opt/thepwf
+    file_server
+    log {
+        output file /var/log/caddy/thepwf.access.log {
+            roll_size 10MB
+            roll_keep 10
+        }
+    }
+}
+www.thepwf.net {
+    redir https://thepwf.net{uri} permanent
+}
+
+bldrz.net {
+    reverse_proxy 127.0.0.1:3356
+    log {
+        output file /var/log/caddy/bldrz.access.log {
+            roll_size 10MB
+            roll_keep 10
+        }
+    }
+}
+
+www.bldrz.net {
+    redir https://bldrz.net{uri} permanent
+}

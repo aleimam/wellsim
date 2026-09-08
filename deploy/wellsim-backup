@@ -1,0 +1,12 @@
+#!/bin/bash
+# Nightly snapshot of the ONLY stateful thing in WellSim: data/ (accounts +
+# company cases). Written OUTSIDE /opt/wellsim/app so wiping or re-extracting
+# the app directory cannot take the backups with it. 30 days kept.
+# NOTE: this is still the SAME DISK. It survives a bad write, a bad deploy or
+# an accidental delete -- NOT a lost server. Pull it off-box (see deploy.md).
+set -euo pipefail
+DEST=/var/backups/wellsim
+STAMP=$(date +%F)
+tar -czf "$DEST/wellsim-data-$STAMP.tar.gz" -C /opt/wellsim/app data
+find "$DEST" -name 'wellsim-data-*.tar.gz' -mtime +30 -delete
+echo "wellsim data backup: $DEST/wellsim-data-$STAMP.tar.gz ($(du -h "$DEST/wellsim-data-$STAMP.tar.gz" | cut -f1))"

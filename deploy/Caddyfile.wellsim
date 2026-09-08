@@ -1,0 +1,28 @@
+# Caddyfile for a server that hosts WellSim AND NOTHING ELSE.
+#
+# The old box (91.98.23.255) terminates TLS for six names across three sites:
+# wellsim.app, thepwf.net and bldrz.net. Only WellSim is moving; the other two
+# stay where they are, untouched (owner decision, 8 Sep 2026). This file is
+# therefore the live Caddyfile with the thepwf and bldrz blocks REMOVED —
+# the two wellsim blocks below are verbatim from the running box.
+#
+# Install as /etc/caddy/Caddyfile on the NEW server. Caddy gets its own
+# Let's Encrypt certificate for wellsim.app the first time DNS points here and
+# ports 80/443 are open; nothing needs copying from the old machine.
+#
+# /var/log/caddy must exist and be writable by the caddy user, or the log
+# directive fails at startup.
+
+wellsim.app {
+    reverse_proxy 127.0.0.1:3355
+    # access log added 1 Sep 2026 — the site had NO traffic record since launch
+    log {
+        output file /var/log/caddy/wellsim.access.log {
+            roll_size 10MB
+            roll_keep 10
+        }
+    }
+}
+www.wellsim.app {
+    redir https://wellsim.app{uri} permanent
+}

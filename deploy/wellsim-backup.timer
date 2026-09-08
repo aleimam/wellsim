@@ -1,0 +1,7 @@
+[Unit]
+Description=Nightly WellSim data/ backup
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+[Install]
+WantedBy=timers.target

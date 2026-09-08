@@ -1,0 +1,5 @@
+[Unit]
+Description=WellSim data/ nightly backup
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wellsim-backup
