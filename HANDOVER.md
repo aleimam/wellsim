@@ -302,24 +302,36 @@ private; neither belongs in a repository. They **are** in the F: backup.
   from committed source; the outputs (`WellSim.exe`, `build/`) are gitignored
   because they are ~200 MB per build. It serves the identical UI and physics,
   stores cases in a `cases/` folder **beside the exe**, has no accounts, and
-  takes the first free port from 3355. The last build was **2.5, 8 Sep 2026**,
-  from commit `9025968`, signed `CN=M. El-Ashry`.
+  takes the first free port from 3355. Current: **build 2.6, 9 Sep 2026**,
+  from commit `615c972`, signed `CN=M. El-Ashry`, at `D:\WellSim_2.6\` and
+  `F:\WellSim_2.6\`. **With the site retired this is the deliverable.**
 
-  **NO BUILT COPY EXISTS ANY MORE.** On 9 Sep 2026 the owner had every
-  portable deleted from both drives — 1.0 through 2.5, the build working
-  folders, and the copies inside all 26 dated backup and handover folders,
-  about 4.5 GB. With the site retired as well, **WellSim now exists only as
-  source**: this repo, plus the workbooks and archives on D: and F:.
+  **2.6 is a REBUILD of 2.5, not a new version.** Nothing in `src/`,
+  `portable/`, `build.ps1` or `sea-config.json` changed between `9025968` and
+  `615c972`; the commits between are the retirement and the credential
+  clearance. It exists because on 9 Sep every portable was deleted from both
+  drives — 1.0 through 2.5, the build folders and the copies inside all 26
+  dated backups, about 4.5 GB — and this replaced them from the same source.
+  Its hashes cannot match 2.5's: a fresh signature, timestamp and base
+  `node.exe` make a different file. Both `.sha256.txt` files record what
+  shipped; neither is a target.
 
-  Getting a binary back is a command, not a reconstruction —
-  `npm install` then `.\build.ps1`. Everything it needs survived on purpose:
-  the signing identity `CN=M. El-Ashry` in `CurrentUser\My` with its private
-  key, its backup at `F:\key\M-ElAshry-CodeSigning.pfx`, and
-  `portable/main.js`, which is committed source and is what makes the exe
-  serve the vendored Plotly instead of the CDN — do not confuse that folder
-  with a build output. **A rebuild will not match the published hashes in
-  `WellSim-2.5.sha256.txt`**; a fresh signature and timestamp make a
-  different file. Those hashes are the record of what shipped, not a target. Builds 1.3–2.0 carry the ThePWF signature.
+  Rebuilding is a command, not a reconstruction — `npm install` then
+  `.\build.ps1`. What it needs survived on purpose: `CN=M. El-Ashry` in
+  `CurrentUser\My` with its private key, its backup at
+  `F:\key\M-ElAshry-CodeSigning.pfx`, and `portable/main.js` — **committed
+  source, not a build output**, and the file that makes the exe serve the
+  vendored Plotly instead of the CDN. The folder name invites deleting it;
+  don't.
+
+  **The exe and a dev server can BOTH hold port 3355, and this bites.**
+  Measured 9 Sep: `node` binds `::` and the portable binds `127.0.0.1`, so
+  the exe's "first free port" check does not see the dev server and takes
+  3355 anyway. Which one `localhost:3355` reaches then depends on whether the
+  name resolves to `::1` or `127.0.0.1`. If you are testing a source change
+  and the page will not budge — or the reverse — check
+  `Get-NetTCPConnection -State Listen -LocalPort 3355` before believing
+  either. Stop one of them. Builds 1.3–2.0 carry the ThePWF signature.
 
   **The ThePWF private key was NOT destroyed on 5 Sep, whatever this file and
   README-PORTABLE said for three days.** It had been exported to

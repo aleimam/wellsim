@@ -1,23 +1,38 @@
 # WellSim — standalone portable program
 
-> **NO BUILT COPY OF THIS PROGRAM EXISTS.** On 9 September 2026 the owner had
-> every portable deleted from both backup drives — 1.0 through 2.5, the build
-> working folders, and the copies inside all 26 dated backup and handover
-> folders. wellsim.app was retired the day before, so **WellSim now exists
-> only as source.** Everything below describes build 2.5 as it was, and is
-> also the specification a rebuild reproduces.
->
-> To build one: `npm install` then `.\build.ps1`. The signing identity
-> `CN=M. El-Ashry` survives with its private key, and `portable/main.js` is
-> committed source. **The result will not match the hashes in
-> `WellSim-2.5.sha256.txt`** — a new signature and timestamp make a different
-> file. Those hashes record what shipped; they are not a target to hit.
-
-**Build 2.5 — 8 September 2026**, from commit `9025968` of the main project.
+**Build 2.6 — 9 September 2026**, from commit `615c972` of the main project.
 Identical physics to what wellsim.app served before it was retired; the source
-is guarded by 344 tests, the 43/43 validation sweep and a 38/38 module smoke
-check, all passing. Changes since build 2.4 (7 Sep) — two website releases, both in the
-**Lift selection** module on the Oil tab:
+is guarded by 344 tests and the 43/43 validation sweep, both passing.
+
+> **2.6 IS A REBUILD OF 2.5, NOT A NEW VERSION.** Nothing in `src/`,
+> `portable/`, `build.ps1` or the SEA config changed between commit `9025968`
+> (2.5) and `615c972` — the thirteen commits between them are the wellsim.app
+> retirement, the credential clearance and the documentation that records
+> them. **The program behaves identically.** 2.6 exists because on 9 September
+> every portable binary was deleted from both drives, 2.5 included, and this
+> is the replacement built from the same source.
+>
+> It is a **different file** from 2.5 and always would be: a fresh signature
+> and timestamp, and a base `node.exe` taken from whatever Node is installed
+> at build time. So `WellSim-2.6.sha256.txt` does not and cannot match
+> `WellSim-2.5.sha256.txt`. Both are records of what shipped, not targets.
+>
+> **There is no `ThePWF-CodeSigning.cer` in this release.** All 81 copies were
+> deleted on 9 September with the ThePWF identity. Only
+> `M-ElAshry-CodeSigning.cer` ships now, which is all 2.1 and later need.
+>
+> **The exe will happily share port 3355 with a dev server.** Measured on
+> 9 September: `node src/server/server.js` binds `::` while the portable
+> binds `127.0.0.1`, so the exe's "first free port from 3355" check does not
+> notice it and takes 3355 too. Both then listen, and which one
+> `localhost:3355` reaches depends on whether the name resolves to `::1` or
+> `127.0.0.1`. If a change you just made refuses to appear — or one you
+> didn't make does — run
+> `Get-NetTCPConnection -State Listen -LocalPort 3355` and stop one of them.
+
+The engineering content below is unchanged from 2.5 and reached the exe with
+that build. **Changes 2.4 → 2.5 (7 → 8 Sep)** — two website releases, both in
+the **Lift selection** module on the Oil tab:
 
 - **The depth band is METRES, and the row reads "To perf. Depth, m".** The
   source workbook always meant metres — its Level-1 chart axis is titled
