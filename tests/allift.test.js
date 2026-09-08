@@ -16,9 +16,9 @@ import { screenLifecycle } from '../src/core/allift/screen.js';
 import { economicScreen, trapezoidCumStb } from '../src/core/allift/economics.js';
 
 const SNAPS = [
-  { j: 0.7, prPsi: 5200, pbPsi: 2000, pwfPsi: 2000, depthFt: 3200, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
-  { j: 0.7, prPsi: 3500, pbPsi: 2000, pwfPsi: 2000, depthFt: 3200, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
-  { j: 0.7, prPsi: 2500, pbPsi: 2000, pwfPsi: 2000, depthFt: 3200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { j: 0.7, prPsi: 5200, pbPsi: 2000, pwfPsi: 2000, depthM: 3200, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { j: 0.7, prPsi: 3500, pbPsi: 2000, pwfPsi: 2000, depthM: 3200, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { j: 0.7, prPsi: 2500, pbPsi: 2000, pwfPsi: 2000, depthM: 3200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
 ];
 const FORM = {
   snapshots: SNAPS,
@@ -54,9 +54,9 @@ test('allift: Qgross is the composite Vogel across the three snapshots', () => {
 test('allift: the demo well screens to ESP + Gas Lift + Jet, SRP and PCP out', () => {
   const r = run();
   assert.deepEqual(r.screen.technicallyApplicable, ['ESP', 'GL', 'JET']);
-  assert.ok(r.screen.byMethod.SRP.failedParams.includes('depthFt'));
+  assert.ok(r.screen.byMethod.SRP.failedParams.includes('depthM'));
   assert.ok(r.screen.byMethod.SRP.failedParams.includes('dogLegDeg'));
-  assert.ok(r.screen.byMethod.PCP.failedParams.includes('depthFt'));
+  assert.ok(r.screen.byMethod.PCP.failedParams.includes('depthM'));
 });
 
 test('allift: the UDC denominator is cumulative OIL, not gross liquid', () => {
@@ -133,7 +133,7 @@ test('gate: both sucker-rod conditions give both reasons, not one', () => {
 // hide whether the sour-gas gate fired at all.
 const PCP_OK = [2, 20, 50].map((wcPct, i) => ({
   j: 0.5, prPsi: [5200, 3500, 2500][i], pbPsi: 2000, pwfPsi: 2000,
-  depthFt: 2200, whpPsi: 250, wcPct, gorScfStb: 400, devDeg: 3, dogLegDeg: 2,
+  depthM: 2200, whpPsi: 250, wcPct, gorScfStb: 400, devDeg: 3, dogLegDeg: 2,
 }));
 
 test('gate: high H2S/CO2 also rules PCP out, on the stator elastomer', () => {
@@ -172,7 +172,7 @@ test('gate: with no condition set, nothing is excluded and the demo is unchanged
 
 test('gate: excluding every survivor leaves no recommendation, and says why', () => {
   // ESP and JET out on their envelopes (a shallow, low-rate well), GL by gate
-  const shallow = SNAPS.map((s) => ({ ...s, depthFt: 1200, j: 0.02 }));
+  const shallow = SNAPS.map((s) => ({ ...s, depthM: 1200, j: 0.02 }));
   const r = run({ snapshots: shallow, gates: { naturalFlow: false, nearGasCompression: false, sourGasHigh: false } });
   assert.ok(!r.applicable.includes('GL'));
   assert.equal(r.recommendation, null);
@@ -182,7 +182,7 @@ test('gate: excluding every survivor leaves no recommendation, and says why', ()
 test('allift: the core screen is reachable directly and agrees with the handler', () => {
   const r = run();
   const points = r.snapshots.map((s) => ({
-    qGrossStbD: s.qGrossStbD, depthFt: s.depthFt, glr: s.glr, whpPsi: s.whpPsi,
+    qGrossStbD: s.qGrossStbD, depthM: s.depthM, glr: s.glr, whpPsi: s.whpPsi,
     wcPct: s.wcPct, gorScfStb: s.gorScfStb, devDeg: s.devDeg, dogLegDeg: s.dogLegDeg,
   }));
   const s = screenLifecycle(points);
@@ -220,8 +220,8 @@ test('bands v1.2: a vertical, straight well is INSIDE every geometry band, not o
   // with the geometry no longer knocking anything out, the survivors are the
   // ones their OTHER bands allow: SRP and PCP are still out on depth
   assert.deepEqual(r.screen.technicallyApplicable, ['ESP', 'GL', 'JET']);
-  assert.ok(r.screen.byMethod.SRP.failedParams.includes('depthFt'));
-  assert.ok(r.screen.byMethod.PCP.failedParams.includes('depthFt'));
+  assert.ok(r.screen.byMethod.SRP.failedParams.includes('depthM'));
+  assert.ok(r.screen.byMethod.PCP.failedParams.includes('depthM'));
   // and the run still stamps a version, so an old screen stays reproducible
   assert.ok(r.limits.version, 'the bands version travels with the result');
 });
@@ -292,4 +292,23 @@ test('horizon: anything outside 1-4 falls back to the workbook year, never to a 
     assert.equal(r.cumBasis.horizonYears, 1, `horizon ${bad}`);
     near(r.cumBasis.cumStb, 369580.75, 1, 'the workbook cum');
   }
+});
+
+test('bands v1.3: the depth band is the sheet\'s METRES, and no number moved', () => {
+  const r = run();
+  // the sheet's own Level-1 axis reads "Depth, m"; these are its numbers
+  assert.deepEqual(r.limits.bands.ESP.depthM, [1000, 3700]);
+  assert.deepEqual(r.limits.bands.PCP.depthM, [1000, 2500]);
+  assert.equal(r.limits.bands.ESP.depthFt, undefined, 'the ft key is gone, not aliased');
+  assert.match(r.limits.provenance, /METRES/);
+  // the demo well is 3200 m and screens exactly as the workbook says
+  assert.equal(r.snapshots[0].depthM, 3200);
+  assert.deepEqual(r.screen.technicallyApplicable, ['ESP', 'GL', 'JET']);
+  assert.equal(r.recommendation, 'GL');
+  // a depth typed in FEET for the same well now screens OUT, which is the
+  // point of the correction: 10,500 ft is 3200 m, and 10,500 is past every band
+  const feet = run({ snapshots: SNAPS.map((s) => ({ ...s, depthM: 10500 })) });
+  assert.deepEqual(feet.screen.technicallyApplicable, []);
+  for (const m of ['ESP', 'GL', 'SRP', 'JET', 'PCP'])
+    assert.ok(feet.screen.byMethod[m].failedParams.includes('depthM'), `${m} out on depth`);
 });

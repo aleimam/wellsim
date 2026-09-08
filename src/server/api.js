@@ -2125,7 +2125,7 @@ function alliftSnapshotPoint(s) {
   return {
     point: {
       qGrossStbD,
-      depthFt: num(s.depthFt),
+      depthM: num(s.depthM),
       glr,
       whpPsi: num(s.whpPsi),
       wcPct,

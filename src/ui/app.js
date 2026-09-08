@@ -3427,6 +3427,16 @@ function collectCase() {
 }
 
 function applyCase(c) {
+  // the lift-selection depth was renamed depthFt -> depthM on 8 Sep 2026 when
+  // the band was corrected to the sheet's metres. The NUMBER did not change,
+  // so a case saved before that keeps its typed depth rather than silently
+  // falling back to the default.
+  if (c?.inputs) {
+    for (const [k, v] of Object.entries(c.inputs)) {
+      const m = k.match(/^al-depthFt-(\d+)$/);
+      if (m && c.inputs[`al-depthM-${m[1]}`] === undefined) c.inputs[`al-depthM-${m[1]}`] = v;
+    }
+  }
   // radios first: the prod_data Model column defaults a row with no model to
   // the ACTIVE lift type, so the case's own lift must be in place before its
   // grid renders — otherwise an ESP case opened in a natural-flow session
@@ -4081,30 +4091,30 @@ const ALLIFT_M = [
   { k: 'PCP', label: 'PCP', engine: false, c: '#b4443a' },
 ];
 const ALLIFT_P = [
-  { k: 'qGrossStbD', label: 'Gross rate', u: 'stb/d' }, { k: 'depthFt', label: 'Depth', u: 'ft' },
+  { k: 'qGrossStbD', label: 'Gross rate', u: 'stb/d' }, { k: 'depthM', label: 'To perf. Depth', u: 'm' },
   { k: 'glr', label: 'GLR', u: 'scf/stb' }, { k: 'whpPsi', label: 'WHP', u: 'psi' },
   { k: 'wcPct', label: 'Water cut', u: '%' }, { k: 'gorScfStb', label: 'GOR', u: 'scf/stb' },
-  { k: 'devDeg', label: 'Max well deviation', u: 'deg' }, { k: 'dogLegDeg', label: 'Dog-leg', u: 'deg/100ft' },
+  { k: 'devDeg', label: 'Max well deviation', u: 'deg' }, { k: 'dogLegDeg', label: 'Max dog-leg', u: 'deg/100ft' },
 ];
 const ALLIFT_L = [
-  { level: 1, title: 'Depth + Gross Rate', x: 'qGrossStbD', y: 'depthFt', xt: 'log', yt: 'linear', xd: [10, 10000], yd: [500, 4500] },
+  { level: 1, title: 'Depth + Gross Rate', x: 'qGrossStbD', y: 'depthM', xt: 'log', yt: 'linear', xd: [10, 10000], yd: [500, 4500] },
   { level: 2, title: 'WHP + GLR', x: 'glr', y: 'whpPsi', xt: 'log', yt: 'log', xd: [1, 2000], yd: [10, 5000] },
   { level: 3, title: 'Water-Cut + GOR', x: 'wcPct', y: 'gorScfStb', xt: 'linear', yt: 'log', xd: [0, 100], yd: [100, 200000] },
-  { level: 4, title: 'Max deviation + Dog-Leg', x: 'devDeg', y: 'dogLegDeg', xt: 'linear', yt: 'linear', xd: [0, 80], yd: [0, 16] },
+  { level: 4, title: 'Max deviation + Max dog-leg', x: 'devDeg', y: 'dogLegDeg', xt: 'linear', yt: 'linear', xd: [0, 80], yd: [0, 16] },
 ];
 const ALLIFT_ED = [
   ['pwfPsi', 'Pwf', 'psi'], ['prPsi', 'Res. P', 'psi'], ['pbPsi', 'Bubble P', 'psi'], ['j', 'PI (J)', ''],
   // GLR is NOT here: it is calculated from GOR and W.C (see alliftGlr) and
   // shown as a computed row, exactly like Qgross
-  ['depthFt', 'Depth', 'ft'], ['whpPsi', 'WHP', 'psi'], ['wcPct', 'Water cut', '%'],
-  ['gorScfStb', 'GOR', 'scf/stb'], ['devDeg', 'Max well deviation', 'deg'], ['dogLegDeg', 'Dog-leg', '°/100ft'],
+  ['depthM', 'To perf. Depth', 'm'], ['whpPsi', 'WHP', 'psi'], ['wcPct', 'Water cut', '%'],
+  ['gorScfStb', 'GOR', 'scf/stb'], ['devDeg', 'Max well deviation', 'deg'], ['dogLegDeg', 'Max dog-leg', '°/100ft'],
 ];
 // Properties of the FLUID and the WELLBORE, not of time: the bubble point, the
 // maximum deviation and the dog-leg do not migrate over a well's life the way
 // rate, water cut and GLR do. They are typed once, in the Initial column, and
 // the +6 mo / +1 yr columns carry that value (shown greyed, and sent to the
 // handler for every snapshot so the screen sees the same constant throughout).
-const ALLIFT_STATIC = new Set(['pbPsi', 'devDeg', 'dogLegDeg']);
+const ALLIFT_STATIC = new Set(['pbPsi', 'depthM', 'devDeg', 'dogLegDeg']);
 /** The live value of parameter k at snapshot i — a static parameter always
  *  reads the Initial column, wherever it is asked for. */
 function alliftVal(k, i) {
@@ -4115,9 +4125,9 @@ function alliftVal(k, i) {
 
 const ALLIFT_CAP = { ESP: 500000, GL: 150000, SRP: 300000, JET: 292000, PCP: 400000 };
 const ALLIFT_DEFAULT = [
-  { pwfPsi: 2000, prPsi: 5200, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
-  { pwfPsi: 2000, prPsi: 3500, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
-  { pwfPsi: 2000, prPsi: 2500, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 5200, pbPsi: 2000, j: 0.7, depthM: 3200, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 3500, pbPsi: 2000, j: 0.7, depthM: 3200, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
+  { pwfPsi: 2000, prPsi: 2500, pbPsi: 2000, j: 0.7, depthM: 3200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
 ];
 // The horizon is the analyst's (1, 2, 3 or 4 years; the workbook's is 1). The
 // middle snapshot always sits at half of it, so its label follows the select.
@@ -4160,7 +4170,7 @@ function alliftEnsureForm() {
       ).join('') + '</tr>';
   }
   h += '</tbody></table>';
-  h += '<div class="note" style="margin:2px 0 0">Bubble P, max well deviation and dog-leg belong to the fluid and the wellbore, not to time: type them once under <b>Initial</b> and the later columns carry that value.</div>';
+  h += '<div class="note" style="margin:2px 0 0">Bubble P, to-perf. depth, max well deviation and max dog-leg belong to the fluid and the wellbore, not to time: type them once under <b>Initial</b> and the later columns carry that value.</div>';
   h += '<div class="senshead">Estimated cost per method, $ (capex + hookup)</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:6px">';
   for (const m of ALLIFT_M) h += `<label style="display:flex;justify-content:space-between;gap:6px;align-items:center"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${m.c};margin-right:5px"></span>${m.label}</span><input id="al-cap-${m.k}" type="number" step="any" value="${ALLIFT_CAP[m.k]}" style="width:6.5em;text-align:right"></label>`;
   h += '</div>';
