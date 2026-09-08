@@ -305,9 +305,24 @@ private; neither belongs in a repository. They **are** in the F: backup.
   takes the first free port from 3355. Current: **build 2.5, 8 Sep 2026**,
   from commit `9025968`, signed `CN=M. El-Ashry`; it lives at
   `D:\WellSim_2.5\` and `F:\WellSim_2.5\`, with 2.0–2.4 kept beside it.
-  **With wellsim.app retired this is the shipping product**, not a sidecar. Builds 1.3–2.0 carry the ThePWF signature; that
-  certificate and its private key were destroyed on 5 Sep and can never sign
-  again — README-PORTABLE.md records what that does and does not change.
+  **With wellsim.app retired this is the shipping product**, not a sidecar. Builds 1.3–2.0 carry the ThePWF signature.
+
+  **The ThePWF private key was NOT destroyed on 5 Sep, whatever this file and
+  README-PORTABLE said for three days.** It had been exported to
+  `ThePWF-CodeSigning-BACKUP.pfx` on 27 Aug, and **four passphrase-protected
+  copies survived** — one on D: and three on F:, inside the 27 and 28 Aug
+  backups. They were found on 8 Sep while clearing server credentials off this
+  machine, and **deleted the same day at the owner's instruction**, so the
+  claim is true now and was not before. ThePWF is in no certificate store on
+  this workstation either. Nothing can sign as `CN=ThePWF WellSim, O=ThePWF`
+  again.
+
+  **This changes nothing about builds 1.3–2.0**: their signatures are embedded
+  and timestamped, and `ThePWF-CodeSigning.cer` — the PUBLIC half, needed to
+  verify them — still ships beside every release and must be kept.
+  README-PORTABLE.md records what that does and does not change. The lesson is
+  the one the record already had backwards: **"destroyed" is a claim to verify,
+  not to assert.**
 
   Two things about it are easy to get wrong, and both were wrong until
   30 Aug 2026:
@@ -329,11 +344,30 @@ private; neither belongs in a repository. They **are** in the F: backup.
   worker are correct for the website and are untouched. Verify a build by
   running the exe and checking the page loads `/vendor/plotly.min.js`, not
   the CDN.
-- **Secrets**, verified 8 Sep 2026: `d:\hetzner_token.txt` (64 bytes) and
-  `d:\wellsim_token.txt` (Cloudflare, 53 bytes) are both present, as this
-  file has always said. **`d:\github_token.txt` is not there** — that one
-  path is stale, and `git push` works from the credential helper rather than
-  a token file, so nothing depends on it.
+- **Server credentials were cleared off this workstation on 8 Sep 2026**, at
+  the owner's instruction, after the retirement. Deleted: the SSH key
+  `~/.ssh/wellsim_hetzner` and its `.pub`, its F: backup copy, `known_hosts`
+  and `known_hosts.old` (which held nothing but that box), and the key's
+  identity in the Windows ssh-agent, which is now empty. **The two token files
+  `d:\hetzner_token.txt` and `d:\wellsim_token.txt` must be deleted by hand** —
+  an agent's tooling refuses to remove files at a drive root.
+  `d:\github_token.txt` had already gone and nothing depends on it; `git push`
+  uses the credential helper.
+
+  **Deleting a credential is not revoking it.** Both tokens and the
+  `wellsim-deploy` key remain valid — at Hetzner, at Cloudflare and in the
+  box's `authorized_keys` — they are simply no longer held here. What each one
+  reached, checked before deletion: the **Cloudflare** token saw one zone,
+  `wellsim.app`, now empty, so it commands nothing. The **Hetzner** token
+  controls one server, `wellsim` at `91.98.23.255`, **still running and still
+  serving thepwf.net and bldrz.net** — that token is full control of a live
+  machine, and revoking it in the Hetzner console is the step that actually
+  closes it.
+
+  **From this workstation that box is now reachable only through the Hetzner
+  web console.** Two other keys remain authorised on it —
+  `wellsim-ops-2026-09-02` and `wellsim-other-device-2026-09-03` — on other
+  devices.
 
   **A tooling trap worth knowing, because it produced a false alarm on 8 Sep:**
   an agent's sandboxed shell refuses to see or read files whose names look
@@ -395,13 +429,14 @@ private; neither belongs in a repository. They **are** in the F: backup.
 
   See **docs/architecture/infrastructure-audit-2026-09-02.md** for why.
 
-  **The consequence to respect: this host accepts no passwords — from this
-  workstation it is reachable only with the private key
-  `~/.ssh/wellsim_hetzner`.** Lose it and recovery is through the
-  Hetzner console, not SSH. A passphrase-protected copy is kept on the F:
-  backup drive at **`F:\WellSim-Backup-2026-08-29\ssh-key\`** (the key is
-  `wellsim_hetzner` + `.pub`); the passphrase is in the password manager and
-  deliberately NOT on that drive.
+  **That key no longer exists on this workstation.** It and its F: backup were
+  deleted on 8 Sep 2026 with the rest of the server credentials — see the
+  Secrets entry above. The host still accepts no passwords, so **from here the
+  box is reachable only through the Hetzner web console.** The notes left in
+  `F:\WellSim-Backup-2026-08-29\ssh-key\` describe a key that is gone; they are
+  kept as history, not as a recovery path. Everything below this line is the
+  record of how that key was handled while it existed, and is retained because
+  the same traps apply to whatever key a future box uses.
 
   **Recovered once, on 31 Aug 2026** — a new Windows account had no `~/.ssh`
   at all and the `d:\*.txt` token files had been deleted. What that taught:

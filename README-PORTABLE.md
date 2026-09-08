@@ -456,11 +456,17 @@ password-protected at `F:\key\M-ElAshry-CodeSigning.pfx`.
 
 > **Builds 1.3 – 2.0 were signed by CN=ThePWF WellSim, O=ThePWF** (thumbprint
 > `EB639FB356A4603BE341FFC7D4569EC09CE3E58B`, valid to 2029).
-> **That certificate and its private key were deleted from the build machine on
-> 5 September 2026, and the private key was never exported.** It is gone
-> permanently: no further binary can ever be signed as ThePWF WellSim, and
-> 1.3 – 2.0 cannot be re-signed under their original publisher. Do not go
-> looking for it.
+> **The private key WAS exported, and this paragraph was wrong for three
+> days.** It said the key had been deleted on 5 September 2026 and "never
+> exported". In fact it had been exported to `ThePWF-CodeSigning-BACKUP.pfx`
+> on 27 August, and **four passphrase-protected copies survived** — one on D:
+> and three inside the 27 and 28 August backups on F:. They were found on
+> 8 September while clearing server credentials off the build machine and
+> **deleted the same day**, and a full sweep of both drives now finds no
+> ThePWF private key anywhere; the certificate is in no store on that machine
+> either. **So the claim is true from 8 September 2026, and was not before.**
+> No further binary can be signed as ThePWF WellSim, and 1.3 – 2.0 cannot be
+> re-signed under their original publisher.
 >
 > Those eight releases are unaffected. Their signatures are embedded and
 > timestamped, so they keep verifying and keep naming their signer. Only the
