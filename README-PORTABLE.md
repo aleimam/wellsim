@@ -4,6 +4,13 @@
 Identical physics to what wellsim.app served before it was retired; the source
 is guarded by 344 tests and the 43/43 validation sweep, both passing.
 
+> **NO BUILT COPY OF THIS PROGRAM EXISTS.** 2.6 was built on 9 September 2026
+> and deleted the same day at the owner's instruction — the release folders on
+> both drives, the build output in the project, and finally both zips inside
+> the backups. WellSim is source only. Everything below describes 2.6 as it
+> was and is the specification a rebuild reproduces; `npm install` then
+> `.\build.ps1` makes one, signed, in about a minute.
+>
 > **2.6 IS A REBUILD OF 2.5, NOT A NEW VERSION.** Nothing in `src/`,
 > `portable/`, `build.ps1` or the SEA config changed between commit `9025968`
 > (2.5) and `615c972` — the thirteen commits between them are the wellsim.app
