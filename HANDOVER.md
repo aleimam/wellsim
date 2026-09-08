@@ -28,6 +28,12 @@ What was done to `91.98.23.255`, in order, each step verified:
    Caddyfile names only thepwf.net and bldrz.net (both HTTP 200) and its log
    carries no warnings. **WellSim's data is off that machine.** The only
    copies now are the capture on D: and F: and the workstation's own `data/`.
+6. **The units went too**, also verified: `wellsim.service`,
+   `wellsim-backup.service`, `wellsim-backup.timer` and
+   `/usr/local/bin/wellsim-backup` are off the disk and systemd knows no
+   wellsim unit at all. Caddy stayed active through it and thepwf.net and
+   bldrz.net still answer 200, with no failed units on the box. All four
+   files are committed verbatim under `deploy/`, so nothing was lost.
 
 **The box lives on and still serves the other two sites**, which were never
 touched: thepwf.net and bldrz.net both verified HTTP 200 after the Caddy
@@ -42,12 +48,10 @@ Still outstanding:
   while that box serves only fixed site blocks, but the records should be
   removed at Cloudflare so nothing added there later answers to this name by
   accident. **Registrar and Cloudflare are the owner's to do.**
-- **Inert leftovers on the box**, disabled and pointing at a directory that no
-  longer exists: `/etc/systemd/system/wellsim.service`,
-  `wellsim-backup.service`, `wellsim-backup.timer` and
-  `/usr/local/bin/wellsim-backup`. All four are captured verbatim in
-  `deploy/`, so removing them loses nothing:
-  `systemctl disable wellsim wellsim-backup.timer; rm -f /etc/systemd/system/wellsim*.service /etc/systemd/system/wellsim*.timer /usr/local/bin/wellsim-backup; systemctl daemon-reload`
+- the `wellsim` service user (uid 996, `/usr/sbin/nologin`, home
+  `/opt/wellsim` which no longer exists) is all that is left of the app on
+  that box. It owns nothing and can log in nowhere; `userdel wellsim` closes
+  it whenever it suits, and is the last thing to do there.
 - when the new domain exists: `deploy/README-server-rebuild.md` has the whole
   rebuild order, and `deploy/Caddyfile.wellsim` is the site block to install.
   **Every published reference to wellsim.app then needs updating in one pass** —
