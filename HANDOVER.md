@@ -317,9 +317,16 @@ private; neither belongs in a repository. They **are** in the F: backup.
   this workstation either. Nothing can sign as `CN=ThePWF WellSim, O=ThePWF`
   again.
 
-  **This changes nothing about builds 1.3–2.0**: their signatures are embedded
-  and timestamped, and `ThePWF-CodeSigning.cer` — the PUBLIC half, needed to
-  verify them — still ships beside every release and must be kept.
+  **On 9 Sep the owner went further and had every loose `ThePWF-CodeSigning.cer`
+  deleted too** — 81 copies across D: and F:, the public half this file used to
+  say must be kept. Builds 1.3–2.0 still carry embedded, timestamped signatures
+  naming their signer, but a machine that does not already trust ThePWF can no
+  longer be handed the certificate to check them fully. One copy survives
+  **inside each 1.3–2.0 release zip**, since removing it there would have
+  invalidated each zip's published SHA-256 — extract it from there if it is
+  ever needed. Builds 2.1+ verify against `M-ElAshry-CodeSigning.cer`, which is
+  kept, and 2.5 was re-checked after the sweep: **Valid, signer
+  CN=M. El-Ashry**.
   README-PORTABLE.md records what that does and does not change. The lesson is
   the one the record already had backwards: **"destroyed" is a claim to verify,
   not to assert.**

@@ -468,16 +468,26 @@ password-protected at `F:\key\M-ElAshry-CodeSigning.pfx`.
 > No further binary can be signed as ThePWF WellSim, and 1.3 – 2.0 cannot be
 > re-signed under their original publisher.
 >
-> Those eight releases are unaffected. Their signatures are embedded and
-> timestamped, so they keep verifying and keep naming their signer. Only the
-> *public* certificate is needed to check them, and it is kept in
-> `ThePWF-CodeSigning.cer` — shipped in the 2.0 and 2.1 folders, inside the 2.1
-> zip, and in `F:\key`. **Do not delete that file**; it contains no secret and
-> it is the half that verification needs.
+> Those eight releases still carry embedded, timestamped signatures and still
+> name their signer. **But on 9 September 2026 the owner had every loose copy
+> of `ThePWF-CodeSigning.cer` deleted** — 81 of them across D: and F: — as
+> part of retiring the ThePWF identity along with the site. That file is the
+> *public* half, the one verification needs; it holds no secret and could not
+> sign anything.
+>
+> **What that means in practice:** a machine that does not already trust
+> ThePWF can no longer be handed the certificate to check builds 1.3 – 2.0
+> fully. Windows still shows the embedded signature, its signer name and its
+> timestamp. A copy does survive **inside each 1.3 – 2.0 release zip**,
+> because removing it there would have invalidated each zip's published
+> SHA-256 — extract it from one of those if it is ever needed again.
+> **Builds 2.1 and later are unaffected**: they verify against
+> `M-ElAshry-CodeSigning.cer`, which is kept.
 
 **Company machines** — to make the signature show as fully trusted, install the
-matching `.cer` (`M-ElAshry-CodeSigning.cer` for 2.1+, `ThePWF-CodeSigning.cer`
-for 1.3 – 2.0) on each machine: double-click →
+matching `.cer` (`M-ElAshry-CodeSigning.cer` for 2.1+; for 1.3 – 2.0 the ThePWF
+certificate must now be extracted from that release's own zip, see above) on
+each machine: double-click →
 *Install Certificate* → Local Machine → *Place all certificates in the
 following store* → **Trusted Root Certification Authorities** (and optionally
 also into **Trusted Publishers** to suppress publisher prompts). This is an

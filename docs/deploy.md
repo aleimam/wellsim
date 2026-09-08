@@ -66,8 +66,14 @@ directory, service, port, logs or case data.
 | Access log | `wellsim.access.log` | `bldrz.access.log` |
 | Stateful data | `/opt/wellsim/app/data` | `/opt/bldrz/app/data` |
 
-The checked-in service and Caddy definitions are
-`deploy/bldrz.service` and `deploy/bldrz.Caddyfile`. The legacy JSON account
+**Its checked-in service and Caddy definitions were removed from this repo on
+9 September 2026** (`deploy/bldrz.service`, `deploy/bldrz.Caddyfile`, the
+database backup and verification scripts, and the full three-site
+`deploy/Caddyfile`), at the owner's instruction, when WellSim stopped keeping
+other sites' server material. They live on the bldrz box itself; this repo now
+carries only WellSim's own units and `Caddyfile.wellsim`. Anything below that
+names a `deploy/…bldrz…` path refers to that machine's copy, not to a file
+here. The legacy JSON account
 store is explicitly disabled. PostgreSQL migrations `0001` through `0003` are
 applied to the separate `bldrz` comparison database. The web service now loads
 the application credential and verifies the database security boundary before
@@ -137,9 +143,9 @@ until the user identity comes from verified authentication.
 
 Unlike the older production revision, the comparison web server requires the
 `pg` runtime dependency. Every bldrz release must run `npm ci --omit=dev
---ignore-scripts` from the committed lockfile before restart. Test a staged
-release with `bash deploy/verify-bldrz-pool.sh <absolute-release-directory>`
-before replacing the live source. Preserve `/etc/bldrz/postgresql.env`,
+--ignore-scripts` from the committed lockfile before restart. Test a staged release with that box's own copy of
+`verify-bldrz-pool.sh` before replacing the live source — the script is no
+longer in this repo, see the note above. Preserve `/etc/bldrz/postgresql.env`,
 `data/`, and `data-backups/`; none belong in a source archive. Back up the
 current app source and systemd unit so code and unit can be rolled back
 together. Never apply this bldrz unit or credential to `wellsim.service`.

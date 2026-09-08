@@ -39,10 +39,17 @@ serves and fills its log with the failures.
 
 ## What is captured here, and where it belongs
 
+**Scope narrowed, 9 September 2026.** At the owner's instruction this
+directory now carries **only WellSim's own** server files. The bldrz service,
+its Caddy block, its database backup and verification scripts, and the full
+three-site `Caddyfile` were deleted from the repo — WellSim no longer keeps
+another site's infrastructure. Rows below that named them are struck from the
+table; the paragraphs describing the old box's three-site layout are kept as
+history, because they explain what `Caddyfile.wellsim` was trimmed *from*.
+
 | File | Goes to | Notes |
 |---|---|---|
 | `wellsim.service` | `/etc/systemd/system/` | **Read the containment note below before editing.** |
-| `Caddyfile` | *(record only)* | The **whole live file** from the old box — three sites, six names. Kept as evidence of what was there, not for installation. |
 | `Caddyfile.wellsim` | `/etc/caddy/Caddyfile` | **This is what the new box gets**: the two wellsim blocks, verbatim, with thepwf and bldrz removed. |
 | `wellsim-backup` | `/usr/local/bin/` (mode 755) | The plaintext nightly snapshot the timer actually runs. |
 | `wellsim-backup.service` | `/etc/systemd/system/` | oneshot, calls the script above. |
