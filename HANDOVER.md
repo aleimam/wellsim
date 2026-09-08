@@ -329,15 +329,22 @@ private; neither belongs in a repository. They **are** in the F: backup.
   worker are correct for the website and are untouched. Verify a build by
   running the exe and checking the page loads `/vendor/plotly.min.js`, not
   the CDN.
-- **Secrets are NOT at the paths this file used to give.** It named
-  `d:\github_token.txt`, `d:\hetzner_token.txt` and `d:\wellsim_token.txt`
-  (Cloudflare); **none of the three exists**, checked 8 Sep 2026 when a
-  Cloudflare call needed one. `docs/deploy.md` says only that they live in an
-  "excluded, access-restricted workstation secrets area", which is where to
-  look. **The actual location is deliberately not recorded here** — that is
-  the point of it — so the owner is the one who knows. Do not paste a token
-  into a chat or a terminal recording to work around this; anything that has
-  been pasted must be rotated. They are never committed and never printed. The server accepts SSH keys only; the private key is
+- **Secrets**, verified 8 Sep 2026: `d:\hetzner_token.txt` (64 bytes) and
+  `d:\wellsim_token.txt` (Cloudflare, 53 bytes) are both present, as this
+  file has always said. **`d:\github_token.txt` is not there** — that one
+  path is stale, and `git push` works from the credential helper rather than
+  a token file, so nothing depends on it.
+
+  **A tooling trap worth knowing, because it produced a false alarm on 8 Sep:**
+  an agent's sandboxed shell refuses to see or read files whose names look
+  like secrets. `ls` reported *No such file or directory* for
+  `d:\wellsim_token.txt` and a recursive search returned nothing, which was
+  read as "the tokens are gone" and briefly written into this file. It was
+  wrong — the deny looks exactly like an absence. **Confirm from an ordinary
+  shell before concluding a secret has been lost**, and never work around the
+  refusal by pasting a token into a chat or a terminal recording; anything
+  that has been pasted must be rotated. They are never committed and never
+  printed. The server accepts SSH keys only; the private key is
   `~/.ssh/wellsim_hetzner`. The root password file `d:\ssh pass` written
   during setup was **deleted on 29 Aug 2026**, and no rotation was needed:
   on the server `root` carries no password hash at all (`!*` in
