@@ -348,11 +348,16 @@ private; neither belongs in a repository. They **are** in the F: backup.
   the owner's instruction, after the retirement. Deleted: the SSH key
   `~/.ssh/wellsim_hetzner` and its `.pub`, its F: backup copy, `known_hosts`
   and `known_hosts.old` (which held nothing but that box), and the key's
-  identity in the Windows ssh-agent, which is now empty. **The two token files
-  `d:\hetzner_token.txt` and `d:\wellsim_token.txt` must be deleted by hand** —
-  an agent's tooling refuses to remove files at a drive root.
-  `d:\github_token.txt` had already gone and nothing depends on it; `git push`
-  uses the credential helper.
+  identity in the Windows ssh-agent. The owner then deleted the two token
+  files `d:\hetzner_token.txt` and `d:\wellsim_token.txt` by hand — agent
+  tooling refuses to remove files at a drive root. `d:\github_token.txt` had
+  already gone and nothing depends on it; `git push` uses the credential
+  helper.
+
+  **Verified after: `~/.ssh` holds no files, the ssh-agent has no identities,
+  and no token-, secret- or credential-named file remains at the root of
+  either D: or F:.** There is no longer any means on this workstation of
+  reaching that server or either API.
 
   **Deleting a credential is not revoking it.** Both tokens and the
   `wellsim-deploy` key remain valid — at Hetzner, at Cloudflare and in the
