@@ -111,6 +111,12 @@ export function sideGates({ nearGasCompression, naturalFlow, sourGasHigh }) {
  *   flows naturally    -> Sucker Rod
  *   high H2S / CO2     -> Sucker Rod (rod-string sour service)
  *                      -> PCP        (stator elastomer)
+ *   exclude jet pump   -> Jet Pump   (analyst's call, on efficiency)
+ *
+ * The last one is not a well condition at all: it is the analyst deciding the
+ * jet pump is not worth screening on this well. It rides here because the
+ * machinery is the same — an exclusion never happens without its reason
+ * travelling with it — and its reason says whose decision it was.
  *
  * The jet pump is deliberately NOT excluded on sour gas. In the published
  * screening tables it rates well on corrosion — no moving parts downhole, a
@@ -123,13 +129,15 @@ export function sideGates({ nearGasCompression, naturalFlow, sourGasHigh }) {
  *
  * Returns { METHOD: [reason, ...] } for the excluded methods only.
  */
-export function gateExclusions({ nearGasCompression, naturalFlow, sourGasHigh } = {}) {
+export function gateExclusions({ nearGasCompression, naturalFlow, sourGasHigh, excludeJetPump } = {}) {
   const out = {};
   const add = (m, reason) => { (out[m] ??= []).push(reason); };
   if (nearGasCompression === false)
     add('GL', 'No gas compression nearby — gas lift has no source of injection gas. Removable: tie in or install compression.');
   if (naturalFlow === true)
     add('SRP', 'The well still flows naturally — a rod pump belongs on a well that can no longer flow unaided.');
+  if (excludeJetPump === true)
+    add('JET', 'Excluded by the analyst, on efficiency. A jet pump lifts by momentum exchange between a high-velocity power-fluid jet and the produced fluid, and that mixing is irreversibly lossy: overall efficiency runs about 20-30 %, against 50-60 % for an ESP or a rod pump. The power fluid must therefore be pumped at high rate and pressure, which buys a surface plant — HP triplex pumps, power-fluid tankage and treating, an extra string or flowline — and the energy bill that goes with it; the throat also needs enough intake submergence to stay off its cavitation limit. Removable: nothing about the well — untick the box to screen it again.');
   if (sourGasHigh === true) {
     add('SRP', 'High H2S/CO2 — sour service attacks the rod string (sulphide stress cracking) and the stuffing box.');
     add('PCP', 'High H2S/CO2 — H2S and CO2 swell and harden the stator elastomer until it chunks; in sour service the stator is the PCP\'s shortest-lived part. Removable: an elastomer qualified for THIS gas composition.');

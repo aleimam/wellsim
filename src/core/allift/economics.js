@@ -1,6 +1,11 @@
 // Artificial-lift economic screen — UDC (Undiscounted Development Cost).
 //
-//   UDC ($/bbl of OIL) = capex / one-year cumulative OIL + opex
+//   UDC ($/bbl of OIL) = capex / cumulative OIL over the horizon + opex
+//
+// The horizon is the analyst's (1, 2, 3 or 4 years, owner decision 8 Sep
+// 2026); the workbook's own case is the 1-year one. The three snapshots sit
+// at Initial, half the horizon and the horizon, so the trapezoid below is the
+// same shape at every horizon and scales with it.
 //
 // The denominator is OIL, never gross liquid. The handler builds each
 // snapshot's rate as gross x (1 - W.C/100) before the trapezoid, so on the
@@ -25,10 +30,11 @@
 // Every UDC therefore carries a `cumSource` provenance tag so a pasted number
 // never renders with the same authority as a forecast-backed one.
 
-/** Workbook trapezoid over the year: half-year segments between the three
- *  OIL-rate snapshots, returning stb. Pass oil rates, not gross liquid — the
- *  name says stb because the answer is stock-tank barrels of oil.
- *  `days` defaults to 365. */
+/** Workbook trapezoid over the horizon: equal segments between the OIL-rate
+ *  snapshots (Initial / half-horizon / horizon), returning stb. Pass oil
+ *  rates, not gross liquid — the name says stb because the answer is
+ *  stock-tank barrels of oil. `days` is the horizon; it defaults to the
+ *  workbook's 365. */
 export function trapezoidCumStb(oilRatesStbD, days = 365) {
   const r = oilRatesStbD.filter((x) => Number.isFinite(x));
   if (r.length < 2) return null;
@@ -57,7 +63,7 @@ export function udcForMethod({ capexUsd, opexUsdPerBbl, cum }) {
  * dropped before costing are returned in `notCosted` rather than left silently
  * absent.
  *
- * The survivors share the SAME well cumulative (the one-year prod cum is the
+ * The survivors share the SAME well cumulative (the horizon prod cum is the
  * well's oil production, not method-specific), so UDC differences are capex
  * differences. The economical method is the cheapest survivor under the limit.
  *  inputs:

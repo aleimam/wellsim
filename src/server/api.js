@@ -2103,9 +2103,10 @@ export function skinGuidance() {
 }
 
 // Artificial-lift selection — screens 5 lift methods against the global
-// envelope bands across 3 life snapshots, then costs them on the one-year
-// cumulative oil from those snapshots (workbook: initial / +6mo / +1yr) to pick
-// the economical method. No physics here: Qgross reuses the composite Vogel.
+// envelope bands across 3 life snapshots, then costs them on the cumulative
+// oil from those snapshots over the analyst's horizon (1, 2, 3 or 4 years;
+// the workbook's case is initial / +6mo / +1yr) to pick the economical method.
+// No physics here: Qgross reuses the composite Vogel.
 function alliftSnapshotPoint(s) {
   const j = num(s.j);
   const prPsi = num(s.prPsi);
@@ -2151,14 +2152,21 @@ export function alliftSelect(f) {
 
   const screen = screenLifecycle(points, bands);
 
-  // one common one-year cum from the snapshots' oil rate (workbook trapezoid);
+  // the horizon is the analyst's: 1 (the workbook's), 2, 3 or 4 years. The
+  // snapshots sit at Initial / half-horizon / horizon, so one trapezoid shape
+  // serves every horizon and simply scales with it. Anything else falls back
+  // to the workbook's year rather than to a silent guess.
+  const hz = num(f.horizonYears);
+  const horizonYears = [1, 2, 3, 4].includes(hz) ? hz : 1;
+  const snapshotYears = [0, horizonYears / 2, horizonYears];
+  // one common horizon cum from the snapshots' oil rate (workbook trapezoid);
   // a per-method paste may override it
-  const oneYearCumStb = trapezoidCumStb(built.map((b) => b.oilRateStbD));
+  const cumStb = trapezoidCumStb(built.map((b) => b.oilRateStbD), 365 * horizonYears);
   const pasted = f.cumStbByMethod || {};
   const cumByMethod = {};
   for (const { key: m } of ALLIFT_METHODS) {
     if (Number.isFinite(num(pasted[m]))) cumByMethod[m] = { value: num(pasted[m]), source: 'analyst-input' };
-    else if (oneYearCumStb != null) cumByMethod[m] = { value: oneYearCumStb, source: 'prod-data' };
+    else if (cumStb != null) cumByMethod[m] = { value: cumStb, source: 'prod-data' };
     else cumByMethod[m] = { value: null, source: 'missing' };
   }
 
@@ -2181,7 +2189,7 @@ export function alliftSelect(f) {
 
   return {
     limits: { version: limits.version, provenance: limits.provenance, overrides, bands },
-    snapshots: built.map((b, i) => ({ index: i, qGrossStbD: b.qGrossStbD, oilRateStbD: b.oilRateStbD, ...b.point })),
+    snapshots: built.map((b, i) => ({ index: i, atYears: snapshotYears[i] ?? null, qGrossStbD: b.qGrossStbD, oilRateStbD: b.oilRateStbD, ...b.point })),
     screen,
     // the envelope result is screen.technicallyApplicable; these two say what
     // the well's own conditions did to it
@@ -2189,21 +2197,23 @@ export function alliftSelect(f) {
     applicable,
     economics: econ,
     cumBasis: {
-      source: oneYearCumStb != null ? 'prod-data' : 'none',
-      horizon: 'oneYear',
+      source: cumStb != null ? 'prod-data' : 'none',
+      horizonYears,
+      horizonDays: 365 * horizonYears,
+      snapshotYears,
       stream: 'oil', // NOT gross liquid: the rate is gross x (1 - W.C/100)
-      label: 'One-year cumulative oil, stb',
-      oneYearCumStb: oneYearCumStb ?? null,
-      note: 'trapezoid of the OIL rate (gross x (1 - W.C/100)) at Initial / +6 mo / +1 yr, stb',
+      label: `${horizonYears}-year cumulative oil, stb`,
+      cumStb: cumStb ?? null,
+      note: `trapezoid of the OIL rate (gross x (1 - W.C/100)) at Initial / +${horizonYears / 2} yr / +${horizonYears} yr, stb`,
     },
     gateNotes: sideGates(gates),
     recommendation: econ.cheapestApplicable,
     warnings: [
-      ...(oneYearCumStb == null ? ['One-year cumulative needs oil rate at 2+ snapshots.'] : []),
+      ...(cumStb == null ? ['The cumulative needs an oil rate at 2+ snapshots.'] : []),
       // name each exclusion, so a method never disappears without its reason
       ...Object.entries(gateOut)
         .filter(([m]) => screen.technicallyApplicable.includes(m))
-        .flatMap(([m, rs]) => rs.map((r) => `${m} clears its envelope but is ruled out by this well: ${r}`)),
+        .flatMap(([m, rs]) => rs.map((r) => `${m} clears its envelope but is ruled out: ${r}`)),
       ...(screen.technicallyApplicable.length === 0
         ? ['No method passes the envelope screen across the well life.']
         : applicable.length === 0

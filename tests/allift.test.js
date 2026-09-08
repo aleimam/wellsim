@@ -71,7 +71,7 @@ test('allift: the UDC denominator is cumulative OIL, not gross liquid', () => {
   // the ESP's UDC by 0.18 $/bbl, so the two are not interchangeable.
   const oil = trapezoidCumStb(r.snapshots.map((s) => s.oilRateStbD));
   const gross = trapezoidCumStb(r.snapshots.map((s) => s.qGrossStbD));
-  near(r.cumBasis.oneYearCumStb, oil, 1e-9, 'cum is the oil trapezoid');
+  near(r.cumBasis.cumStb, oil, 1e-9, 'cum is the oil trapezoid');
   assert.ok(oil < gross * 0.9, `oil cum ${oil} should sit below gross ${gross}`);
   near(500000 / oil - 500000 / gross, 0.1845, 0.001, 'what costing on gross would hide');
   // and the UDC that quotes it is $/bbl of oil
@@ -80,7 +80,7 @@ test('allift: the UDC denominator is cumulative OIL, not gross liquid', () => {
 
 test('allift: one-year cum and UDC tie to the workbook; Gas Lift is the pick', () => {
   const r = run();
-  near(r.cumBasis.oneYearCumStb, 369580.75, 1, 'one-year cum'); // trapezoid of 2195.2 / 840 / 175
+  near(r.cumBasis.cumStb, 369580.75, 1, 'one-year cum'); // trapezoid of 2195.2 / 840 / 175
   near(r.economics.byMethod.ESP.udcUsdPerBbl, 4.353, 0.01, 'ESP UDC');
   near(r.economics.byMethod.GL.udcUsdPerBbl, 3.406, 0.01, 'GL UDC');
   near(r.economics.byMethod.JET.udcUsdPerBbl, 3.79, 0.01, 'JET UDC');
@@ -188,7 +188,7 @@ test('allift: the core screen is reachable directly and agrees with the handler'
   const s = screenLifecycle(points);
   assert.deepEqual(s.technicallyApplicable, r.screen.technicallyApplicable);
   const cum = trapezoidCumStb(r.snapshots.map((x) => x.oilRateStbD));
-  near(cum, r.cumBasis.oneYearCumStb, 1e-6, 'cum via the core');
+  near(cum, r.cumBasis.cumStb, 1e-6, 'cum via the core');
   const econ = economicScreen({
     methods: ['ESP', 'GL', 'SRP', 'JET', 'PCP'],
     applicable: s.technicallyApplicable,
@@ -198,4 +198,98 @@ test('allift: the core screen is reachable directly and agrees with the handler'
     cumByMethod: Object.fromEntries(['ESP', 'GL', 'SRP', 'JET', 'PCP'].map((m) => [m, { value: cum, source: 'prod-data' }])),
   });
   assert.equal(econ.cheapestApplicable, 'GL');
+});
+
+// ---- owner changes of 8 Sep 2026: the deviation floor and the analyst's
+// jet-pump exclusion ----
+
+test('bands v1.2: a vertical, straight well is INSIDE every geometry band, not outside it', () => {
+  // The workbook's 0.1 floor on BOTH deviation and dog-leg knocked all five
+  // methods out at 0, which is the opposite of the truth: a vertical hole with
+  // no dog-leg is the easiest case any of them will ever see. Both floors are
+  // 0 from v1.2 — a method is limited by how MUCH a hole bends, never by how
+  // little.
+  const r = run({ snapshots: SNAPS.map((s) => ({ ...s, devDeg: 0, dogLegDeg: 0 })) });
+  for (const m of ['ESP', 'GL', 'SRP', 'JET', 'PCP']) {
+    for (const k of ['devDeg', 'dogLegDeg']) {
+      assert.ok(!r.screen.byMethod[m].failedParams.includes(k), `${m} must not fail on ${k} at 0`);
+      assert.equal(r.screen.byMethod[m].paramAgg[k], 'pass', `${m} ${k} cell`);
+      assert.equal(r.limits.bands[m][k][0], 0, `${m} ${k} band is stamped with the fix`);
+    }
+  }
+  // with the geometry no longer knocking anything out, the survivors are the
+  // ones their OTHER bands allow: SRP and PCP are still out on depth
+  assert.deepEqual(r.screen.technicallyApplicable, ['ESP', 'GL', 'JET']);
+  assert.ok(r.screen.byMethod.SRP.failedParams.includes('depthFt'));
+  assert.ok(r.screen.byMethod.PCP.failedParams.includes('depthFt'));
+  // and the run still stamps a version, so an old screen stays reproducible
+  assert.ok(r.limits.version, 'the bands version travels with the result');
+});
+
+test('bands v1.2: the demo well is unchanged by both floor moves', () => {
+  // the fix must not quietly re-score a well that never sat near the floors
+  const r = run();
+  assert.deepEqual(r.screen.technicallyApplicable, ['ESP', 'GL', 'JET']);
+  assert.equal(r.recommendation, 'GL');
+});
+
+test('gate: "exclude jet pump" is the analyst\'s call, and carries its reason', () => {
+  const base = { naturalFlow: false, nearGasCompression: true, sourGasHigh: false };
+  const unticked = run({ gates: base });
+  assert.ok(unticked.applicable.includes('JET'), 'unticked, the jet pump screens normally');
+  assert.deepEqual(unticked.gateExclusions, {});
+
+  const r = run({ gates: { ...base, excludeJetPump: true } });
+  assert.ok(r.gateExclusions.JET, 'ticked, the jet pump is excluded');
+  assert.equal(r.gateExclusions.JET.length, 1, 'one reason, not a pile');
+  assert.match(r.gateExclusions.JET[0], /Excluded by the analyst/, 'it says whose decision it was');
+  assert.match(r.gateExclusions.JET[0], /efficiency/i);
+  assert.match(r.gateExclusions.JET[0], /20-30 %/, 'and gives the number behind it');
+  assert.ok(!r.applicable.includes('JET'), 'it cannot be costed');
+  assert.ok(r.economics.notCosted.includes('JET'), 'and it is named as dropped, not dropped silently');
+  assert.ok(r.warnings.some((w) => /^JET clears its envelope but is ruled out/.test(w)), 'the reason reaches the user');
+  // nothing else moves: the other four are screened exactly as before
+  assert.deepEqual(r.applicable, ['ESP', 'GL']);
+  assert.equal(r.recommendation, 'GL');
+});
+
+test('gate: with gas lift out too, the pick falls PAST the excluded jet pump', () => {
+  // the gas-compression test shows the pick falling to the jet pump; with the
+  // analyst's exclusion on top it must fall further, not stop there
+  const r = run({ gates: { naturalFlow: false, nearGasCompression: false, sourGasHigh: false, excludeJetPump: true } });
+  assert.ok(!r.applicable.includes('GL'), 'no compression');
+  assert.ok(!r.applicable.includes('JET'), 'excluded by the analyst');
+  assert.equal(r.recommendation, 'ESP');
+  assert.equal(Object.keys(r.gateExclusions).sort().join(','), 'GL,JET');
+});
+
+// ---- the economic horizon (owner decision, 8 Sep 2026) ----
+
+test('horizon: the workbook year is the default, and 2/3/4 years scale the trapezoid with them', () => {
+  const one = run();
+  assert.equal(one.cumBasis.horizonYears, 1, 'no horizon sent = the workbook year');
+  assert.equal(one.cumBasis.horizonDays, 365);
+  assert.deepEqual(one.cumBasis.snapshotYears, [0, 0.5, 1]);
+  assert.deepEqual(one.snapshots.map((s) => s.atYears), [0, 0.5, 1]);
+  assert.match(one.cumBasis.label, /^1-year cumulative oil/);
+  for (const h of [2, 3, 4]) {
+    const r = run({ horizonYears: h });
+    assert.equal(r.cumBasis.horizonYears, h);
+    assert.deepEqual(r.cumBasis.snapshotYears, [0, h / 2, h], `snapshots sit at 0, half and ${h}`);
+    // the same three rates spread over h years integrate to h times the year
+    near(r.cumBasis.cumStb, h * one.cumBasis.cumStb, 1e-6, `${h}-year cum`);
+    // and the UDC follows: capex spread over more barrels, opex unchanged
+    for (const m of r.applicable) {
+      const e1 = one.economics.byMethod[m], eh = r.economics.byMethod[m];
+      near(eh.udcUsdPerBbl - 3, (e1.udcUsdPerBbl - 3) / h, 1e-9, `${m} UDC at ${h} yr`);
+    }
+  }
+});
+
+test('horizon: anything outside 1-4 falls back to the workbook year, never to a silent guess', () => {
+  for (const bad of [0, 5, -1, 'x', null, 1.5]) {
+    const r = run({ horizonYears: bad });
+    assert.equal(r.cumBasis.horizonYears, 1, `horizon ${bad}`);
+    near(r.cumBasis.cumStb, 369580.75, 1, 'the workbook cum');
+  }
 });

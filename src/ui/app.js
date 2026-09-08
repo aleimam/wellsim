@@ -4070,7 +4070,8 @@ document.getElementById('water-btn-matchhead').onclick = guard(() => liquidMatch
 document.getElementById('water-btn-sens').onclick = guard(waterSens);
 /* ===== Artificial-lift selection (Oil tab · "Lift selection" module) =====
  * Screens the 5 lift methods against the global envelope bands across 3 life
- * snapshots and costs them on the one-year cum from those snapshots. Compute is
+ * snapshots (Initial / half-horizon / horizon) and costs them on the cum over
+ * the analyst's horizon, 1-4 years, chosen in the table header. Compute is
  * server-side (api 'allift/select'); this only builds the form and renders. */
 const ALLIFT_M = [
   { k: 'ESP', label: 'ESP', engine: true, c: '#0f6e8c' },
@@ -4083,28 +4084,47 @@ const ALLIFT_P = [
   { k: 'qGrossStbD', label: 'Gross rate', u: 'stb/d' }, { k: 'depthFt', label: 'Depth', u: 'ft' },
   { k: 'glr', label: 'GLR', u: 'scf/stb' }, { k: 'whpPsi', label: 'WHP', u: 'psi' },
   { k: 'wcPct', label: 'Water cut', u: '%' }, { k: 'gorScfStb', label: 'GOR', u: 'scf/stb' },
-  { k: 'devDeg', label: 'Deviation', u: 'deg' }, { k: 'dogLegDeg', label: 'Dog-leg', u: 'deg/100ft' },
+  { k: 'devDeg', label: 'Max well deviation', u: 'deg' }, { k: 'dogLegDeg', label: 'Dog-leg', u: 'deg/100ft' },
 ];
 const ALLIFT_L = [
   { level: 1, title: 'Depth + Gross Rate', x: 'qGrossStbD', y: 'depthFt', xt: 'log', yt: 'linear', xd: [10, 10000], yd: [500, 4500] },
   { level: 2, title: 'WHP + GLR', x: 'glr', y: 'whpPsi', xt: 'log', yt: 'log', xd: [1, 2000], yd: [10, 5000] },
   { level: 3, title: 'Water-Cut + GOR', x: 'wcPct', y: 'gorScfStb', xt: 'linear', yt: 'log', xd: [0, 100], yd: [100, 200000] },
-  { level: 4, title: 'Deviation + Dog-Leg', x: 'devDeg', y: 'dogLegDeg', xt: 'linear', yt: 'linear', xd: [0, 80], yd: [0, 16] },
+  { level: 4, title: 'Max deviation + Dog-Leg', x: 'devDeg', y: 'dogLegDeg', xt: 'linear', yt: 'linear', xd: [0, 80], yd: [0, 16] },
 ];
 const ALLIFT_ED = [
   ['pwfPsi', 'Pwf', 'psi'], ['prPsi', 'Res. P', 'psi'], ['pbPsi', 'Bubble P', 'psi'], ['j', 'PI (J)', ''],
   // GLR is NOT here: it is calculated from GOR and W.C (see alliftGlr) and
   // shown as a computed row, exactly like Qgross
   ['depthFt', 'Depth', 'ft'], ['whpPsi', 'WHP', 'psi'], ['wcPct', 'Water cut', '%'],
-  ['gorScfStb', 'GOR', 'scf/stb'], ['devDeg', 'Deviation', 'deg'], ['dogLegDeg', 'Dog-leg', '°/100ft'],
+  ['gorScfStb', 'GOR', 'scf/stb'], ['devDeg', 'Max well deviation', 'deg'], ['dogLegDeg', 'Dog-leg', '°/100ft'],
 ];
+// Properties of the FLUID and the WELLBORE, not of time: the bubble point, the
+// maximum deviation and the dog-leg do not migrate over a well's life the way
+// rate, water cut and GLR do. They are typed once, in the Initial column, and
+// the +6 mo / +1 yr columns carry that value (shown greyed, and sent to the
+// handler for every snapshot so the screen sees the same constant throughout).
+const ALLIFT_STATIC = new Set(['pbPsi', 'devDeg', 'dogLegDeg']);
+/** The live value of parameter k at snapshot i — a static parameter always
+ *  reads the Initial column, wherever it is asked for. */
+function alliftVal(k, i) {
+  const el = document.getElementById('al-' + k + '-' + (ALLIFT_STATIC.has(k) ? 0 : i));
+  const v = parseFloat(el?.value);
+  return Number.isFinite(v) ? v : undefined;
+}
+
 const ALLIFT_CAP = { ESP: 500000, GL: 150000, SRP: 300000, JET: 292000, PCP: 400000 };
 const ALLIFT_DEFAULT = [
   { pwfPsi: 2000, prPsi: 5200, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 2, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
   { pwfPsi: 2000, prPsi: 3500, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 20, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
   { pwfPsi: 2000, prPsi: 2500, pbPsi: 2000, j: 0.7, depthFt: 3200, whpPsi: 250, wcPct: 50, gorScfStb: 400, devDeg: 1, dogLegDeg: 7 },
 ];
-const ALLIFT_LABELS = ['Initial', '+6 mo', '+1 yr'];
+// The horizon is the analyst's (1, 2, 3 or 4 years; the workbook's is 1). The
+// middle snapshot always sits at half of it, so its label follows the select.
+const ALLIFT_HORIZONS = [1, 2, 3, 4];
+const alliftMidLabel = (h) => (h === 1 ? '+6 mo' : `+${h / 2} yr`);
+const alliftHorizon = () => { const v = parseFloat(document.getElementById('al-horizon')?.value); return ALLIFT_HORIZONS.includes(v) ? v : 1; };
+const ALLIFT_LABELS = ['Initial', '+6 mo', '+1 yr']; // column COUNT; the two later labels are live
 const labelAllift = (k) => (ALLIFT_M.find((m) => m.k === k) || {}).label || k;
 
 // GLR from the GOR and the water cut — gas per barrel of TOTAL liquid, where
@@ -4122,25 +4142,39 @@ function alliftEnsureForm() {
   const host = document.getElementById('oil-allift-fields');
   if (!host) return;
   let h = '<table class="sens" style="width:100%"><thead><tr><th style="text-align:left">Parameter</th>' +
-    ALLIFT_LABELS.map((l) => `<th>${l}</th>`).join('') + '</tr></thead><tbody>';
+    '<th>Initial</th>' +
+    `<th id="al-mid-label">${alliftMidLabel(1)}</th>` +
+    `<th><select id="al-horizon" title="Economic horizon: the last snapshot sits here, the middle one at half of it">${ALLIFT_HORIZONS.map((y) => `<option value="${y}"${y === 1 ? ' selected' : ''}>+${y} yr</option>`).join('')}</select></th>` +
+    '</tr></thead><tbody>';
   h += '<tr><td style="text-align:left;color:#0f6e8c">Qgross (Vogel) stb/d</td>' +
     ALLIFT_DEFAULT.map((_, i) => `<td id="al-q-${i}" style="text-align:right;color:#0f6e8c;font-weight:600">&mdash;</td>`).join('') + '</tr>';
   h += '<tr><td style="text-align:left;color:#0f6e8c">GLR <span class="note" style="margin:0">= GOR &times; (1 &minus; W.C) scf/stb</span></td>' +
     ALLIFT_DEFAULT.map((_, i) => `<td id="al-glr-${i}" style="text-align:right;color:#0f6e8c;font-weight:600">&mdash;</td>`).join('') + '</tr>';
   for (const [k, label, u] of ALLIFT_ED) {
+    const stat = ALLIFT_STATIC.has(k);
     h += `<tr><td style="text-align:left">${label}${u ? ` <span class="note" style="margin:0">${u}</span>` : ''}</td>` +
-      ALLIFT_DEFAULT.map((s, i) => `<td><input id="al-${k}-${i}" type="number" step="any" value="${s[k]}" style="width:5.5em;text-align:right"></td>`).join('') + '</tr>';
+      ALLIFT_DEFAULT.map((s, i) =>
+        stat && i > 0
+          ? `<td id="al-${k}-${i}-m" style="text-align:right;color:#8a97a2">${s[k]}</td>`
+          : `<td><input id="al-${k}-${i}" type="number" step="any" value="${s[k]}" style="width:5.5em;text-align:right"></td>`,
+      ).join('') + '</tr>';
   }
   h += '</tbody></table>';
+  h += '<div class="note" style="margin:2px 0 0">Bubble P, max well deviation and dog-leg belong to the fluid and the wellbore, not to time: type them once under <b>Initial</b> and the later columns carry that value.</div>';
   h += '<div class="senshead">Estimated cost per method, $ (capex + hookup)</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:6px">';
   for (const m of ALLIFT_M) h += `<label style="display:flex;justify-content:space-between;gap:6px;align-items:center"><span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${m.c};margin-right:5px"></span>${m.label}</span><input id="al-cap-${m.k}" type="number" step="any" value="${ALLIFT_CAP[m.k]}" style="width:6.5em;text-align:right"></label>`;
   h += '</div>';
   h += '<div class="frow" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:8px"><label>Opex, $/bbl <input id="al-opex" type="number" step="any" value="3" style="width:5em;text-align:right"></label><label>UDC limit, $/bbl <input id="al-limit" type="number" step="any" value="11" style="width:5em;text-align:right"></label></div>';
-  h += '<div class="senshead">Other conditions</div><div style="display:flex;flex-wrap:wrap;gap:14px"><label class="radio"><input type="checkbox" id="al-natural" checked> Flows naturally</label><label class="radio"><input type="checkbox" id="al-gascomp" checked> Near gas compression</label><label class="radio"><input type="checkbox" id="al-sour"> High H2S/CO2</label></div>';
+  h += '<div class="senshead">Other conditions</div><div style="display:flex;flex-wrap:wrap;gap:14px"><label class="radio"><input type="checkbox" id="al-natural" checked> Flows naturally</label><label class="radio"><input type="checkbox" id="al-gascomp" checked> Near gas compression</label><label class="radio"><input type="checkbox" id="al-sour"> High H2S/CO2</label><label class="radio"><input type="checkbox" id="al-exjet"> Exclude jet pump</label></div>';
   host.innerHTML = h;
   const upd = () => {
     for (let i = 0; i < ALLIFT_DEFAULT.length; i++) {
-      const g = (id) => parseFloat(document.getElementById('al-' + id + '-' + i)?.value);
+      const g = (id) => alliftVal(id, i);
+      // the mirrored cells follow the Initial input as it is typed
+      if (i > 0) for (const k of ALLIFT_STATIC) {
+        const cell = document.getElementById('al-' + k + '-' + i + '-m');
+        if (cell) { const v = alliftVal(k, 0); cell.textContent = v == null ? '—' : v; }
+      }
       const q = alliftVogel(g('pwfPsi'), g('j'), g('prPsi'), g('pbPsi'));
       const c = document.getElementById('al-q-' + i);
       if (c) c.textContent = Number.isFinite(q) ? Math.round(q).toLocaleString() : '—';
@@ -4150,6 +4184,13 @@ function alliftEnsureForm() {
     }
   };
   host.querySelectorAll('input[type="number"]').forEach((inp) => inp.addEventListener('input', upd));
+  // the horizon moves the middle column's label with it and re-screens at
+  // once: the cum, every UDC and the pick all depend on it
+  document.getElementById('al-horizon')?.addEventListener('change', () => {
+    const lbl = document.getElementById('al-mid-label');
+    if (lbl) lbl.textContent = alliftMidLabel(alliftHorizon());
+    alliftRun().catch(() => {});
+  });
   upd();
   alliftBuilt = true;
   alliftRun().catch(() => {});
@@ -4157,14 +4198,16 @@ function alliftEnsureForm() {
 
 function alliftReadForm() {
   const n = (id) => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) ? v : undefined; };
-  const snapshots = ALLIFT_DEFAULT.map((_, i) => { const o = {}; for (const [k] of ALLIFT_ED) o[k] = n('al-' + k + '-' + i); return o; });
+  const snapshots = ALLIFT_DEFAULT.map((_, i) => { const o = {}; for (const [k] of ALLIFT_ED) o[k] = alliftVal(k, i); return o; });
   const capexUsd = {}; for (const m of ALLIFT_M) capexUsd[m.k] = n('al-cap-' + m.k);
   return {
     snapshots, capexUsd, opexUsdPerBbl: n('al-opex'), udcLimitUsdPerBbl: n('al-limit'),
+    horizonYears: alliftHorizon(),
     gates: {
       naturalFlow: document.getElementById('al-natural')?.checked,
       nearGasCompression: document.getElementById('al-gascomp')?.checked,
       sourGasHigh: document.getElementById('al-sour')?.checked,
+      excludeJetPump: document.getElementById('al-exjet')?.checked,
     },
   };
 }
@@ -4172,7 +4215,7 @@ function alliftReadForm() {
 async function alliftRun() {
   const r = await api('allift/select', alliftReadForm());
   document.getElementById('oil-allift-result').textContent = r.recommendation
-    ? `Economical method: ${labelAllift(r.recommendation)} — UDC ${fmt(r.economics.byMethod[r.recommendation].udcUsdPerBbl, 2)} $/bbl oil (one-year cum oil ${fmt(r.cumBasis.oneYearCumStb, 0)} stb).`
+    ? `Economical method: ${labelAllift(r.recommendation)} — UDC ${fmt(r.economics.byMethod[r.recommendation].udcUsdPerBbl, 2)} $/bbl oil (${r.cumBasis.horizonYears}-year cum oil ${fmt(r.cumBasis.cumStb, 0)} stb).`
     : 'No method passes both the technical and economic screens.';
   alliftRenderInto(document.getElementById('oil-allift-output'), r);
   applyOilRows();
@@ -4238,12 +4281,13 @@ function alliftRenderInto(el, r) {
   const exRows = Object.entries(gateOut).flatMap(([m, rs]) => rs.map((t) => ({ m, t })));
   const exBlock = exRows.length
     ? `<div style="margin-top:8px;border-left:3px solid #b07d16;padding:6px 10px;background:#f7edd8">` +
-      `<div class="senshead" style="margin:0 0 4px">Ruled out by this well's conditions</div>` +
+      `<div class="senshead" style="margin:0 0 4px">Ruled out before costing &mdash; well conditions and analyst exclusions</div>` +
       exRows.map((x) => `<div class="note" style="margin:2px 0"><b>${labelAllift(x.m)}</b> — ${x.t}</div>`).join('') +
       `</div>`
     : '';
-  const cum = r.cumBasis.oneYearCumStb;
-  let udc = `<div class="note" style="margin:0 0 6px">One-year cum OIL = ${num0(cum)} stb — trapezoid of the oil rate (gross &times; (1 &minus; W.C)) at Initial/+6mo/+1yr, one well cum shared by every method · opex ${fmt(r.economics.opexUsdPerBbl, 0)} $/bbl · UDC limit ${fmt(r.economics.udcLimitUsdPerBbl, 0)} $/bbl</div>`;
+  const cum = r.cumBasis.cumStb;
+  const hzY = r.cumBasis.horizonYears ?? 1;
+  let udc = `<div class="note" style="margin:0 0 6px">${hzY}-year cum OIL = ${num0(cum)} stb — trapezoid of the oil rate (gross &times; (1 &minus; W.C)) at Initial / ${alliftMidLabel(hzY)} / +${hzY} yr, one well cum shared by every method · opex ${fmt(r.economics.opexUsdPerBbl, 0)} $/bbl · UDC limit ${fmt(r.economics.udcLimitUsdPerBbl, 0)} $/bbl</div>`;
   // only technically-accepted methods are costed, so there is no "applicable"
   // column any more — everything in this table already cleared the screen
   udc += '<table class="sens" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Method</th><th>Capex $</th><th>Cum oil, stb</th><th>UDC $/bbl oil</th><th>&le; limit</th><th>Rank</th></tr></thead><tbody>';
@@ -4277,7 +4321,7 @@ function alliftRenderInto(el, r) {
   el.innerHTML =
     `<div class="senshead">Technically applicable across well life</div><div>${pills}</div>` +
     `<div style="overflow-x:auto">${mtx}</div>` + exBlock +
-    `<div class="senshead" style="margin-top:10px">Economic screen — UDC on the one-year cumulative OIL</div><div style="overflow-x:auto">${udc}</div>` +
+    `<div class="senshead" style="margin-top:10px">Economic screen — UDC on the ${hzY}-year cumulative OIL</div><div style="overflow-x:auto">${udc}</div>` +
     (notes ? `<div style="margin-top:8px">${notes}</div>` : '') +
     `<div class="senshead" style="margin-top:10px">Envelope charts — well design line vs method envelopes</div>` +
     `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px">${charts}</div>`;

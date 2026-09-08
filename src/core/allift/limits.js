@@ -12,11 +12,13 @@
 // overrides live on the case revision, not here. See economics.js / the
 // handler for how the version + any overrides are stamped onto the result.
 
-export const LIMITS_VERSION = '1.0.0';
+export const LIMITS_VERSION = '1.2.0';
 
 export const LIMITS_PROVENANCE =
-  'Default screening bands v1 — from Artificial Lift Method Selection_v07.xlsx ' +
-  '(BAPETCO, 2020), onshore Western-Desert assumptions. Advisory, not physical limits.';
+  'Default screening bands v1.2 — from Artificial Lift Method Selection_v07.xlsx ' +
+  '(BAPETCO, 2020), onshore Western-Desert assumptions, with the deviation AND ' +
+  'dog-leg floors lowered from 0.1 to 0 (owner decision, 8 Sep 2026). ' +
+  'Advisory, not physical limits.';
 
 // The eight screened parameters, in canonical units, grouped by the four
 // selection "levels" (which is only how the workbook lays them out on its four
@@ -28,7 +30,7 @@ export const PARAMS = [
   { key: 'whpPsi', label: 'WHP', unit: 'psi', level: 2 },
   { key: 'wcPct', label: 'Water cut', unit: '%', level: 3 },
   { key: 'gorScfStb', label: 'GOR', unit: 'scf/stb', level: 3 },
-  { key: 'devDeg', label: 'Deviation', unit: 'deg', level: 4 },
+  { key: 'devDeg', label: 'Max well deviation', unit: 'deg', level: 4 },
   { key: 'dogLegDeg', label: 'Dog-leg', unit: 'deg/100ft', level: 4 },
 ];
 
@@ -36,7 +38,7 @@ export const LEVELS = [
   { level: 1, title: 'Depth + Gross Rate', params: ['depthFt', 'qGrossStbD'] },
   { level: 2, title: 'WHP + GLR', params: ['whpPsi', 'glr'] },
   { level: 3, title: 'Water-Cut + GOR', params: ['wcPct', 'gorScfStb'] },
-  { level: 4, title: 'Deviation + Dog-Leg', params: ['devDeg', 'dogLegDeg'] },
+  { level: 4, title: 'Max deviation + Dog-Leg', params: ['devDeg', 'dogLegDeg'] },
 ];
 
 // Method identity. `engine` marks which methods WellSim can actually DESIGN
@@ -51,28 +53,37 @@ export const METHODS = [
 ];
 
 // min/max per method per parameter. Nulls would mean "unbounded" (none here).
-// Values are exactly the workbook's Min/Max columns; the workbook's third
-// "typical/preferred" column is intentionally omitted from v1 (see README).
+// Values are the workbook's Min/Max columns; the workbook's third
+// "typical/preferred" column is intentionally omitted (see README).
+//
+// ONE DEPARTURE from the sheet, v1.2 (owner decision, 8 Sep 2026): the
+// DEVIATION and DOG-LEG minima are 0, not the workbook's 0.1. A 0.1 floor put
+// a perfectly vertical, perfectly straight well OUTSIDE every method's
+// envelope and knocked all five out at once — the opposite of the truth, since
+// a vertical hole with no dog-leg is the easiest case any of them will ever
+// see. The floor was a spreadsheet artifact of plotting on a log-friendly
+// axis, not an engineering limit: a lift method is limited by how MUCH a hole
+// bends, never by how little.
 export const BANDS = {
   ESP: {
     qGrossStbD: [200, 8000], depthFt: [1000, 3700], glr: [1, 800], whpPsi: [15, 3000],
-    wcPct: [0, 99], gorScfStb: [1, 80000], devDeg: [0.1, 70], dogLegDeg: [0.1, 8],
+    wcPct: [0, 99], gorScfStb: [1, 80000], devDeg: [0, 70], dogLegDeg: [0, 8],
   },
   GL: {
     qGrossStbD: [50, 6500], depthFt: [1000, 3500], glr: [1, 1000], whpPsi: [15, 300],
-    wcPct: [0, 99], gorScfStb: [1, 100000], devDeg: [0.1, 50], dogLegDeg: [0.1, 15],
+    wcPct: [0, 99], gorScfStb: [1, 100000], devDeg: [0, 50], dogLegDeg: [0, 15],
   },
   SRP: {
     qGrossStbD: [25, 600], depthFt: [1000, 3100], glr: [1, 300], whpPsi: [15, 300],
-    wcPct: [0, 99], gorScfStb: [1, 30000], devDeg: [0.1, 10], dogLegDeg: [0.1, 3],
+    wcPct: [0, 99], gorScfStb: [1, 30000], devDeg: [0, 10], dogLegDeg: [0, 3],
   },
   JET: {
     qGrossStbD: [100, 4000], depthFt: [1000, 4000], glr: [1, 800], whpPsi: [15, 500],
-    wcPct: [0, 99], gorScfStb: [1, 80000], devDeg: [0.1, 40], dogLegDeg: [0.1, 15],
+    wcPct: [0, 99], gorScfStb: [1, 80000], devDeg: [0, 40], dogLegDeg: [0, 15],
   },
   PCP: {
     qGrossStbD: [10, 2000], depthFt: [1000, 2500], glr: [1, 400], whpPsi: [15, 500],
-    wcPct: [0, 98.5], gorScfStb: [1, 26666.67], devDeg: [0.1, 6], dogLegDeg: [0.1, 3],
+    wcPct: [0, 98.5], gorScfStb: [1, 26666.67], devDeg: [0, 6], dogLegDeg: [0, 3],
   },
 };
 
