@@ -1,10 +1,60 @@
 # WellSim — standalone portable program
 
-**Build 2.4 — 7 September 2026**, from commit `0f5b6c4` of the main project.
+**Build 2.5 — 8 September 2026**, from commit `9025968` of the main project.
 Identical physics to https://wellsim.app; the current source is guarded by 344
 tests, the 43/43 validation sweep and a 38/38 module smoke check, all passing
-there. Changes since build 2.3 (5 Sep) — seven website releases, all now in
-the portable:
+there. Changes since build 2.4 (7 Sep) — two website releases, both in the
+**Lift selection** module on the Oil tab:
+
+- **The depth band is METRES, and the row reads "To perf. Depth, m".** The
+  source workbook always meant metres — its Level-1 chart axis is titled
+  *"Depth, m"* and its demo well is 3200, the same ~3200 m well the oil model
+  carries at 2810 mAH — but the port had labelled those numbers **ft**. As
+  feet, a 3700 ft ESP ceiling would be 1128 m and every real well would screen
+  out. **No band number moved**: 1000–3700 for an ESP and so on are the
+  sheet's own, so a case that typed 3200 meaning depth scores exactly as it
+  did in 2.4. What changes is that a depth typed in FEET for that well —
+  10,500 — now correctly screens every method out instead of being read as a
+  10,500 m well. A case saved by an earlier build keeps its typed depth.
+- **The geometry floors are 0.** The workbook starts both the deviation and
+  the dog-leg bands at 0.1, which put a perfectly vertical, perfectly straight
+  well OUTSIDE all five envelopes at once — the opposite of the truth, since a
+  vertical hole with no dog-leg is the easiest case any method will ever see.
+  **This one does change an answer**: a well at 0° / 0°/100 ft used to lose
+  every method and now keeps the ones its other bands allow.
+- **An economic horizon of 1, 2, 3 or 4 years**, set in the table header. The
+  middle snapshot sits at half of it and its label follows. The cumulative is
+  the same trapezoid over the chosen span, so every UDC's capex term scales
+  with it while opex stays put; the default is the workbook's 1 year, so an
+  untouched case is unchanged. **The horizon stretches the three rates you
+  typed — it does not forecast them**: at 4 years it spreads the same Initial /
+  middle / final rates over four years rather than projecting a decline, so
+  type the rates you expect AT those dates.
+- **Exclude jet pump**, a fourth tick-box beside the well conditions. It is
+  the analyst's own call, not a well condition, and it says so: a jet pump
+  lifts by momentum exchange between a high-velocity power-fluid jet and the
+  produced fluid, and that mixing is irreversibly lossy — about 20–30 %
+  overall against 50–60 % for an ESP or a rod pump — so the power fluid must
+  be pumped at high rate and pressure, buying a surface plant (HP triplex
+  pumps, power-fluid tankage and treating, an extra string or flowline) and
+  the energy bill with it, while the throat needs intake submergence to stay
+  off its cavitation limit.
+- **Life-constant inputs and clearer names.** The bubble point, the to-perf.
+  depth, the max well deviation and the max dog-leg belong to the fluid and
+  the wellbore rather than to time, so they are typed once under **Initial**
+  and the later columns carry that value. "Deviation" now reads **Max well
+  deviation** and "Dog-leg" reads **Max dog-leg**.
+
+**The screening bands are versioned and stamped on every run** — this build
+ships **v1.3.0**, against v1.0.0 in 2.4 — so a screen done with an older build
+still reproduces from its own stamp. **Nothing outside Lift selection moved**:
+no commit since `0a9abcf` touches the marches, the PVT or the IPR, so the well
+model, reserve and forecast give byte-identical answers to 2.4.
+
+The packaged manual is current with all of it, including the note that the
+horizon stretches rather than forecasts.
+
+Changes in build 2.4 (7 Sep), kept for reference:
 
 - **Save as asks where.** It was always local, but it only prompted for a
   name and the browser filed the case in its downloads folder. On Chromium
