@@ -21,19 +21,33 @@ What was done to `91.98.23.255`, in order, each step verified:
 3. `systemctl disable --now wellsim.service wellsim-backup.timer` —
    both inactive and disabled, port 3355 free on the box.
 4. `/opt/wellsim` → `/opt/wellsim.retired-2026-09-08` and
-   `/var/backups/wellsim` → `/var/backups/wellsim.retired-2026-09-08`.
-   **Moved, not deleted** — still recoverable on the box.
+   `/var/backups/wellsim` → `/var/backups/wellsim.retired-2026-09-08` —
+   moved rather than deleted, so the irreversible step stayed the owner's.
+5. **The owner then took that step, and it is verified:** `/opt/wellsim*` and
+   `/var/backups/wellsim*` are gone from the box, port 3355 is free, the
+   Caddyfile names only thepwf.net and bldrz.net (both HTTP 200) and its log
+   carries no warnings. **WellSim's data is off that machine.** The only
+   copies now are the capture on D: and F: and the workstation's own `data/`.
 
 **The box lives on and still serves the other two sites**, which were never
 touched: thepwf.net and bldrz.net both verified HTTP 200 after the Caddy
 reload, their `www` names 301 as before. bldrz keeps its own PostgreSQL
 database and runtime user.
 
-Still outstanding, and the owner's to do:
+Still outstanding:
 
-- the permanent delete on the box —
-  `rm -rf /opt/wellsim.retired-2026-09-08 /var/backups/wellsim.retired-2026-09-08`
-- the registrar and Cloudflare records for `wellsim.app`
+- **DNS still points at the old box.** `wellsim.app` and `www.wellsim.app`
+  both resolve to `91.98.23.255`, which no longer claims either name — the
+  names simply fail to answer (no Caddy block, so no certificate). Harmless
+  while that box serves only fixed site blocks, but the records should be
+  removed at Cloudflare so nothing added there later answers to this name by
+  accident. **Registrar and Cloudflare are the owner's to do.**
+- **Inert leftovers on the box**, disabled and pointing at a directory that no
+  longer exists: `/etc/systemd/system/wellsim.service`,
+  `wellsim-backup.service`, `wellsim-backup.timer` and
+  `/usr/local/bin/wellsim-backup`. All four are captured verbatim in
+  `deploy/`, so removing them loses nothing:
+  `systemctl disable wellsim wellsim-backup.timer; rm -f /etc/systemd/system/wellsim*.service /etc/systemd/system/wellsim*.timer /usr/local/bin/wellsim-backup; systemctl daemon-reload`
 - when the new domain exists: `deploy/README-server-rebuild.md` has the whole
   rebuild order, and `deploy/Caddyfile.wellsim` is the site block to install.
   **Every published reference to wellsim.app then needs updating in one pass** —
