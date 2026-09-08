@@ -34,6 +34,14 @@ What was done to `91.98.23.255`, in order, each step verified:
    wellsim unit at all. Caddy stayed active through it and thepwf.net and
    bldrz.net still answer 200, with no failed units on the box. All four
    files are committed verbatim under `deploy/`, so nothing was lost.
+7. **The DNS records are deleted**, 8 September. The `wellsim.app` zone at
+   Cloudflare held exactly two records — `A wellsim.app` and
+   `A www.wellsim.app`, both → `91.98.23.255`, unproxied — and no MX, TXT or
+   verification record of any kind, so removing them broke no mail and no
+   domain ownership proof. **The zone is now empty (0 records).** Both names
+   return no address; `www` returns NXDOMAIN outright. thepwf.net and
+   bldrz.net answered 200 throughout. The name now fails to resolve rather
+   than resolving to a machine that ignores it.
 
 **The box lives on and still serves the other two sites**, which were never
 touched: thepwf.net and bldrz.net both verified HTTP 200 after the Caddy
@@ -42,22 +50,14 @@ database and runtime user.
 
 Still outstanding:
 
-- **DNS stays as it is — a decision, not an oversight (owner, 8 Sep 2026).**
-  `wellsim.app` and `www.wellsim.app` still resolve to `91.98.23.255` through
-  Cloudflare, and that is deliberate. **Do not "fix" it.** The end state is
-  already the intended one, verified 8 Sep: HTTPS fails outright — no Caddy
-  block claims the name, so no certificate is ever requested — while
-  thepwf.net and bldrz.net on the same IP answer 200 from the same machine.
-  The 308 on port 80 is Caddy's blanket HTTP→HTTPS redirect, returned
-  identically for `Host: nosuchname.invalid`; it is the listener, not a
-  WellSim site. **The name resolves and serves nothing.**
-
-  What leaving the records in place does cost: they must be revisited before
-  anything with a catch-all or on-demand TLS is ever added to that Caddy,
-  since such a block would answer to a name WellSim no longer means to serve.
-  Deleting the two A records turns the dead connection into a clean NXDOMAIN
-  and removes that condition. **The registrar and Cloudflare remain the
-  owner's alone** — no token for either is on this workstation.
+- **the `wellsim.app` registration itself.** The zone still exists at
+  Cloudflare — empty, 0 records — and the domain is still registered in the
+  owner's name. Nothing depends on either, and keeping them costs only the
+  renewal: it holds the name against anyone else registering it, and an empty
+  zone serves nothing. **Letting it lapse is a one-way door** — the name
+  becomes available to the world, and the brochure and meeting invite in
+  ALdocs still print it. Whichever way, it is the owner's call at the
+  registrar, and there is no hurry.
 - the `wellsim` service user (uid 996, `/usr/sbin/nologin`, home
   `/opt/wellsim` which no longer exists) is all that is left of the app on
   that box. It owns nothing and can log in nowhere; `userdel wellsim` closes
